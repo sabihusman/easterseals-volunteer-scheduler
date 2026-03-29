@@ -38,7 +38,26 @@ export default function ShiftHistory() {
           .eq("invited_by", user.id)
           .order("created_at", { ascending: false }),
       ]);
-      setBookings((bookingData as any) || []);
+      const bookingsArr = (bookingData as any) || [];
+      // Fetch booked slots for all bookings to calculate hours
+      const bookingIds = bookingsArr.map((b: any) => b.id);
+      let slotMap: Record<string, number> = {};
+      if (bookingIds.length > 0) {
+        const { data: slotData } = await supabase
+          .from("shift_booking_slots")
+          .select("booking_id, shift_time_slots(slot_start, slot_end)")
+          .in("booking_id", bookingIds);
+        (slotData || []).forEach((s: any) => {
+          if (!s.shift_time_slots) return;
+          const [sh, sm] = s.shift_time_slots.slot_start.split(":").map(Number);
+          const [eh, em] = s.shift_time_slots.slot_end.split(":").map(Number);
+          const hours = (eh * 60 + em - sh * 60 - sm) / 60;
+          slotMap[s.booking_id] = (slotMap[s.booking_id] || 0) + hours;
+        });
+      }
+      // Attach slot hours to each booking
+      bookingsArr.forEach((b: any) => { b._slotHours = slotMap[b.id] || 0; });
+      setBookings(bookingsArr);
       setInvitations((inviteData as any) || []);
       setLoading(false);
     };
@@ -52,7 +71,8 @@ export default function ShiftHistory() {
     const map: Record<string, number> = {};
     pastBookings.filter(b => b.confirmation_status === "confirmed").forEach((b) => {
       const month = format(new Date(b.shifts.shift_date), "yyyy-MM");
-      const hours = b.shifts.time_type === "all_day" ? 8 : b.shifts.time_type === "morning" || b.shifts.time_type === "afternoon" ? 4 : 4;
+      // Use slot-based hours if available, fall back to estimate
+      const hours = b._slotHours > 0 ? b._slotHours : (b.shifts.time_type === "all_day" ? 8 : 4);
       map[month] = (map[month] || 0) + hours;
     });
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
