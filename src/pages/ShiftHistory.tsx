@@ -225,6 +225,37 @@ export default function ShiftHistory() {
           })}
         </div>
       )}
+
+      {/* Sent Invitations */}
+      {invitations.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <UserPlus className="h-5 w-5" /> Sent Invitations
+          </h3>
+          <div className="grid gap-2">
+            {invitations.map((inv) => (
+              <Card key={inv.id}>
+                <CardContent className="pt-3 pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <div className="font-medium text-sm">{inv.invite_name} ({inv.invite_email})</div>
+                      <div className="text-xs text-muted-foreground">
+                        {inv.shifts?.title} — {inv.shifts?.shift_date ? format(new Date(inv.shifts.shift_date), "MMM d, yyyy") : ""}
+                      </div>
+                    </div>
+                    <Badge
+                      variant={inv.status === "accepted" ? "default" : inv.status === "expired" ? "secondary" : "outline"}
+                      className="text-xs w-fit"
+                    >
+                      {inv.status}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
