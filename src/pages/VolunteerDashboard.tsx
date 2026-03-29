@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { downloadICS, googleCalendarUrl, timeLabel } from "@/lib/calendar-utils";
 import { InviteFriendModal } from "@/components/InviteFriendModal";
+import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
 
 export default function VolunteerDashboard() {
   const { user, profile } = useAuth();
@@ -153,6 +154,7 @@ export default function VolunteerDashboard() {
                           {booking.confirmation_status === "confirmed" && <Badge className="text-xs bg-success text-success-foreground">Confirmed</Badge>}
                           {booking.confirmation_status === "pending_confirmation" && <Badge variant="secondary" className="text-xs">Pending</Badge>}
                         </div>
+                        <BookedSlotsDisplay bookingId={booking.id} />
                       </div>
                       <div className="flex flex-col gap-2 sm:items-end">
                         {isToday && !alreadyCheckedIn && (

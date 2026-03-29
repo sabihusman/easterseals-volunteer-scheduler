@@ -5,12 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays, UserPlus } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
 import { InviteFriendModal } from "@/components/InviteFriendModal";
+import { SlotSelectionDialog } from "@/components/SlotSelectionDialog";
 
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
@@ -22,63 +23,39 @@ export default function BrowseShifts() {
   const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
+  const [slotDialogShift, setSlotDialogShift] = useState<any>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
-        supabase.from("departments").select("id, name").eq("is_active", true),
-        supabase
-          .from("shifts")
-          .select("*, departments(name)")
-          .gte("shift_date", new Date().toISOString().split("T")[0])
-          .in("status", ["open", "full"])
-          .order("shift_date", { ascending: true }),
-        user
-          ? supabase.from("shift_bookings").select("shift_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
-          : Promise.resolve({ data: [] }),
-        user
-          ? supabase.from("department_restrictions").select("department_id").eq("volunteer_id", user.id)
-          : Promise.resolve({ data: [] }),
-      ]);
-      const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: any) => r.department_id));
-      setDepartments((depts || []).filter((d: any) => !restrictedDeptIds.has(d.id)));
-      setShifts((shiftData || []).filter((s: any) => !restrictedDeptIds.has(s.department_id)));
-      setBookingIds(new Set((myBookings || []).map((b: any) => b.shift_id)));
-      setLoading(false);
-    };
+  const fetchData = async () => {
+    const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
+      supabase.from("departments").select("id, name").eq("is_active", true),
+      supabase
+        .from("shifts")
+        .select("*, departments(name)")
+        .gte("shift_date", new Date().toISOString().split("T")[0])
+        .in("status", ["open", "full"])
+        .order("shift_date", { ascending: true }),
+      user
+        ? supabase.from("shift_bookings").select("shift_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
+        : Promise.resolve({ data: [] }),
+      user
+        ? supabase.from("department_restrictions").select("department_id").eq("volunteer_id", user.id)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: any) => r.department_id));
+    setDepartments((depts || []).filter((d: any) => !restrictedDeptIds.has(d.id)));
+    setShifts((shiftData || []).filter((s: any) => !restrictedDeptIds.has(s.department_id)));
+    setBookingIds(new Set((myBookings || []).map((b: any) => b.shift_id)));
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchData(); }, [user]);
+
+  const handleBooked = () => {
     fetchData();
-  }, [user]);
-
-  const handleBook = async (shiftId: string, isFull: boolean) => {
-    if (!user || !profile) return;
-
-    // Check booking window
-    const shift = shifts.find((s) => s.id === shiftId);
-    if (shift) {
-      const daysAhead = Math.ceil((new Date(shift.shift_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      const maxDays = profile.extended_booking ? 21 : 14;
-      if (daysAhead > maxDays) {
-        toast({ title: "Booking window exceeded", description: `You can book up to ${maxDays} days in advance.`, variant: "destructive" });
-        return;
-      }
-    }
-
-    const { error } = await supabase.from("shift_bookings").insert({
-      shift_id: shiftId,
-      volunteer_id: user.id,
-      booking_status: isFull ? "waitlisted" : "confirmed",
-    });
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      setBookingIds((prev) => new Set(prev).add(shiftId));
-      toast({ title: isFull ? "Added to waitlist" : "Shift booked!" });
-    }
   };
 
   const filtered = selectedDept === "all" ? shifts : shifts.filter((s) => s.department_id === selectedDept);
 
-  // Calendar helpers
   const monthStart = startOfMonth(calMonth);
   const monthEnd = endOfMonth(calMonth);
   const calendarDays = eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(monthEnd) });
@@ -115,7 +92,7 @@ export default function BrowseShifts() {
               <Button
                 size="sm"
                 disabled={alreadyBooked || !profile?.booking_privileges}
-                onClick={() => handleBook(s.id, isFull)}
+                onClick={() => setSlotDialogShift(s)}
               >
                 {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
               </Button>
@@ -195,7 +172,7 @@ export default function BrowseShifts() {
                             isBooked ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"
                           }`}
                           title={`${s.title} - ${timeLabel(s)}`}
-                          onClick={() => handleBook(s.id, s.booked_slots >= s.total_slots)}
+                          onClick={() => !isBooked && setSlotDialogShift(s)}
                         >
                           {s.title}
                         </div>
@@ -210,6 +187,15 @@ export default function BrowseShifts() {
             })}
           </div>
         </div>
+      )}
+
+      {slotDialogShift && (
+        <SlotSelectionDialog
+          open={!!slotDialogShift}
+          onOpenChange={(open) => { if (!open) setSlotDialogShift(null); }}
+          shift={slotDialogShift}
+          onBooked={handleBooked}
+        />
       )}
     </div>
   );

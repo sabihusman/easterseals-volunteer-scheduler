@@ -14,6 +14,7 @@ import { Plus, Edit, Trash2, Calendar, Clock, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
+import { previewSlotCount } from "@/lib/slot-utils";
 
 export default function ManageShifts() {
   const { user } = useAuth();
@@ -168,15 +169,22 @@ export default function ManageShifts() {
                 </div>
               </div>
               {timeType === "custom" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
-                    <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                  </div>
+                  {startTime && endTime && previewSlotCount(startTime, endTime) > 0 && (
+                    <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                      ⏱ This shift will be divided into {previewSlotCount(startTime, endTime)} × 2-hour slot{previewSlotCount(startTime, endTime) !== 1 ? "s" : ""} for volunteer booking
+                    </p>
+                  )}
                 </div>
               )}
               <div className="space-y-2">

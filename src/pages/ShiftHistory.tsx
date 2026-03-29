@@ -11,7 +11,7 @@ import { Calendar, Clock, FileText, Upload, Download, Award, UserPlus } from "lu
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
-import { Badge as BadgeUI } from "@/components/ui/badge";
+import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
 
 export default function ShiftHistory() {
   const { user, profile } = useAuth();
@@ -191,6 +191,7 @@ export default function ShiftHistory() {
                         <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
                         {statusBadge(b.confirmation_status)}
                       </div>
+                      <BookedSlotsDisplay bookingId={b.id} />
                     </div>
                     <div className="flex gap-2">
                       <Dialog>
