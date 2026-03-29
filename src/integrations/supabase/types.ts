@@ -375,6 +375,42 @@ export type Database = {
           },
         ]
       }
+      shift_booking_slots: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          slot_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          slot_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          slot_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_booking_slots_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "shift_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_booking_slots_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "shift_time_slots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_bookings: {
         Row: {
           booking_status: Database["public"]["Enums"]["booking_status"]
@@ -543,6 +579,44 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "shift_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_time_slots: {
+        Row: {
+          booked_slots: number
+          created_at: string
+          id: string
+          shift_id: string
+          slot_end: string
+          slot_start: string
+          total_slots: number
+        }
+        Insert: {
+          booked_slots?: number
+          created_at?: string
+          id?: string
+          shift_id: string
+          slot_end: string
+          slot_start: string
+          total_slots?: number
+        }
+        Update: {
+          booked_slots?: number
+          created_at?: string
+          id?: string
+          shift_id?: string
+          slot_end?: string
+          slot_start?: string
+          total_slots?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_time_slots_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]
