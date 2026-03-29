@@ -15,11 +15,11 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
 
-  const volunteerItems = [
+  const volunteerItems = role === "volunteer" ? [
     { title: "My Shifts", url: "/dashboard", icon: Home },
-    ...(role === "volunteer" ? [{ title: "Browse Shifts", url: "/shifts", icon: Calendar }] : []),
+    { title: "Browse Shifts", url: "/shifts", icon: Calendar },
     { title: "My History", url: "/history", icon: ClipboardList },
-  ];
+  ] : [];
 
   const coordinatorItems = [
     { title: "Department Shifts", url: "/coordinator", icon: Building2 },

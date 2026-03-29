@@ -5,14 +5,18 @@ import { Home, Calendar, ClipboardList, Building2, Shield } from "lucide-react";
 export function MobileNav() {
   const { role } = useAuth();
 
-  const items = [
-    { title: "Shifts", url: "/dashboard", icon: Home },
-    ...(role === "volunteer" ? [{ title: "Browse", url: "/shifts", icon: Calendar }] : []),
-    { title: "History", url: "/history", icon: ClipboardList },
-  ];
+  const items: { title: string; url: string; icon: any }[] = [];
 
+  if (role === "volunteer") {
+    items.push(
+      { title: "Shifts", url: "/dashboard", icon: Home },
+      { title: "Browse", url: "/shifts", icon: Calendar },
+      { title: "History", url: "/history", icon: ClipboardList },
+    );
+  }
   if (role === "coordinator" || role === "admin") {
     items.push({ title: "Dept", url: "/coordinator", icon: Building2 });
+    items.push({ title: "Manage", url: "/coordinator/manage", icon: Calendar });
   }
   if (role === "admin") {
     items.push({ title: "Admin", url: "/admin", icon: Shield });
