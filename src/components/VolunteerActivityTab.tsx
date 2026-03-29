@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Users } from "lucide-react";
 import { format } from "date-fns";
 import { timeLabel } from "@/lib/calendar-utils";
+import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
 
 interface Props {
   departmentIds: string[];
@@ -53,10 +54,13 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
           <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{b.shifts?.shift_date ? format(new Date(b.shifts.shift_date), "MMM d, yyyy") : ""}</span>
         </div>
       </div>
-      <div className="flex gap-2 items-center">
-        <Badge variant="outline" className="text-xs">{b.booking_status}</Badge>
-        {statusBadge(b.confirmation_status)}
-        {b.checked_in_at && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
+      <div className="space-y-1">
+        <div className="flex gap-2 items-center">
+          <Badge variant="outline" className="text-xs">{b.booking_status}</Badge>
+          {statusBadge(b.confirmation_status)}
+          {b.checked_in_at && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
+        </div>
+        <BookedSlotsDisplay bookingId={b.id} compact />
       </div>
     </div>
   );
