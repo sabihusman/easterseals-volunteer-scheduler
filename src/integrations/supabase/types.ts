@@ -89,6 +89,55 @@ export type Database = {
           },
         ]
       }
+      department_restrictions: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          reason: string | null
+          restricted_by: string
+          volunteer_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          reason?: string | null
+          restricted_by: string
+          volunteer_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          reason?: string | null
+          restricted_by?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_restrictions_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_restrictions_restricted_by_fkey"
+            columns: ["restricted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_restrictions_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           allows_groups: boolean
