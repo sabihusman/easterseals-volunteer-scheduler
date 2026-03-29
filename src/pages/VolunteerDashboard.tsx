@@ -4,48 +4,29 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Shield, Users } from "lucide-react";
-import { format } from "date-fns";
+import { Calendar, Clock, MapPin, Shield, Award } from "lucide-react";
+import { format, differenceInHours } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-
-type ShiftWithDept = {
-  id: string;
-  title: string;
-  shift_date: string;
-  time_type: string;
-  start_time: string | null;
-  end_time: string | null;
-  total_slots: number;
-  booked_slots: number;
-  requires_bg_check: boolean;
-  status: string;
-  allows_group: boolean;
-  department_id: string;
-  departments?: { name: string; location_id: string } | null;
-};
-
-type Booking = {
-  id: string;
-  booking_status: string;
-  confirmation_status: string;
-  shifts: ShiftWithDept | null;
-};
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { downloadICS, googleCalendarUrl, timeLabel } from "@/lib/calendar-utils";
 
 export default function VolunteerDashboard() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [upcomingBookings, setUpcomingBookings] = useState<Booking[]>([]);
+  const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     if (!user) return;
     const fetchBookings = async () => {
       const { data } = await supabase
         .from("shift_bookings")
-        .select("id, booking_status, confirmation_status, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+        .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
         .eq("volunteer_id", user.id)
         .eq("booking_status", "confirmed")
-        .gte("shifts.shift_date", new Date().toISOString().split("T")[0])
+        .gte("shifts.shift_date", today)
         .order("created_at", { ascending: true });
       setUpcomingBookings((data as any) || []);
       setLoading(false);
@@ -53,22 +34,36 @@ export default function VolunteerDashboard() {
     fetchBookings();
   }, [user]);
 
-  const handleCancel = async (bookingId: string) => {
+  const handleCancel = async (bookingId: string, shiftDate: string) => {
+    const hoursUntil = differenceInHours(new Date(shiftDate), new Date());
+    const isLateCancel = hoursUntil < 48;
+
     const { error } = await supabase
       .from("shift_bookings")
-      .update({ booking_status: "cancelled" })
+      .update({ booking_status: "cancelled", cancelled_at: new Date().toISOString() })
       .eq("id", bookingId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setUpcomingBookings((prev) => prev.filter((b) => b.id !== bookingId));
-      toast({ title: "Shift cancelled" });
+      toast({
+        title: "Shift cancelled",
+        description: isLateCancel ? "Late cancellation (within 48 hours) may affect your consistency score." : "Cancelled successfully.",
+      });
     }
   };
 
-  const timeLabel = (s: ShiftWithDept) => {
-    if (s.time_type === "custom" && s.start_time && s.end_time) return `${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}`;
-    return s.time_type.charAt(0).toUpperCase() + s.time_type.slice(1);
+  const handleCheckIn = async (bookingId: string) => {
+    const { error } = await supabase
+      .from("shift_bookings")
+      .update({ checked_in_at: new Date().toISOString() })
+      .eq("id", bookingId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setUpcomingBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, checked_in_at: new Date().toISOString() } : b));
+      toast({ title: "Checked in!" });
+    }
   };
 
   if (!profile?.is_active) {
@@ -84,12 +79,17 @@ export default function VolunteerDashboard() {
     );
   }
 
+  const milestoneBadges = [10, 25, 50, 100];
+  const hours = profile?.total_hours ?? 0;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Welcome back, {profile?.full_name?.split(" ")[0]}</h2>
         <p className="text-muted-foreground">Here are your upcoming shifts</p>
       </div>
+
+      <OnboardingChecklist />
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
@@ -100,14 +100,22 @@ export default function VolunteerDashboard() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{profile?.total_hours ?? 0}</div>
+            <div className="text-2xl font-bold">{hours}</div>
             <p className="text-sm text-muted-foreground">Total Hours</p>
+            <div className="flex gap-1 mt-2">
+              {milestoneBadges.map((m) => (
+                <Badge key={m} variant={hours >= m ? "default" : "secondary"} className="text-[10px]">
+                  {hours >= m && <Award className="h-2.5 w-2.5 mr-0.5" />}{m}h
+                </Badge>
+              ))}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{profile?.consistency_score ?? 0}%</div>
             <p className="text-sm text-muted-foreground">Consistency Score</p>
+            <p className="text-xs text-muted-foreground mt-1">Based on last 5 shifts</p>
           </CardContent>
         </Card>
       </div>
@@ -126,6 +134,8 @@ export default function VolunteerDashboard() {
           <div className="grid gap-3">
             {upcomingBookings.filter(b => b.shifts).map((booking) => {
               const s = booking.shifts!;
+              const isToday = s.shift_date === today;
+              const alreadyCheckedIn = !!booking.checked_in_at;
               return (
                 <Card key={booking.id}>
                   <CardContent className="pt-4 pb-4">
@@ -134,8 +144,8 @@ export default function VolunteerDashboard() {
                         <div className="font-medium">{s.title}</div>
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date), "MMM d, yyyy")}</span>
-                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s as any)}</span>
-                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{(s as any).departments?.name}</span>
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
+                          <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{s.departments?.name}</span>
                         </div>
                         <div className="flex gap-2">
                           {s.requires_bg_check && <Badge variant="outline" className="text-xs"><Shield className="h-3 w-3 mr-1" />BG Check</Badge>}
@@ -143,7 +153,23 @@ export default function VolunteerDashboard() {
                           {booking.confirmation_status === "pending_confirmation" && <Badge variant="secondary" className="text-xs">Pending</Badge>}
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => handleCancel(booking.id)}>Cancel</Button>
+                      <div className="flex flex-col gap-2 sm:items-end">
+                        {isToday && !alreadyCheckedIn && (
+                          <Button size="sm" onClick={() => handleCheckIn(booking.id)}>Check In</Button>
+                        )}
+                        {alreadyCheckedIn && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => downloadICS(s)} aria-label="Download iCal">
+                            📅 iCal
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-xs h-7" asChild>
+                            <a href={googleCalendarUrl(s)} target="_blank" rel="noopener noreferrer" aria-label="Add to Google Calendar">
+                              📆 Google
+                            </a>
+                          </Button>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleCancel(booking.id, s.shift_date)}>Cancel</Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

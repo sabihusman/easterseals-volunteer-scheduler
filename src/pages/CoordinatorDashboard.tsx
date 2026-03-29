@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, Users, CheckCircle, XCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar, Clock, Users, CheckCircle, XCircle, AlertTriangle, Download, List, CalendarDays } from "lucide-react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
 
 export default function CoordinatorDashboard() {
   const { user } = useAuth();
@@ -17,6 +19,8 @@ export default function CoordinatorDashboard() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"list" | "calendar">("list");
+  const [calMonth, setCalMonth] = useState(new Date());
 
   useEffect(() => {
     if (!user) return;
@@ -47,7 +51,7 @@ export default function CoordinatorDashboard() {
       if (shiftIds.length > 0) {
         const { data: bookingData } = await supabase
           .from("shift_bookings")
-          .select("*, profiles(full_name, email)")
+          .select("*, profiles(full_name, email, phone, emergency_contact)")
           .in("shift_id", shiftIds)
           .eq("booking_status", "confirmed");
         setBookings(bookingData || []);
@@ -71,7 +75,30 @@ export default function CoordinatorDashboard() {
     }
   };
 
-  const deptName = departments.find(d => d.id === selectedDept)?.name || "";
+  const handleExportHours = () => {
+    const data = bookings
+      .filter((b) => b.confirmation_status === "confirmed")
+      .map((b) => {
+        const shift = shifts.find((s) => s.id === b.shift_id);
+        return {
+          Volunteer: b.profiles?.full_name || "",
+          Email: b.profiles?.email || "",
+          "Shift Date": shift?.shift_date || "",
+          Shift: shift?.title || "",
+          Time: shift ? timeLabel(shift) : "",
+        };
+      });
+    downloadCSV(data, `dept_hours_${format(new Date(), "yyyy-MM-dd")}.csv`);
+  };
+
+  // Coverage alerts
+  const upcomingShifts = shifts.filter((s) => s.shift_date >= new Date().toISOString().split("T")[0]);
+  const lowCoverage = upcomingShifts.filter((s) => s.booked_slots < Math.ceil(s.total_slots * 0.5));
+
+  // Calendar
+  const monthStart = startOfMonth(calMonth);
+  const monthEnd = endOfMonth(calMonth);
+  const calendarDays = eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(monthEnd) });
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -80,18 +107,74 @@ export default function CoordinatorDashboard() {
           <h2 className="text-2xl font-bold">Department Shifts</h2>
           <p className="text-muted-foreground">Manage shifts for your department</p>
         </div>
-        {departments.length > 1 && (
-          <Select value={selectedDept} onValueChange={setSelectedDept}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex gap-2">
+          {departments.length > 1 && (
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          <Button variant="outline" size="sm" onClick={handleExportHours}>
+            <Download className="h-4 w-4 mr-1" />Export
+          </Button>
+          <Tabs value={view} onValueChange={(v) => setView(v as "list" | "calendar")}>
+            <TabsList>
+              <TabsTrigger value="list"><List className="h-4 w-4" /></TabsTrigger>
+              <TabsTrigger value="calendar"><CalendarDays className="h-4 w-4" /></TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {/* Coverage alerts */}
+      {lowCoverage.length > 0 && (
+        <Card className="border-warning">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-2 text-warning font-medium text-sm mb-2">
+              <AlertTriangle className="h-4 w-4" /> Low Coverage Alerts
+            </div>
+            <div className="space-y-1">
+              {lowCoverage.slice(0, 5).map((s) => (
+                <div key={s.id} className="text-sm text-muted-foreground">
+                  {s.title} on {format(new Date(s.shift_date), "MMM d")} — {s.booked_slots}/{s.total_slots} filled
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {departments.length === 0 ? (
         <Card><CardContent className="pt-6 text-center text-muted-foreground">You're not assigned to any department.</CardContent></Card>
+      ) : view === "calendar" ? (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="outline" size="sm" onClick={() => setCalMonth(subMonths(calMonth, 1))}>← Prev</Button>
+            <h3 className="text-lg font-semibold">{format(calMonth, "MMMM yyyy")}</h3>
+            <Button variant="outline" size="sm" onClick={() => setCalMonth(addMonths(calMonth, 1))}>Next →</Button>
+          </div>
+          <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+              <div key={d} className="bg-muted p-2 text-center text-xs font-medium text-muted-foreground">{d}</div>
+            ))}
+            {calendarDays.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const dayShifts = shifts.filter((s) => s.shift_date === dateStr);
+              return (
+                <div key={day.toISOString()} className={`bg-card min-h-[80px] p-1.5 ${!isSameMonth(day, calMonth) ? "opacity-40" : ""} ${isSameDay(day, new Date()) ? "ring-2 ring-primary ring-inset" : ""}`}>
+                  <div className="text-xs font-medium mb-1">{format(day, "d")}</div>
+                  {dayShifts.slice(0, 3).map((s) => (
+                    <div key={s.id} className={`text-[10px] px-1 py-0.5 rounded truncate mb-0.5 ${s.booked_slots >= s.total_slots ? "bg-destructive/20 text-destructive" : "bg-primary/10 text-primary"}`}>
+                      {s.title} ({s.booked_slots}/{s.total_slots})
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       ) : (
         <div className="space-y-4">
           {shifts.map((s) => {
@@ -105,6 +188,7 @@ export default function CoordinatorDashboard() {
                   </div>
                   <div className="flex gap-3 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date), "MMM d, yyyy")}</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
                     <span className="flex items-center gap-1"><Users className="h-3 w-3" />{s.booked_slots}/{s.total_slots}</span>
                   </div>
                 </CardHeader>
@@ -116,6 +200,8 @@ export default function CoordinatorDashboard() {
                           <div>
                             <div className="text-sm font-medium">{b.profiles?.full_name}</div>
                             <div className="text-xs text-muted-foreground">{b.profiles?.email}</div>
+                            {b.profiles?.phone && <div className="text-xs text-muted-foreground">📞 {b.profiles.phone}</div>}
+                            {b.profiles?.emergency_contact && <div className="text-xs text-muted-foreground">🆘 {b.profiles.emergency_contact}</div>}
                           </div>
                           <div className="flex items-center gap-2">
                             {b.confirmation_status === "pending_confirmation" ? (
