@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, Users } from "lucide-react";
+import { Calendar, Users, Download } from "lucide-react";
 import { format } from "date-fns";
+import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
 
 export default function AdminDashboard() {
   const [shifts, setShifts] = useState<any[]>([]);
@@ -16,7 +18,7 @@ export default function AdminDashboard() {
     const fetch = async () => {
       const [{ data: depts }, { data: shiftData }, { count: volCount }] = await Promise.all([
         supabase.from("departments").select("id, name").eq("is_active", true),
-        supabase.from("shifts").select("*, departments(name)").order("shift_date", { ascending: false }).limit(50),
+        supabase.from("shifts").select("*, departments(name)").order("shift_date", { ascending: false }).limit(100),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "volunteer"),
       ]);
       setDepartments(depts || []);
@@ -32,9 +34,32 @@ export default function AdminDashboard() {
 
   const filtered = selectedDept === "all" ? shifts : shifts.filter((s) => s.department_id === selectedDept);
 
+  const handleExportAll = async () => {
+    const { data: allBookings } = await supabase
+      .from("shift_bookings")
+      .select("*, profiles(full_name, email), shifts(title, shift_date, time_type, start_time, end_time, departments(name))")
+      .eq("confirmation_status", "confirmed")
+      .limit(1000);
+    if (!allBookings) return;
+    const csvData = allBookings.map((b: any) => ({
+      Volunteer: b.profiles?.full_name || "",
+      Email: b.profiles?.email || "",
+      Shift: b.shifts?.title || "",
+      Date: b.shifts?.shift_date || "",
+      Department: b.shifts?.departments?.name || "",
+      Time: b.shifts ? timeLabel(b.shifts) : "",
+    }));
+    downloadCSV(csvData, `all_hours_${format(new Date(), "yyyy-MM-dd")}.csv`);
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <h2 className="text-2xl font-bold">Admin Dashboard</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Admin Dashboard</h2>
+        <Button variant="outline" size="sm" onClick={handleExportAll}>
+          <Download className="h-4 w-4 mr-1" />Export All Hours
+        </Button>
+      </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{stats.totalShifts}</div><p className="text-sm text-muted-foreground">Total Shifts</p></CardContent></Card>
@@ -67,7 +92,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="flex gap-2">
                   <Badge variant="secondary">{s.departments?.name}</Badge>
-                  <Badge variant={s.status === "open" ? "default" : "secondary"}>{s.status}</Badge>
+                  <Badge variant={s.status === "open" ? "default" : s.status === "cancelled" ? "destructive" : "secondary"}>{s.status}</Badge>
                 </div>
               </div>
             </CardContent>
