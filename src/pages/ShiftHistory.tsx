@@ -7,15 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Clock, FileText, Upload, Download, Award } from "lucide-react";
+import { Calendar, Clock, FileText, Upload, Download, Award, UserPlus } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
+import { Badge as BadgeUI } from "@/components/ui/badge";
 
 export default function ShiftHistory() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [bookings, setBookings] = useState<any[]>([]);
+  const [invitations, setInvitations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [noteContent, setNoteContent] = useState("");
   const [activeBooking, setActiveBooking] = useState<string | null>(null);
@@ -23,16 +25,24 @@ export default function ShiftHistory() {
 
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("shift_bookings")
-        .select("id, booking_status, confirmation_status, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
-        .eq("volunteer_id", user.id)
-        .order("created_at", { ascending: false });
-      setBookings((data as any) || []);
+    const fetchData = async () => {
+      const [{ data: bookingData }, { data: inviteData }] = await Promise.all([
+        supabase
+          .from("shift_bookings")
+          .select("id, booking_status, confirmation_status, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
+          .eq("volunteer_id", user.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("shift_invitations")
+          .select("id, invite_name, invite_email, status, created_at, shifts(title, shift_date)")
+          .eq("invited_by", user.id)
+          .order("created_at", { ascending: false }),
+      ]);
+      setBookings((bookingData as any) || []);
+      setInvitations((inviteData as any) || []);
       setLoading(false);
     };
-    fetch();
+    fetchData();
   }, [user]);
 
   const pastBookings = bookings.filter(b => b.shifts && b.shifts.shift_date < new Date().toISOString().split("T")[0]);
