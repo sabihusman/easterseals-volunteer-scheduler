@@ -402,6 +402,57 @@ export type Database = {
           },
         ]
       }
+      shift_invitations: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          invite_email: string
+          invite_name: string | null
+          invited_by: string
+          shift_id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_email: string
+          invite_name?: string | null
+          invited_by: string
+          shift_id: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_email?: string
+          invite_name?: string | null
+          invited_by?: string
+          shift_id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_invitations_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shift_notes: {
         Row: {
           author_id: string
