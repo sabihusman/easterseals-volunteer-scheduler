@@ -163,6 +163,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          link: string | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          link?: string | null
+          message?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bg_check_expires_at: string | null
@@ -181,6 +222,7 @@ export type Database = {
           onboarding_complete: boolean
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
+          tos_accepted_at: string | null
           total_hours: number
           updated_at: string
         }
@@ -201,6 +243,7 @@ export type Database = {
           onboarding_complete?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
         }
@@ -221,6 +264,7 @@ export type Database = {
           onboarding_complete?: boolean
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
         }
@@ -285,6 +329,8 @@ export type Database = {
       shift_bookings: {
         Row: {
           booking_status: Database["public"]["Enums"]["booking_status"]
+          cancelled_at: string | null
+          checked_in_at: string | null
           confirmation_status: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at: string | null
           confirmed_by: string | null
@@ -300,6 +346,8 @@ export type Database = {
         }
         Insert: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
+          cancelled_at?: string | null
+          checked_in_at?: string | null
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
           confirmed_by?: string | null
@@ -315,6 +363,8 @@ export type Database = {
         }
         Update: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
+          cancelled_at?: string | null
+          checked_in_at?: string | null
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
           confirmed_by?: string | null
