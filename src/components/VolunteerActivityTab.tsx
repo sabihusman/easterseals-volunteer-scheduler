@@ -19,7 +19,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
     const fetchActivity = async () => {
       const { data } = await supabase
         .from("shift_bookings")
-        .select("id, booking_status, confirmation_status, checked_in_at, created_at, profiles(full_name, email), shifts(title, shift_date, time_type, start_time, end_time, department_id)")
+        .select("id, booking_status, confirmation_status, checked_in_at, created_at, profiles!shift_bookings_volunteer_id_fkey(full_name, email), shifts!shift_bookings_shift_id_fkey(title, shift_date, time_type, start_time, end_time, department_id)")
         .in("booking_status", ["confirmed", "waitlisted"])
         .order("created_at", { ascending: false })
         .limit(200);

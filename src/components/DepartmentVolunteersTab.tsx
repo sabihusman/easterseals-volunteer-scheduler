@@ -30,7 +30,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     const [{ data: bookings }, { data: restrictions }] = await Promise.all([
       supabase
         .from("shift_bookings")
-        .select("volunteer_id, profiles(full_name), shifts(department_id)")
+        .select("volunteer_id, profiles!shift_bookings_volunteer_id_fkey(full_name), shifts!shift_bookings_shift_id_fkey(department_id)")
         .eq("booking_status", "confirmed"),
       supabase
         .from("department_restrictions")
