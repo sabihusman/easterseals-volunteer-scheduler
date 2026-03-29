@@ -4,11 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Shield, Award } from "lucide-react";
+import { Calendar, Clock, MapPin, Shield, Award, UserPlus } from "lucide-react";
 import { format, differenceInHours } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { downloadICS, googleCalendarUrl, timeLabel } from "@/lib/calendar-utils";
+import { InviteFriendModal } from "@/components/InviteFriendModal";
 
 export default function VolunteerDashboard() {
   const { user, profile } = useAuth();
@@ -158,7 +159,7 @@ export default function VolunteerDashboard() {
                           <Button size="sm" onClick={() => handleCheckIn(booking.id)}>Check In</Button>
                         )}
                         {alreadyCheckedIn && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-wrap">
                           <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => downloadICS(s)} aria-label="Download iCal">
                             📅 iCal
                           </Button>
@@ -167,6 +168,9 @@ export default function VolunteerDashboard() {
                               📆 Google
                             </a>
                           </Button>
+                          {!s.requires_bg_check && (
+                            <InviteFriendModal shiftId={s.id} shiftTitle={s.title} />
+                          )}
                         </div>
                         <Button variant="outline" size="sm" onClick={() => handleCancel(booking.id, s.shift_date)}>Cancel</Button>
                       </div>

@@ -48,7 +48,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route path="/dashboard" element={<ProtectedRoute><VolunteerDashboard /></ProtectedRoute>} />
-            <Route path="/shifts" element={<ProtectedRoute><BrowseShifts /></ProtectedRoute>} />
+            <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
 
             <Route path="/coordinator" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><CoordinatorDashboard /></ProtectedRoute>} />

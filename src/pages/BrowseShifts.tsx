@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays, UserPlus } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
+import { InviteFriendModal } from "@/components/InviteFriendModal";
 
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
@@ -103,13 +104,18 @@ export default function BrowseShifts() {
                 {s.requires_bg_check && <Badge variant="outline" className="text-xs"><Shield className="h-3 w-3 mr-1" />BG Check Required</Badge>}
               </div>
             </div>
-            <Button
-              size="sm"
-              disabled={alreadyBooked || !profile?.booking_privileges}
-              onClick={() => handleBook(s.id, isFull)}
-            >
-              {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
-            </Button>
+            <div className="flex gap-2 items-center">
+              {alreadyBooked && !s.requires_bg_check && (
+                <InviteFriendModal shiftId={s.id} shiftTitle={s.title} />
+              )}
+              <Button
+                size="sm"
+                disabled={alreadyBooked || !profile?.booking_privileges}
+                onClick={() => handleBook(s.id, isFull)}
+              >
+                {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
