@@ -38,7 +38,7 @@ export default function AdminUsers() {
     toast({ title: `Booking privileges ${!current ? "granted" : "revoked"}` });
   };
 
-  const handleBgCheck = async (id: string, status: string) => {
+  const handleBgCheck = async (id: string, status: "cleared" | "pending" | "failed" | "expired") => {
     const { error } = await supabase.from("profiles").update({
       bg_check_status: status,
       bg_check_updated_at: new Date().toISOString(),
