@@ -15,11 +15,11 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
 
-  const volunteerItems = [
+  const volunteerItems = role === "volunteer" ? [
     { title: "My Shifts", url: "/dashboard", icon: Home },
-    ...(role === "volunteer" ? [{ title: "Browse Shifts", url: "/shifts", icon: Calendar }] : []),
+    { title: "Browse Shifts", url: "/shifts", icon: Calendar },
     { title: "My History", url: "/history", icon: ClipboardList },
-  ];
+  ] : [];
 
   const coordinatorItems = [
     { title: "Department Shifts", url: "/coordinator", icon: Building2 },
@@ -38,25 +38,27 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {!collapsed && "Easterseals"}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {volunteerItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink to={item.url} end>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {volunteerItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>
+              {!collapsed && "Easterseals"}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {volunteerItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                      <NavLink to={item.url} end>
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {(role === "coordinator" || role === "admin") && (
           <SidebarGroup>

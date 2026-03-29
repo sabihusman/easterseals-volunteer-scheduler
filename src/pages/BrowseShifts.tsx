@@ -25,7 +25,7 @@ export default function BrowseShifts() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [{ data: depts }, { data: shiftData }, { data: myBookings }] = await Promise.all([
+      const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
         supabase.from("departments").select("id, name").eq("is_active", true),
         supabase
           .from("shifts")
@@ -36,9 +36,13 @@ export default function BrowseShifts() {
         user
           ? supabase.from("shift_bookings").select("shift_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
           : Promise.resolve({ data: [] }),
+        user
+          ? supabase.from("department_restrictions").select("department_id").eq("volunteer_id", user.id)
+          : Promise.resolve({ data: [] }),
       ]);
-      setDepartments(depts || []);
-      setShifts(shiftData || []);
+      const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: any) => r.department_id));
+      setDepartments((depts || []).filter((d: any) => !restrictedDeptIds.has(d.id)));
+      setShifts((shiftData || []).filter((s: any) => !restrictedDeptIds.has(s.department_id)));
       setBookingIds(new Set((myBookings || []).map((b: any) => b.shift_id)));
       setLoading(false);
     };

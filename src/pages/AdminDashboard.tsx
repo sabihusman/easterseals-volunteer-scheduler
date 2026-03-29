@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar, Users, Download } from "lucide-react";
 import { format } from "date-fns";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
+import { DepartmentCoordinatorManager } from "@/components/DepartmentCoordinatorManager";
 
 export default function AdminDashboard() {
   const [shifts, setShifts] = useState<any[]>([]);
@@ -99,6 +100,8 @@ export default function AdminDashboard() {
           </Card>
         ))}
       </div>
+
+      <DepartmentCoordinatorManager />
     </div>
   );
 }

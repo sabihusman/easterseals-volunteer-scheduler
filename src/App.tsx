@@ -24,7 +24,11 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
   const { user, role, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center text-muted-foreground">Loading...</div>;
   if (!user) return <Navigate to="/auth" replace />;
-  if (requiredRole && role && !requiredRole.includes(role)) return <Navigate to="/dashboard" replace />;
+  if (requiredRole && role && !requiredRole.includes(role)) {
+    if (role === "coordinator") return <Navigate to="/coordinator" replace />;
+    if (role === "admin") return <Navigate to="/admin" replace />;
+    return <Navigate to="/dashboard" replace />;
+  }
   return <AppLayout>{children}</AppLayout>;
 }
 
@@ -47,9 +51,9 @@ const App = () => (
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            <Route path="/dashboard" element={<ProtectedRoute><VolunteerDashboard /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>} />
             <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />
-            <Route path="/history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftHistory /></ProtectedRoute>} />
 
             <Route path="/coordinator" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><CoordinatorDashboard /></ProtectedRoute>} />
             <Route path="/coordinator/manage" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><ManageShifts /></ProtectedRoute>} />
