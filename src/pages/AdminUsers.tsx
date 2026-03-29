@@ -103,7 +103,7 @@ export default function AdminUsers() {
                   <Button size="sm" variant="outline" onClick={() => handleToggleBooking(p.id, p.booking_privileges)}>
                     {p.booking_privileges ? "Revoke Booking" : "Grant Booking"}
                   </Button>
-                  <Select onValueChange={(v) => handleBgCheck(p.id, v)}>
+                  <Select onValueChange={(v) => handleBgCheck(p.id, v as "cleared" | "pending" | "failed" | "expired")}>
                     <SelectTrigger className="h-8 w-[120px] text-xs"><SelectValue placeholder="BG Check" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cleared">Cleared</SelectItem>
