@@ -7,7 +7,7 @@ export function MobileNav() {
 
   const items = [
     { title: "Shifts", url: "/dashboard", icon: Home },
-    { title: "Browse", url: "/shifts", icon: Calendar },
+    ...(role === "volunteer" ? [{ title: "Browse", url: "/shifts", icon: Calendar }] : []),
     { title: "History", url: "/history", icon: ClipboardList },
   ];
 
