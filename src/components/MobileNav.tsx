@@ -23,7 +23,7 @@ export function MobileNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-card md:hidden" role="navigation" aria-label="Mobile navigation">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background md:hidden" role="navigation" aria-label="Mobile navigation">
       <div className="flex items-center justify-around py-2">
         {items.map((item) => (
           <NavLink
@@ -31,7 +31,7 @@ export function MobileNav() {
             to={item.url}
             end
             className="flex flex-col items-center gap-1 px-3 py-1 text-xs text-muted-foreground"
-            activeClassName="text-primary font-medium"
+            activeClassName="text-primary font-semibold"
           >
             <item.icon className="h-5 w-5" />
             <span>{item.title}</span>

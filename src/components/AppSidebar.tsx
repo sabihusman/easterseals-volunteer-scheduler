@@ -1,5 +1,4 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -41,14 +40,22 @@ export function AppSidebar() {
         {volunteerItems.length > 0 && (
           <SidebarGroup>
             <SidebarGroupLabel>
-              {!collapsed && "Easterseals"}
+              {!collapsed && <span className="uppercase-label">Volunteer</span>}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {volunteerItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} end>
+                      <NavLink
+                        to={item.url}
+                        end
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                          isActive(item.url)
+                            ? "border-l-[3px] border-l-primary bg-accent text-accent-foreground font-medium"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
@@ -62,13 +69,21 @@ export function AppSidebar() {
 
         {(role === "coordinator" || role === "admin") && (
           <SidebarGroup>
-            <SidebarGroupLabel>{!collapsed && "Coordinator"}</SidebarGroupLabel>
+            <SidebarGroupLabel>{!collapsed && <span className="uppercase-label">Coordinator</span>}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {coordinatorItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} end>
+                      <NavLink
+                        to={item.url}
+                        end
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                          isActive(item.url)
+                            ? "border-l-[3px] border-l-primary bg-accent text-accent-foreground font-medium"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
@@ -82,13 +97,21 @@ export function AppSidebar() {
 
         {role === "admin" && (
           <SidebarGroup>
-            <SidebarGroupLabel>{!collapsed && "Admin"}</SidebarGroupLabel>
+            <SidebarGroupLabel>{!collapsed && <span className="uppercase-label">Admin</span>}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {adminItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <NavLink to={item.url} end>
+                      <NavLink
+                        to={item.url}
+                        end
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                          isActive(item.url)
+                            ? "border-l-[3px] border-l-primary bg-accent text-accent-foreground font-medium"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                      >
                         <item.icon className="h-4 w-4" />
                         {!collapsed && <span>{item.title}</span>}
                       </NavLink>
@@ -102,13 +125,18 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className={`p-2 ${collapsed ? "text-center" : ""}`}>
+        <div className={`p-3 ${collapsed ? "text-center" : ""}`}>
           {!collapsed && (
-            <p className="text-xs text-sidebar-foreground/70 mb-2 truncate">
+            <p className="text-xs text-muted-foreground mb-2 truncate">
               {profile?.full_name}
             </p>
           )}
-          <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground" onClick={signOut}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={signOut}
+          >
             <LogOut className="h-4 w-4" />
             {!collapsed && <span className="ml-2">Sign Out</span>}
           </Button>
