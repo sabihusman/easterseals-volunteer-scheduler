@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, Users } from "lucide-react";
+import { Calendar, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatSlotRange, slotHours } from "@/lib/slot-utils";
@@ -44,18 +44,21 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
   useEffect(() => {
     if (!open) return;
     setSelected(new Set());
+    setSlots([]);
     setLoading(true);
     supabase
       .from("shift_time_slots")
       .select("id, slot_start, slot_end, total_slots, booked_slots")
       .eq("shift_id", shift.id)
       .order("slot_start", { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        console.log("Fetched time slots for shift", shift.id, ":", data, error);
         setSlots(data || []);
         setLoading(false);
       });
   }, [open, shift.id]);
 
+  const hasSlots = slots.length > 0;
   const availableSlots = slots.filter(s => s.booked_slots < s.total_slots);
   const allSelected = availableSlots.length > 0 && availableSlots.every(s => selected.has(s.id));
 
@@ -83,7 +86,9 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
     if (hasSlots && selected.size === 0) return;
 
     // Check booking window
-    const daysAhead = Math.ceil((new Date(shift.shift_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const shiftDate = new Date(shift.shift_date + "T00:00:00");
+    const now = new Date();
+    const daysAhead = Math.ceil((shiftDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const maxDays = profile.extended_booking ? 21 : 14;
     if (daysAhead > maxDays) {
       toast({ title: "Booking window exceeded", description: `You can book up to ${maxDays} days in advance.`, variant: "destructive" });
@@ -110,26 +115,26 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       return;
     }
 
-    // Insert slot selections
-    const slotRows = Array.from(selected).map(slotId => ({
-      booking_id: booking.id,
-      slot_id: slotId,
-    }));
-    const { error: slotError } = await supabase.from("shift_booking_slots").insert(slotRows);
+    // Insert slot selections if slots exist
+    if (hasSlots && selected.size > 0) {
+      const slotRows = Array.from(selected).map(slotId => ({
+        booking_id: booking.id,
+        slot_id: slotId,
+      }));
+      const { error: slotError } = await supabase.from("shift_booking_slots").insert(slotRows);
 
-    if (slotError) {
-      toast({ title: "Error saving slot selections", description: slotError.message, variant: "destructive" });
-    } else {
-      toast({ title: isFull ? "Added to waitlist" : "Shift booked!", description: `${totalHours} hours selected` });
-      onBooked();
+      if (slotError) {
+        toast({ title: "Error saving slot selections", description: slotError.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
     }
 
+    toast({ title: isFull ? "Added to waitlist" : "Shift booked!", description: hasSlots ? `${totalHours} hours selected` : "Booking confirmed" });
+    onBooked();
     setSubmitting(false);
     onOpenChange(false);
   };
-
-  // Fallback: if no time slots exist, book without slot selection
-  const hasSlots = slots.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,7 +147,10 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
         <div className="space-y-1 pb-2 border-b">
           <div className="font-medium">{shift.title}</div>
           <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(shift.shift_date), "MMM d, yyyy")}</span>
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {format(new Date(shift.shift_date + "T00:00:00"), "MMM d, yyyy")}
+            </span>
             {shift.departments?.name && (
               <Badge variant="secondary" className="text-xs">{shift.departments.name}</Badge>
             )}
@@ -202,7 +210,9 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                         {isFull ? (
                           <Badge variant="secondary" className="text-[10px]">Full</Badge>
                         ) : (
-                          <span className="text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" />{remaining} left</span>
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Users className="h-3 w-3" />{remaining} left
+                          </span>
                         )}
                       </div>
                     </div>
@@ -218,7 +228,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                 <div className="text-muted-foreground">
                   {selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ")}
                 </div>
-                <div className="font-medium">{totalHours} hours total</div>
+                <div className="font-medium">Selected: {totalHours} hours</div>
               </div>
             )}
 
