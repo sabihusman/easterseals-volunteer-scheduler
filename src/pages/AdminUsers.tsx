@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle } from "lucide-react";
+import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle, Trash2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -43,6 +43,10 @@ export default function AdminUsers() {
   // Role change confirmation
   const [roleChange, setRoleChange] = useState<{ id: string; name: string; from: UserRole; to: UserRole } | null>(null);
   const [roleChanging, setRoleChanging] = useState(false);
+
+  // Delete user
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; role: UserRole } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Add user modal
   const [addUserOpen, setAddUserOpen] = useState(false);
@@ -129,7 +133,23 @@ export default function AdminUsers() {
     return "";
   };
 
-  // Add user
+  // Delete user
+  const confirmDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke("delete-user", {
+      body: { userId: deleteTarget.id },
+    });
+    setDeleting(false);
+    if (error || data?.error) {
+      toast({ title: "Error", description: data?.error || error?.message || "Failed to delete user", variant: "destructive" });
+    } else {
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      toast({ title: `${deleteTarget.name}'s account has been deleted.` });
+    }
+    setDeleteTarget(null);
+  };
+
   const validateAddUser = () => {
     let valid = true;
     setNewNameError("");
