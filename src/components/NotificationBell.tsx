@@ -81,10 +81,15 @@ export function NotificationBell() {
             <div className="p-4 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
             notifications.map((n) => (
-              <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${!n.is_read ? "bg-accent/50" : ""}`}>
+              <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : !n.is_read ? "bg-accent/50" : ""}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-medium">{n.title}</p>
+                    <div className="flex items-center gap-1.5">
+                      {n.type === "late_cancellation" && (
+                        <span className="inline-flex items-center rounded-full bg-destructive/20 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">Urgent</span>
+                      )}
+                      <p className="text-sm font-medium">{n.title}</p>
+                    </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
                   </div>
                   {!n.is_read && <span className="mt-1 flex-shrink-0 h-2 w-2 rounded-full bg-primary" />}
