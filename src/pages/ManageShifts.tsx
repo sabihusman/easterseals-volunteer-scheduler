@@ -51,6 +51,7 @@ export default function ManageShifts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<any>(null);
   const [editRecurringPrompt, setEditRecurringPrompt] = useState<any>(null);
+  const [deleteShiftPrompt, setDeleteShiftPrompt] = useState<any>(null);
 
   // Form state
   const [title, setTitle] = useState("");
