@@ -95,29 +95,67 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
     }
 
     setSubmitting(true);
+
+    // Check for existing booking
+    const { data: existingBookings } = await supabase
+      .from("shift_bookings")
+      .select("id, booking_status")
+      .eq("shift_id", shift.id)
+      .eq("volunteer_id", user.id);
+
+    const existing = existingBookings?.[0];
+
+    if (existing && (existing.booking_status === "confirmed" || existing.booking_status === "waitlisted")) {
+      toast({ title: "Already booked", description: "You have already booked this shift.", variant: "destructive" });
+      setSubmitting(false);
+      onOpenChange(false);
+      return;
+    }
+
+    let bookingId: string;
     const isFull = shift.booked_slots >= shift.total_slots;
 
-    // Insert booking
-    const { data: booking, error } = await supabase
-      .from("shift_bookings")
-      .insert({
-        shift_id: shift.id,
-        volunteer_id: user.id,
-        booking_status: isFull ? "waitlisted" : "confirmed",
-      })
-      .select("id")
-      .single();
+    if (existing && existing.booking_status === "cancelled") {
+      // Re-activate cancelled booking
+      const { error } = await supabase
+        .from("shift_bookings")
+        .update({
+          booking_status: isFull ? "waitlisted" : "confirmed",
+          confirmation_status: "pending_confirmation" as const,
+          cancelled_at: null,
+        })
+        .eq("id", existing.id);
 
-    if (error || !booking) {
-      toast({ title: "Error", description: error?.message || "Failed to book", variant: "destructive" });
-      setSubmitting(false);
-      return;
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+      bookingId = existing.id;
+    } else {
+      // Insert new booking
+      const { data: booking, error } = await supabase
+        .from("shift_bookings")
+        .insert({
+          shift_id: shift.id,
+          volunteer_id: user.id,
+          booking_status: isFull ? "waitlisted" : "confirmed",
+        })
+        .select("id")
+        .single();
+
+      if (error || !booking) {
+        toast({ title: "Error", description: error?.message || "Failed to book", variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
+      bookingId = booking.id;
     }
 
     // Insert slot selections if slots exist
     if (hasSlots && selected.size > 0) {
       const slotRows = Array.from(selected).map(slotId => ({
-        booking_id: booking.id,
+        booking_id: bookingId,
         slot_id: slotId,
       }));
       const { error: slotError } = await supabase.from("shift_booking_slots").insert(slotRows);
