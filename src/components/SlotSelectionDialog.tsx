@@ -79,7 +79,8 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
   const totalHours = selectedSlots.reduce((sum, s) => sum + slotHours(s.slot_start, s.slot_end), 0);
 
   const handleConfirm = async () => {
-    if (!user || !profile || selected.size === 0) return;
+    if (!user || !profile) return;
+    if (hasSlots && selected.size === 0) return;
 
     // Check booking window
     const daysAhead = Math.ceil((new Date(shift.shift_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
