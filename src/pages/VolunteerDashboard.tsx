@@ -17,6 +17,7 @@ export default function VolunteerDashboard() {
   const { toast } = useToast();
   const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingConfirmations, setPendingConfirmations] = useState<any[]>([]);
 
   const today = new Date().toISOString().split("T")[0];
 
