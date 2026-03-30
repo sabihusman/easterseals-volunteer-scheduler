@@ -5,7 +5,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell } from "lucide-react";
+import { Calendar, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
