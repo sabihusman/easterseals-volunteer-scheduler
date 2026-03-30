@@ -17,6 +17,8 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminReminders from "./pages/AdminReminders";
 import AdminSettings from "./pages/AdminSettings";
 import DepartmentManagement from "./pages/DepartmentManagement";
+import ShiftConfirmation from "./pages/ShiftConfirmation";
+import MyNotes from "./pages/MyNotes";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
