@@ -36,23 +36,57 @@ export default function VolunteerDashboard() {
     fetchBookings();
   }, [user]);
 
-  const handleCancel = async (bookingId: string, shiftDate: string) => {
-    const hoursUntil = differenceInHours(new Date(shiftDate), new Date());
-    const isLateCancel = hoursUntil < 48;
+  const handleCancel = async (bookingId: string, shift: any) => {
+    const shiftDate = shift.shift_date;
+    const startTime = shift.start_time || "08:00:00";
+    const shiftDatetime = new Date(`${shiftDate}T${startTime}`);
+    const now = new Date();
+    const hoursUntilShift = (shiftDatetime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const isLateCancel = hoursUntilShift < 48;
+    const isVeryLateCancel = hoursUntilShift <= 12;
 
     const { error } = await supabase
       .from("shift_bookings")
-      .update({ booking_status: "cancelled", cancelled_at: new Date().toISOString() })
+      .update({ 
+        booking_status: "cancelled", 
+        cancelled_at: new Date().toISOString(),
+        ...(isVeryLateCancel ? { late_cancel_notified: true } : {}),
+      })
       .eq("id", bookingId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      setUpcomingBookings((prev) => prev.filter((b) => b.id !== bookingId));
-      toast({
-        title: "Shift cancelled",
-        description: isLateCancel ? "Late cancellation (within 48 hours) may affect your consistency score." : "Cancelled successfully.",
-      });
+      return;
     }
+
+    // Late cancellation notifications (within 12 hours)
+    if (isVeryLateCancel) {
+      try {
+        // Find coordinators for this shift's department
+        const { data: coords } = await supabase
+          .from("department_coordinators")
+          .select("coordinator_id")
+          .eq("department_id", shift.department_id);
+
+        if (coords && coords.length > 0) {
+          const shiftDateFormatted = format(new Date(shiftDate), "MMM d, yyyy");
+          const notifications = coords.map((c) => ({
+            user_id: c.coordinator_id,
+            type: "late_cancellation",
+            title: "Late Cancellation Alert",
+            message: `${profile?.full_name} cancelled their booking for ${shift.title} on ${shiftDateFormatted} at ${startTime.slice(0, 5)} — less than 12 hours before the shift.`,
+          }));
+          await supabase.from("notifications").insert(notifications);
+        }
+      } catch (e) {
+        // Don't block the cancellation flow if notification fails
+      }
+    }
+
+    setUpcomingBookings((prev) => prev.filter((b) => b.id !== bookingId));
+    toast({
+      title: "Shift cancelled",
+      description: isLateCancel ? "Late cancellation (within 48 hours) may affect your consistency score." : "Cancelled successfully.",
+    });
   };
 
   const handleCheckIn = async (bookingId: string) => {
