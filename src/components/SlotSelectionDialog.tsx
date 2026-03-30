@@ -52,7 +52,6 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       .eq("shift_id", shift.id)
       .order("slot_start", { ascending: true })
       .then(({ data, error }) => {
-        console.log("Fetched time slots for shift", shift.id, ":", data, error);
         setSlots(data || []);
         setLoading(false);
       });

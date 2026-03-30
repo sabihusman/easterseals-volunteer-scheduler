@@ -7,6 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ShieldX } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const restrictSchema = z.object({
+  reason: z.string().max(500, "Reason must be under 500 characters").optional(),
+});
 
 interface Props {
   volunteerId: string;
@@ -22,22 +27,30 @@ export function RestrictVolunteerModal({ volunteerId, volunteerName, departmentI
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async () => {
     if (!user) return;
+    const result = restrictSchema.safeParse({ reason: reason.trim() || undefined });
+    if (!result.success) {
+      setError(result.error.errors[0].message);
+      return;
+    }
+    setError("");
     setSubmitting(true);
-    const { error } = await supabase.from("department_restrictions").insert({
+    const { error: dbError } = await supabase.from("department_restrictions").insert({
       department_id: departmentId,
       volunteer_id: volunteerId,
       restricted_by: user.id,
       reason: reason.trim() || null,
     });
     setSubmitting(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (dbError) {
+      toast({ title: "Error", description: dbError.message, variant: "destructive" });
     } else {
       toast({ title: `${volunteerName} restricted from ${departmentName}` });
       setReason("");
+      setError("");
       setOpen(false);
       onDone();
     }
@@ -57,7 +70,9 @@ export function RestrictVolunteerModal({ volunteerId, volunteerName, departmentI
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Reason (optional)</Label>
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Enter reason for restriction..." rows={3} />
+            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Enter reason for restriction..." rows={3} maxLength={500} />
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            <p className="text-xs text-muted-foreground">{reason.length}/500</p>
           </div>
           <Button onClick={handleSubmit} disabled={submitting} variant="destructive" className="w-full">
             {submitting ? "Restricting..." : "Confirm Restriction"}

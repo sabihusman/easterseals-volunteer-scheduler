@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Building2, UserPlus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export function DepartmentCoordinatorManager() {
+  const { role } = useAuth();
   const { toast } = useToast();
   const [departments, setDepartments] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -29,6 +31,11 @@ export function DepartmentCoordinatorManager() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Client-side role check: only admins can see this component
+  if (role !== "admin") return null;
+
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   const handleAssign = async () => {
     if (!selectedDept || !selectedCoord) return;
@@ -57,8 +64,6 @@ export function DepartmentCoordinatorManager() {
       fetchData();
     }
   };
-
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   return (
     <div className="space-y-4">

@@ -34,7 +34,7 @@ export default function ShiftHistory() {
           .order("created_at", { ascending: false }),
         supabase
           .from("shift_invitations")
-          .select("id, invite_name, invite_email, status, created_at, shifts(title, shift_date)")
+          .select("id, invite_name, invite_email, status, created_at, expires_at, shifts(title, shift_date)")
           .eq("invited_by", user.id)
           .order("created_at", { ascending: false }),
       ]);
@@ -80,6 +80,10 @@ export default function ShiftHistory() {
 
   const handleAddNote = async () => {
     if (!activeBooking || !noteContent.trim() || !user) return;
+    if (noteContent.length > 2000) {
+      toast({ title: "Note too long", description: "Notes must be under 2000 characters.", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase.from("shift_notes").insert({
       booking_id: activeBooking,
       author_id: user.id,
@@ -222,8 +226,10 @@ export default function ShiftHistory() {
                         </DialogTrigger>
                         <DialogContent>
                           <DialogHeader><DialogTitle>Add Note for {s.title}</DialogTitle></DialogHeader>
-                          <Textarea placeholder="Write your note..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={4} />
-                          <Button onClick={handleAddNote} disabled={!noteContent.trim()}>Save Note</Button>
+                          <Textarea placeholder="Write your note..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={4} maxLength={2000} />
+                          <p className="text-xs text-muted-foreground">{noteContent.length}/2000</p>
+                          {noteContent.length > 2000 && <p className="text-xs text-destructive">Note must be under 2000 characters</p>}
+                          <Button onClick={handleAddNote} disabled={!noteContent.trim() || noteContent.length > 2000}>Save Note</Button>
                         </DialogContent>
                       </Dialog>
                       <label className="cursor-pointer">

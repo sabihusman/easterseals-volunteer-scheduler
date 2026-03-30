@@ -9,7 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Leaf, Mail, Lock, User, Phone, Shield, Users, UserCheck } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { z } from "zod";
+
+const registerSchema = z.object({
+  name: z.string().trim().min(1, "Full name is required").max(100, "Name must be under 100 characters"),
+  email: z.string().trim().email("Invalid email address").max(255, "Email must be under 255 characters"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[a-zA-Z]/, "Password must contain at least one letter")
+    .regex(/[0-9]/, "Password must contain at least one number"),
+});
 
 export default function Auth() {
   const [tab, setTab] = useState<"login" | "register">("login");
@@ -26,6 +35,7 @@ export default function Auth() {
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [tosAccepted, setTosAccepted] = useState(false);
+  const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
   const [resetEmail, setResetEmail] = useState("");
 
@@ -46,18 +56,22 @@ export default function Auth() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regName.trim()) {
-      toast({ title: "Name required", description: "Please enter your full name.", variant: "destructive" });
+    const result = registerSchema.safeParse({ name: regName, email: regEmail, password: regPassword });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => { fieldErrors[err.path[0] as string] = err.message; });
+      setRegErrors(fieldErrors);
       return;
     }
+    setRegErrors({});
     if (!tosAccepted) {
       toast({ title: "Terms required", description: "Please accept the Terms of Service and Code of Conduct.", variant: "destructive" });
       return;
     }
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
-      email: regEmail,
-      password: regPassword,
+      email: result.data.email,
+      password: result.data.password,
       options: { emailRedirectTo: window.location.origin },
     });
     if (error) {
@@ -68,8 +82,8 @@ export default function Auth() {
     if (data.user) {
       await supabase.from("profiles").insert({
         id: data.user.id,
-        email: regEmail,
-        full_name: regName,
+        email: result.data.email,
+        full_name: result.data.name,
         phone: regPhone || null,
         role: "volunteer",
         is_active: false,
@@ -192,15 +206,17 @@ export default function Auth() {
                     <Label htmlFor="reg-name">Full Name</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input id="reg-name" className="pl-10" value={regName} onChange={(e) => setRegName(e.target.value)} required />
+                      <Input id="reg-name" className="pl-10" value={regName} onChange={(e) => setRegName(e.target.value)} required maxLength={100} />
                     </div>
+                    {regErrors.name && <p className="text-xs text-destructive">{regErrors.name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-email">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input id="reg-email" type="email" className="pl-10" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required />
+                      <Input id="reg-email" type="email" className="pl-10" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required maxLength={255} />
                     </div>
+                    {regErrors.email && <p className="text-xs text-destructive">{regErrors.email}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-phone">Phone (optional)</Label>
@@ -213,8 +229,10 @@ export default function Auth() {
                     <Label htmlFor="reg-password">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input id="reg-password" type="password" className="pl-10" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required minLength={6} />
+                      <Input id="reg-password" type="password" className="pl-10" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required />
                     </div>
+                    {regErrors.password && <p className="text-xs text-destructive">{regErrors.password}</p>}
+                    <p className="text-xs text-muted-foreground">Min 8 chars, must include a letter and a number</p>
                   </div>
                   <div className="flex items-start space-x-2">
                     <Checkbox
