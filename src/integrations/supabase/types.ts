@@ -191,6 +191,7 @@ export type Database = {
           is_active: boolean
           name: string
           state: string | null
+          timezone: string
         }
         Insert: {
           address?: string | null
@@ -200,6 +201,7 @@ export type Database = {
           is_active?: boolean
           name: string
           state?: string | null
+          timezone?: string
         }
         Update: {
           address?: string | null
@@ -209,6 +211,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           state?: string | null
+          timezone?: string
         }
         Relationships: []
       }
@@ -419,16 +422,20 @@ export type Database = {
           confirmation_status: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at: string | null
           confirmed_by: string | null
+          coordinator_reported_hours: number | null
           counted_in_consistency: boolean
           created_at: string
+          final_hours: number | null
           group_name: string | null
           group_size: number | null
+          hours_source: string | null
           id: string
           is_group_booking: boolean
           late_cancel_notified: boolean
           shift_id: string
           updated_at: string
           volunteer_id: string
+          volunteer_reported_hours: number | null
         }
         Insert: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
@@ -437,16 +444,20 @@ export type Database = {
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
           confirmed_by?: string | null
+          coordinator_reported_hours?: number | null
           counted_in_consistency?: boolean
           created_at?: string
+          final_hours?: number | null
           group_name?: string | null
           group_size?: number | null
+          hours_source?: string | null
           id?: string
           is_group_booking?: boolean
           late_cancel_notified?: boolean
           shift_id: string
           updated_at?: string
           volunteer_id: string
+          volunteer_reported_hours?: number | null
         }
         Update: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
@@ -455,16 +466,20 @@ export type Database = {
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
           confirmed_by?: string | null
+          coordinator_reported_hours?: number | null
           counted_in_consistency?: boolean
           created_at?: string
+          final_hours?: number | null
           group_name?: string | null
           group_size?: number | null
+          hours_source?: string | null
           id?: string
           is_group_booking?: boolean
           late_cancel_notified?: boolean
           shift_id?: string
           updated_at?: string
           volunteer_id?: string
+          volunteer_reported_hours?: number | null
         }
         Relationships: [
           {
@@ -582,6 +597,78 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "shift_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_recurrence_rules: {
+        Row: {
+          allows_group: boolean
+          created_at: string
+          created_by: string
+          department_id: string
+          description: string | null
+          end_date: string
+          end_time: string | null
+          id: string
+          is_active: boolean
+          recurrence_type: Database["public"]["Enums"]["recurrence_type"]
+          requires_bg_check: boolean
+          start_date: string
+          start_time: string | null
+          time_type: Database["public"]["Enums"]["shift_time_type"]
+          title: string
+          total_slots: number
+        }
+        Insert: {
+          allows_group?: boolean
+          created_at?: string
+          created_by: string
+          department_id: string
+          description?: string | null
+          end_date: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          recurrence_type: Database["public"]["Enums"]["recurrence_type"]
+          requires_bg_check?: boolean
+          start_date: string
+          start_time?: string | null
+          time_type?: Database["public"]["Enums"]["shift_time_type"]
+          title: string
+          total_slots?: number
+        }
+        Update: {
+          allows_group?: boolean
+          created_at?: string
+          created_by?: string
+          department_id?: string
+          description?: string | null
+          end_date?: string
+          end_time?: string | null
+          id?: string
+          is_active?: boolean
+          recurrence_type?: Database["public"]["Enums"]["recurrence_type"]
+          requires_bg_check?: boolean
+          start_date?: string
+          start_time?: string | null
+          time_type?: Database["public"]["Enums"]["shift_time_type"]
+          title?: string
+          total_slots?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_recurrence_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_recurrence_rules_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]
@@ -715,6 +802,121 @@ export type Database = {
           },
         ]
       }
+      volunteer_private_notes: {
+        Row: {
+          content: string
+          created_at: string
+          department_id: string | null
+          id: string
+          is_locked: boolean
+          shift_id: string | null
+          title: string | null
+          updated_at: string
+          volunteer_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_locked?: boolean
+          shift_id?: string | null
+          title?: string | null
+          updated_at?: string
+          volunteer_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          department_id?: string | null
+          id?: string
+          is_locked?: boolean
+          shift_id?: string | null
+          title?: string | null
+          updated_at?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_private_notes_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_private_notes_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_private_notes_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      volunteer_shift_reports: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          reminder_sent_at: string | null
+          self_confirm_status: Database["public"]["Enums"]["self_confirm_status"]
+          self_reported_hours: number | null
+          shift_feedback: string | null
+          star_rating: number | null
+          submitted_at: string | null
+          updated_at: string
+          volunteer_id: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          reminder_sent_at?: string | null
+          self_confirm_status?: Database["public"]["Enums"]["self_confirm_status"]
+          self_reported_hours?: number | null
+          shift_feedback?: string | null
+          star_rating?: number | null
+          submitted_at?: string | null
+          updated_at?: string
+          volunteer_id: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          reminder_sent_at?: string | null
+          self_confirm_status?: Database["public"]["Enums"]["self_confirm_status"]
+          self_reported_hours?: number | null
+          shift_feedback?: string | null
+          star_rating?: number | null
+          submitted_at?: string | null
+          updated_at?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_shift_reports_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "shift_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_shift_reports_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -731,6 +933,10 @@ export type Database = {
         Args: { p_volunteer_id: string }
         Returns: undefined
       }
+      resolve_hours_discrepancy: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
       transfer_admin_role: {
         Args: { from_admin_id: string; to_coordinator_id: string }
         Returns: undefined
@@ -740,7 +946,9 @@ export type Database = {
       bg_check_status: "pending" | "cleared" | "failed" | "expired"
       booking_status: "confirmed" | "cancelled" | "waitlisted"
       confirmation_status: "pending_confirmation" | "confirmed" | "no_show"
+      recurrence_type: "daily" | "weekly" | "biweekly" | "monthly"
       reminder_recipient: "coordinator" | "admin"
+      self_confirm_status: "pending" | "attended" | "no_show"
       shift_status: "open" | "full" | "cancelled" | "completed"
       shift_time_type: "morning" | "afternoon" | "all_day" | "custom"
       user_role: "volunteer" | "coordinator" | "admin"
@@ -874,7 +1082,9 @@ export const Constants = {
       bg_check_status: ["pending", "cleared", "failed", "expired"],
       booking_status: ["confirmed", "cancelled", "waitlisted"],
       confirmation_status: ["pending_confirmation", "confirmed", "no_show"],
+      recurrence_type: ["daily", "weekly", "biweekly", "monthly"],
       reminder_recipient: ["coordinator", "admin"],
+      self_confirm_status: ["pending", "attended", "no_show"],
       shift_status: ["open", "full", "cancelled", "completed"],
       shift_time_type: ["morning", "afternoon", "all_day", "custom"],
       user_role: ["volunteer", "coordinator", "admin"],
