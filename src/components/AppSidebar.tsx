@@ -28,6 +28,7 @@ export function AppSidebar() {
   const adminItems = [
     { title: "All Shifts", url: "/admin", icon: Calendar },
     { title: "Users", url: "/admin/users", icon: Users },
+    { title: "Departments", url: "/admin/departments", icon: Building2 },
     { title: "Reminders", url: "/admin/reminders", icon: Bell },
     { title: "Admin Settings", url: "/admin/settings", icon: Shield },
   ];
