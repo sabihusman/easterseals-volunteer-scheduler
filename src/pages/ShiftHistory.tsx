@@ -229,6 +229,7 @@ export default function ShiftHistory() {
                           <Textarea placeholder="Write your note..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={4} maxLength={2000} />
                           <p className="text-xs text-muted-foreground">{noteContent.length}/2000</p>
                           {noteContent.length > 2000 && <p className="text-xs text-destructive">Note must be under 2000 characters</p>}
+                          <Button onClick={handleAddNote} disabled={!noteContent.trim() || noteContent.length > 2000}>Save Note</Button>
                         </DialogContent>
                       </Dialog>
                       <label className="cursor-pointer">
