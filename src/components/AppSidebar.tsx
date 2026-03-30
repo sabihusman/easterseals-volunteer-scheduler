@@ -18,6 +18,7 @@ export function AppSidebar() {
     { title: "My Shifts", url: "/dashboard", icon: Home },
     { title: "Browse Shifts", url: "/shifts", icon: Calendar },
     { title: "My History", url: "/history", icon: ClipboardList },
+    { title: "My Notes", url: "/notes", icon: FileText },
   ] : [];
 
   const coordinatorItems = [

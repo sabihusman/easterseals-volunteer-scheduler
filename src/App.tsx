@@ -57,6 +57,8 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>} />
             <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftHistory /></ProtectedRoute>} />
+            <Route path="/my-shifts/confirm/:bookingId" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftConfirmation /></ProtectedRoute>} />
+            <Route path="/notes" element={<ProtectedRoute requiredRole={["volunteer"]}><MyNotes /></ProtectedRoute>} />
 
             <Route path="/coordinator" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><CoordinatorDashboard /></ProtectedRoute>} />
             <Route path="/coordinator/manage" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><ManageShifts /></ProtectedRoute>} />
