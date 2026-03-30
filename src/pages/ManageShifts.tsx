@@ -269,8 +269,18 @@ export default function ManageShifts() {
       toast({ title: "Shift cancelled" });
     }
   };
+  const handleDeleteShift = async (shift: any) => {
+    const { error } = await supabase.from("shifts").delete().eq("id", shift.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
+      toast({ title: "Shift deleted." });
+    }
+    setDeleteShiftPrompt(null);
+  };
 
-  return (
+
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
