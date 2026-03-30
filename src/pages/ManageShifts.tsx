@@ -89,7 +89,19 @@ export default function ManageShifts() {
   };
 
   const handleSave = async () => {
-    if (!title || !shiftDate || !deptId || !user) return;
+    if (!shiftDate || !deptId || !user) return;
+    const result = shiftSchema.safeParse({
+      title,
+      totalSlots: parseInt(totalSlots) || 0,
+      description: description || undefined,
+    });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((e) => { fieldErrors[e.path[0] as string] = e.message; });
+      setFormErrors(fieldErrors);
+      return;
+    }
+    setFormErrors({});
     setLoading(true);
     const payload = {
       title,
@@ -147,7 +159,8 @@ export default function ManageShifts() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Title</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Shift title" />
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Shift title" maxLength={100} />
+                {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Department</Label>
@@ -197,11 +210,14 @@ export default function ManageShifts() {
               )}
               <div className="space-y-2">
                 <Label>Total Slots</Label>
-                <Input type="number" min="1" value={totalSlots} onChange={(e) => setTotalSlots(e.target.value)} />
+                <Input type="number" min="1" max="100" value={totalSlots} onChange={(e) => setTotalSlots(e.target.value)} />
+                {formErrors.totalSlots && <p className="text-xs text-destructive">{formErrors.totalSlots}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Description (optional)</Label>
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
+                {formErrors.description && <p className="text-xs text-destructive">{formErrors.description}</p>}
+                <p className="text-xs text-muted-foreground">{description.length}/500</p>
               </div>
               <div className="flex items-center justify-between">
                 <Label>Requires Background Check</Label>
