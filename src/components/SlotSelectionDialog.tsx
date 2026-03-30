@@ -116,6 +116,9 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
     const isFull = shift.booked_slots >= shift.total_slots;
 
     if (existing && existing.booking_status === "cancelled") {
+      // Delete old slot selections first
+      await supabase.from("shift_booking_slots").delete().eq("booking_id", existing.id);
+
       // Re-activate cancelled booking
       const { error } = await supabase
         .from("shift_bookings")
