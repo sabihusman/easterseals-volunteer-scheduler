@@ -7,6 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const inviteSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(100, "Name must be under 100 characters"),
+  email: z.string().trim().email("Invalid email address").max(255, "Email must be under 255 characters"),
+});
 
 interface InviteFriendModalProps {
   shiftId: string;
@@ -20,25 +26,35 @@ export function InviteFriendModal({ shiftId, shiftTitle }: InviteFriendModalProp
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async () => {
-    if (!user || !name.trim() || !email.trim()) return;
+    if (!user) return;
+    const result = inviteSchema.safeParse({ name, email });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((e) => { fieldErrors[e.path[0] as string] = e.message; });
+      setErrors(fieldErrors);
+      return;
+    }
+    setErrors({});
     setSubmitting(true);
 
     const { error } = await supabase.from("shift_invitations").insert({
       shift_id: shiftId,
       invited_by: user.id,
-      invite_email: email.trim(),
-      invite_name: name.trim(),
+      invite_email: result.data.email,
+      invite_name: result.data.name,
     });
 
     setSubmitting(false);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: `Invite sent to ${name.trim()}!` });
+      toast({ title: `Invite sent to ${result.data.name}!` });
       setName("");
       setEmail("");
+      setErrors({});
       setOpen(false);
     }
   };
@@ -57,13 +73,15 @@ export function InviteFriendModal({ shiftId, shiftTitle }: InviteFriendModalProp
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="invite-name">Friend's Name</Label>
-            <Input id="invite-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
+            <Input id="invite-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" maxLength={100} />
+            {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="invite-email">Friend's Email</Label>
-            <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" />
+            <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" maxLength={255} />
+            {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
           </div>
-          <Button onClick={handleSubmit} disabled={submitting || !name.trim() || !email.trim()} className="w-full">
+          <Button onClick={handleSubmit} disabled={submitting} className="w-full">
             {submitting ? "Sending..." : "Send Invite"}
           </Button>
         </div>
