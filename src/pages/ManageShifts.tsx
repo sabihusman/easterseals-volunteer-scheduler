@@ -15,6 +15,13 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
 import { previewSlotCount } from "@/lib/slot-utils";
+import { z } from "zod";
+
+const shiftSchema = z.object({
+  title: z.string().trim().min(1, "Title is required").max(100, "Title must be under 100 characters"),
+  totalSlots: z.number().int().min(1, "At least 1 slot required").max(100, "Maximum 100 slots"),
+  description: z.string().max(500, "Description must be under 500 characters").optional(),
+});
 
 export default function ManageShifts() {
   const { user } = useAuth();
@@ -36,6 +43,7 @@ export default function ManageShifts() {
   const [deptId, setDeptId] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!user) return;

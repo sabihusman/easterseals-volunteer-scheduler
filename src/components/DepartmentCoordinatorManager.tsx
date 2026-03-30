@@ -18,9 +18,6 @@ export function DepartmentCoordinatorManager() {
   const [selectedCoord, setSelectedCoord] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  // Client-side role check: only admins can see this component
-  if (role !== "admin") return null;
-
   const fetchData = async () => {
     const [{ data: depts }, { data: assigns }, { data: coords }] = await Promise.all([
       supabase.from("departments").select("id, name").eq("is_active", true).order("name"),
@@ -34,6 +31,11 @@ export function DepartmentCoordinatorManager() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Client-side role check: only admins can see this component
+  if (role !== "admin") return null;
+
+  if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   const handleAssign = async () => {
     if (!selectedDept || !selectedCoord) return;
@@ -62,8 +64,6 @@ export function DepartmentCoordinatorManager() {
       fetchData();
     }
   };
-
-  if (loading) return <p className="text-muted-foreground">Loading...</p>;
 
   return (
     <div className="space-y-4">
