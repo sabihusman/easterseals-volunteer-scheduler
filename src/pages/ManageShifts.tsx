@@ -434,7 +434,23 @@ export default function ManageShifts() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="grid gap-3">
+      {/* Delete cancelled shift dialog */}
+      <AlertDialog open={!!deleteShiftPrompt} onOpenChange={() => setDeleteShiftPrompt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this shift permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will also remove all booking records associated with it. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDeleteShift(deleteShiftPrompt)}>
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
         {shifts.map((s) => (
           <Card key={s.id}>
             <CardContent className="pt-4 pb-4">
