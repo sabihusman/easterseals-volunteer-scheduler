@@ -425,6 +425,7 @@ export type Database = {
           group_size: number | null
           id: string
           is_group_booking: boolean
+          late_cancel_notified: boolean
           shift_id: string
           updated_at: string
           volunteer_id: string
@@ -442,6 +443,7 @@ export type Database = {
           group_size?: number | null
           id?: string
           is_group_booking?: boolean
+          late_cancel_notified?: boolean
           shift_id: string
           updated_at?: string
           volunteer_id: string
@@ -459,6 +461,7 @@ export type Database = {
           group_size?: number | null
           id?: string
           is_group_booking?: boolean
+          late_cancel_notified?: boolean
           shift_id?: string
           updated_at?: string
           volunteer_id?: string

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle } from "lucide-react";
+import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle, Trash2 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -43,6 +43,10 @@ export default function AdminUsers() {
   // Role change confirmation
   const [roleChange, setRoleChange] = useState<{ id: string; name: string; from: UserRole; to: UserRole } | null>(null);
   const [roleChanging, setRoleChanging] = useState(false);
+
+  // Delete user
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; role: UserRole } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Add user modal
   const [addUserOpen, setAddUserOpen] = useState(false);
@@ -129,7 +133,23 @@ export default function AdminUsers() {
     return "";
   };
 
-  // Add user
+  // Delete user
+  const confirmDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke("delete-user", {
+      body: { userId: deleteTarget.id },
+    });
+    setDeleting(false);
+    if (error || data?.error) {
+      toast({ title: "Error", description: data?.error || error?.message || "Failed to delete user", variant: "destructive" });
+    } else {
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      toast({ title: `${deleteTarget.name}'s account has been deleted.` });
+    }
+    setDeleteTarget(null);
+  };
+
   const validateAddUser = () => {
     let valid = true;
     setNewNameError("");
@@ -286,6 +306,11 @@ export default function AdminUsers() {
                       <SelectItem value="expired">Expired</SelectItem>
                     </SelectContent>
                   </Select>
+                  {p.role !== "admin" && (
+                    <Button size="sm" variant="destructive" onClick={() => setDeleteTarget({ id: p.id, name: p.full_name, role: p.role as UserRole })}>
+                      <Trash2 className="h-3 w-3 mr-1" /> Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -312,6 +337,34 @@ export default function AdminUsers() {
             <AlertDialogCancel disabled={roleChanging}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRoleChange} disabled={roleChanging}>
               {roleChanging ? "Updating..." : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete user confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account — This Cannot Be Undone</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to permanently delete {deleteTarget?.name}'s account. This action cannot be reversed. If this user wishes to use the portal again they will need to register a new account.
+            </AlertDialogDescription>
+            {deleteTarget && (
+              <div className="flex items-start gap-2 mt-2 p-3 rounded-md bg-destructive/10 border border-destructive/30">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <p className="text-sm text-foreground">
+                  {deleteTarget.role === "volunteer"
+                    ? "All of their active shift bookings will be automatically cancelled."
+                    : "Their created shifts will remain unchanged."}
+                </p>
+              </div>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteUser} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Deleting..." : "Delete Permanently"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
