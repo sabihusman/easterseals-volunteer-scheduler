@@ -208,7 +208,7 @@ export default function VolunteerDashboard() {
                             <InviteFriendModal shiftId={s.id} shiftTitle={s.title} />
                           )}
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleCancel(booking.id, s.shift_date)}>Cancel</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleCancel(booking.id, s)}>Cancel</Button>
                       </div>
                     </div>
                   </CardContent>
