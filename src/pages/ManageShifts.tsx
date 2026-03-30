@@ -451,6 +451,8 @@ export default function ManageShifts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <div className="grid gap-3">
         {shifts.map((s) => (
           <Card key={s.id}>
             <CardContent className="pt-4 pb-4">
