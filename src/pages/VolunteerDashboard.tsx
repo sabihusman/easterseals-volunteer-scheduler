@@ -137,6 +137,21 @@ export default function VolunteerDashboard() {
 
       <OnboardingChecklist />
 
+      {pendingConfirmations.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-sm font-medium">
+                You have <span className="font-bold text-primary">{pendingConfirmations.length}</span> shift{pendingConfirmations.length !== 1 ? "s" : ""} awaiting your confirmation.
+              </p>
+              <a href={`/my-shifts/confirm/${pendingConfirmations[0]?.booking_id}`} className="text-sm font-medium text-primary hover:underline">
+                Confirm now →
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">

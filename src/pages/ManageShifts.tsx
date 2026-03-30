@@ -452,6 +452,11 @@ export default function ManageShifts() {
                       </Button>
                     </>
                   )}
+                  {s.status === "cancelled" && (
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteShiftPrompt(s)}>
+                      <Trash2 className="h-3 w-3 mr-1" />Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
