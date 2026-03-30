@@ -342,6 +342,34 @@ export default function AdminUsers() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete user confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account — This Cannot Be Undone</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to permanently delete {deleteTarget?.name}'s account. This action cannot be reversed. If this user wishes to use the portal again they will need to register a new account.
+            </AlertDialogDescription>
+            {deleteTarget && (
+              <div className="flex items-start gap-2 mt-2 p-3 rounded-md bg-destructive/10 border border-destructive/30">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <p className="text-sm text-foreground">
+                  {deleteTarget.role === "volunteer"
+                    ? "All of their active shift bookings will be automatically cancelled."
+                    : "Their created shifts will remain unchanged."}
+                </p>
+              </div>
+            )}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteUser} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? "Deleting..." : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Add user modal */}
       <Dialog open={addUserOpen} onOpenChange={(open) => { if (!open) closeAddUser(); else setAddUserOpen(true); }}>
         <DialogContent className="sm:max-w-md">
