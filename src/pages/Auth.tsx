@@ -165,7 +165,7 @@ export default function Auth() {
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
               <Leaf className="h-6 w-6 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl">Easterseals Volunteer Scheduler</CardTitle>
+            <CardTitle className="text-2xl">Easterseals Iowa</CardTitle>
             <CardDescription>Sign in to manage your volunteer shifts</CardDescription>
           </CardHeader>
           <CardContent>
@@ -255,7 +255,7 @@ export default function Auth() {
             <div className="mt-6">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or continue with</span></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or continue with</span></div>
               </div>
               <div className="mt-4">
                 <Button variant="outline" onClick={() => handleOAuth("google")} type="button" className="w-full">
