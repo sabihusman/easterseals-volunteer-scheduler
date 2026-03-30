@@ -306,6 +306,11 @@ export default function AdminUsers() {
                       <SelectItem value="expired">Expired</SelectItem>
                     </SelectContent>
                   </Select>
+                  {p.role !== "admin" && (
+                    <Button size="sm" variant="destructive" onClick={() => setDeleteTarget({ id: p.id, name: p.full_name, role: p.role as UserRole })}>
+                      <Trash2 className="h-3 w-3 mr-1" /> Delete
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
