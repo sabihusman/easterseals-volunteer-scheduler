@@ -17,20 +17,30 @@ export default function VolunteerDashboard() {
   const { toast } = useToast();
   const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingConfirmations, setPendingConfirmations] = useState<any[]>([]);
 
   const today = new Date().toISOString().split("T")[0];
 
   useEffect(() => {
     if (!user) return;
     const fetchBookings = async () => {
-      const { data } = await supabase
-        .from("shift_bookings")
-        .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
-        .eq("volunteer_id", user.id)
-        .eq("booking_status", "confirmed")
-        .gte("shifts.shift_date", today)
-        .order("created_at", { ascending: true });
+      const [{ data }, { data: pendingData }] = await Promise.all([
+        supabase
+          .from("shift_bookings")
+          .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+          .eq("volunteer_id", user.id)
+          .eq("booking_status", "confirmed")
+          .gte("shifts.shift_date", today)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("volunteer_shift_reports")
+          .select("id, booking_id, self_confirm_status, shift_bookings(id, shifts(title, shift_date, departments(name)))")
+          .eq("volunteer_id", user.id)
+          .eq("self_confirm_status", "pending")
+          .is("submitted_at", null),
+      ]);
       setUpcomingBookings((data as any) || []);
+      setPendingConfirmations((pendingData as any) || []);
       setLoading(false);
     };
     fetchBookings();
@@ -126,6 +136,21 @@ export default function VolunteerDashboard() {
       </div>
 
       <OnboardingChecklist />
+
+      {pendingConfirmations.length > 0 && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <p className="text-sm font-medium">
+                You have <span className="font-bold text-primary">{pendingConfirmations.length}</span> shift{pendingConfirmations.length !== 1 ? "s" : ""} awaiting your confirmation.
+              </p>
+              <a href={`/my-shifts/confirm/${pendingConfirmations[0]?.booking_id}`} className="text-sm font-medium text-primary hover:underline">
+                Confirm now →
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>

@@ -51,6 +51,7 @@ export default function ManageShifts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<any>(null);
   const [editRecurringPrompt, setEditRecurringPrompt] = useState<any>(null);
+  const [deleteShiftPrompt, setDeleteShiftPrompt] = useState<any>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -268,6 +269,17 @@ export default function ManageShifts() {
       toast({ title: "Shift cancelled" });
     }
   };
+  const handleDeleteShift = async (shift: any) => {
+    const { error } = await supabase.from("shifts").delete().eq("id", shift.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
+      toast({ title: "Shift deleted." });
+    }
+    setDeleteShiftPrompt(null);
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -423,6 +435,24 @@ export default function ManageShifts() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Delete cancelled shift dialog */}
+      <AlertDialog open={!!deleteShiftPrompt} onOpenChange={() => setDeleteShiftPrompt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this shift permanently?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will also remove all booking records associated with it. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDeleteShift(deleteShiftPrompt)}>
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="grid gap-3">
         {shifts.map((s) => (
           <Card key={s.id}>
@@ -451,6 +481,11 @@ export default function ManageShifts() {
                         <Trash2 className="h-3 w-3 mr-1" />Cancel
                       </Button>
                     </>
+                  )}
+                  {s.status === "cancelled" && (
+                    <Button variant="destructive" size="sm" onClick={() => setDeleteShiftPrompt(s)}>
+                      <Trash2 className="h-3 w-3 mr-1" />Delete
+                    </Button>
                   )}
                 </div>
               </div>

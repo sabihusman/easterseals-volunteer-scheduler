@@ -81,16 +81,24 @@ export function NotificationBell() {
             <div className="p-4 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
             notifications.map((n) => (
-              <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : !n.is_read ? "bg-accent/50" : ""}`}>
+              <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-green-50 border-l-4 border-l-primary" : !n.is_read ? "bg-accent/50" : ""}`}>
                 <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {n.type === "late_cancellation" && (
                         <span className="inline-flex items-center rounded-full bg-destructive/20 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">Urgent</span>
+                      )}
+                      {n.type === "self_confirmation_reminder" && (
+                        <span className="inline-flex items-center rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-primary">Action Required</span>
                       )}
                       <p className="text-sm font-medium">{n.title}</p>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
+                    {n.type === "self_confirmation_reminder" && n.link && (
+                      <a href={n.link} onClick={() => setOpen(false)} className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded px-2.5 py-1">
+                        Confirm Now →
+                      </a>
+                    )}
                   </div>
                   {!n.is_read && <span className="mt-1 flex-shrink-0 h-2 w-2 rounded-full bg-primary" />}
                 </div>

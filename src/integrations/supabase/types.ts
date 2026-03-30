@@ -937,6 +937,7 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
+      send_self_confirmation_reminders: { Args: never; Returns: undefined }
       transfer_admin_role: {
         Args: { from_admin_id: string; to_coordinator_id: string }
         Returns: undefined
