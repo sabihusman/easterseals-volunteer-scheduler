@@ -5,7 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
+import { SessionTimeout } from "@/components/SessionTimeout";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import VolunteerDashboard from "./pages/VolunteerDashboard";
 import BrowseShifts from "./pages/BrowseShifts";
@@ -19,6 +21,7 @@ import AdminSettings from "./pages/AdminSettings";
 import DepartmentManagement from "./pages/DepartmentManagement";
 import ShiftConfirmation from "./pages/ShiftConfirmation";
 import MyNotes from "./pages/MyNotes";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,9 +52,11 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <SessionTimeout />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route path="/dashboard" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>} />
@@ -68,6 +73,8 @@ const App = () => (
             <Route path="/admin/reminders" element={<ProtectedRoute requiredRole={["admin"]}><AdminReminders /></ProtectedRoute>} />
             <Route path="/admin/departments" element={<ProtectedRoute requiredRole={["admin"]}><DepartmentManagement /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole={["admin"]}><AdminSettings /></ProtectedRoute>} />
+
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
