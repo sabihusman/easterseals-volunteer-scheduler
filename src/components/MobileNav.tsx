@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { NavLink } from "@/components/NavLink";
-import { Home, Calendar, ClipboardList, Building2, Shield } from "lucide-react";
+import { Home, Calendar, ClipboardList, Building2, Shield, Cog } from "lucide-react";
 
 export function MobileNav() {
   const { role } = useAuth();
