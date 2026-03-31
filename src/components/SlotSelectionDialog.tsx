@@ -130,12 +130,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
         .eq("id", existing.id);
 
       if (error) {
-        const msg = error.message;
-        if (msg.includes("overlaps with this shift time")) {
-          toast({ title: "Time conflict", description: "You already have a shift booked that overlaps with this time. Please check My Shifts before booking.", variant: "destructive" });
-        } else {
-          toast({ title: "Error", description: msg, variant: "destructive" });
-        }
+        handleBookingError(error.message);
         setSubmitting(false);
         return;
       }
