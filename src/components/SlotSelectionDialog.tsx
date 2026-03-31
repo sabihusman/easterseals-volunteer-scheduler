@@ -212,6 +212,11 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
           </div>
         </div>
 
+        {/* Weather forecast for outdoor departments */}
+        {shift.departments && shift.departments.requires_bg_check === false && (
+          <WeatherForecast shiftDate={shift.shift_date} />
+        )}
+
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading time slots...</p>
         ) : !hasSlots ? (
