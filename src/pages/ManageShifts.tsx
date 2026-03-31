@@ -15,8 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Edit, Trash2, Calendar, Clock, Users, Repeat } from "lucide-react";
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { timeLabel } from "@/lib/calendar-utils";
-import { previewSlotCount } from "@/lib/slot-utils";
+import { timeLabel, SHIFT_TIME_DEFAULTS, getShiftTimes } from "@/lib/calendar-utils";
+import { previewSlotCount, formatSlotTime } from "@/lib/slot-utils";
 import { z } from "zod";
 
 const shiftSchema = z.object({
