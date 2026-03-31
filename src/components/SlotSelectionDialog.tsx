@@ -10,6 +10,8 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatSlotRange, slotHours } from "@/lib/slot-utils";
 import { WeatherForecast } from "@/components/WeatherForecast";
+import { sendEmail } from "@/lib/email-utils";
+import { getShiftTimes, timeLabel } from "@/lib/calendar-utils";
 
 interface Slot {
   id: string;
