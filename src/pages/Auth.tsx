@@ -118,12 +118,6 @@ export default function Auth() {
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
   };
 
-  const fillDemo = (email: string, password: string) => {
-    setLoginEmail(email);
-    setLoginPassword(password);
-    setTab("login");
-  };
-
   if (showReset) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
