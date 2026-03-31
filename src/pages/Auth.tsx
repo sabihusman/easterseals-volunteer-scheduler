@@ -262,41 +262,6 @@ export default function Auth() {
           </CardContent>
         </Card>
 
-        {/* Demo Login Section */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Demo Accounts</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex flex-col items-center gap-1 h-auto py-2"
-              onClick={() => fillDemo("sabih.usman@gmail.com", "Demo1234!")}
-            >
-              <Shield className="h-4 w-4 text-destructive" />
-              <span className="text-xs">Admin</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex flex-col items-center gap-1 h-auto py-2"
-              onClick={() => fillDemo("coordinator@demo.com", "Demo1234!")}
-            >
-              <UserCheck className="h-4 w-4 text-primary" />
-              <span className="text-xs">Coordinator</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex flex-col items-center gap-1 h-auto py-2"
-              onClick={() => fillDemo("volunteer@demo.com", "Demo1234!")}
-            >
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs">Volunteer</span>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
