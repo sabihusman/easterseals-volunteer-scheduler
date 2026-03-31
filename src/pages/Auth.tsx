@@ -93,7 +93,6 @@ export default function Auth() {
         onboarding_complete: false,
         tos_accepted_at: new Date().toISOString(),
       });
-    }
       // Send welcome email
       sendEmail({
         to: result.data.email,
