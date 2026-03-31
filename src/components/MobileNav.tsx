@@ -1,6 +1,6 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { NavLink } from "@/components/NavLink";
-import { Home, Calendar, ClipboardList, Building2, Shield } from "lucide-react";
+import { Home, Calendar, ClipboardList, Building2, Shield, Cog } from "lucide-react";
 
 export function MobileNav() {
   const { role } = useAuth();
@@ -21,6 +21,7 @@ export function MobileNav() {
   if (role === "admin") {
     items.push({ title: "Admin", url: "/admin", icon: Shield });
   }
+  items.push({ title: "Settings", url: "/settings", icon: Cog });
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background md:hidden" role="navigation" aria-label="Mobile navigation">

@@ -5,7 +5,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText } from "lucide-react";
+import { Calendar, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -133,10 +133,28 @@ export function AppSidebar() {
               {profile?.full_name}
             </p>
           )}
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={isActive("/settings")}>
+                <NavLink
+                  to="/settings"
+                  end
+                  className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                    isActive("/settings")
+                      ? "border-l-[3px] border-l-primary bg-accent text-accent-foreground font-medium"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Cog className="h-4 w-4" />
+                  {!collapsed && <span>Settings</span>}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
           <Button
             variant="ghost"
             size="sm"
-            className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted"
+            className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted mt-1"
             onClick={signOut}
           >
             <LogOut className="h-4 w-4" />

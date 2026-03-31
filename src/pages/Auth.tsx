@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ export default function Auth() {
   const [showReset, setShowReset] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as { inactivitySignout?: boolean; accountDeleted?: boolean } | null;
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -154,6 +156,16 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-4">
+        {locationState?.inactivitySignout && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 text-center">
+            You were signed out due to inactivity.
+          </div>
+        )}
+        {locationState?.accountDeleted && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-foreground text-center">
+            Your account has been successfully deleted.
+          </div>
+        )}
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
@@ -188,9 +200,11 @@ export default function Auth() {
                   <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? "Signing in..." : "Sign In"}
                   </Button>
-                  <Button type="button" variant="link" className="w-full text-sm" onClick={() => setShowReset(true)}>
-                    Forgot password?
-                  </Button>
+                  <div className="text-center">
+                    <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                      Forgot your password?
+                    </Link>
+                  </div>
                 </form>
               </TabsContent>
 

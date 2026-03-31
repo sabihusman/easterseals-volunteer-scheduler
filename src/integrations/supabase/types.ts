@@ -271,8 +271,12 @@ export type Database = {
           id: string
           is_active: boolean
           location_id: string | null
+          notif_email: boolean
+          notif_in_app: boolean
+          notif_sms: boolean
           onboarding_complete: boolean
           phone: string | null
+          phone_verified: boolean
           role: Database["public"]["Enums"]["user_role"]
           tos_accepted_at: string | null
           total_hours: number
@@ -292,8 +296,12 @@ export type Database = {
           id: string
           is_active?: boolean
           location_id?: string | null
+          notif_email?: boolean
+          notif_in_app?: boolean
+          notif_sms?: boolean
           onboarding_complete?: boolean
           phone?: string | null
+          phone_verified?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           tos_accepted_at?: string | null
           total_hours?: number
@@ -313,8 +321,12 @@ export type Database = {
           id?: string
           is_active?: boolean
           location_id?: string | null
+          notif_email?: boolean
+          notif_in_app?: boolean
+          notif_sms?: boolean
           onboarding_complete?: boolean
           phone?: string | null
+          phone_verified?: boolean
           role?: Database["public"]["Enums"]["user_role"]
           tos_accepted_at?: string | null
           total_hours?: number
