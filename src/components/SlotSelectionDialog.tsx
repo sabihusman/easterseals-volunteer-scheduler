@@ -26,7 +26,8 @@ interface SlotSelectionDialogProps {
     id: string;
     title: string;
     shift_date: string;
-    departments?: { name: string } | null;
+    department_id?: string;
+    departments?: { name: string; requires_bg_check?: boolean } | null;
     status: string;
     total_slots: number;
     booked_slots: number;
