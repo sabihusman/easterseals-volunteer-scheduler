@@ -10,6 +10,8 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatSlotRange, slotHours } from "@/lib/slot-utils";
 import { WeatherForecast } from "@/components/WeatherForecast";
+import { sendEmail } from "@/lib/email-utils";
+import { getShiftTimes, timeLabel } from "@/lib/calendar-utils";
 
 interface Slot {
   id: string;
@@ -186,6 +188,21 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
     }
 
     toast({ title: isFull ? "Added to waitlist" : "Shift booked!", description: hasSlots ? `${totalHours} hours selected` : "Booking confirmed" });
+
+    // Send booking confirmation email
+    if (profile?.email) {
+      const slotSummary = selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ");
+      sendEmail({
+        to: profile.email,
+        type: "shift_booked",
+        shiftTitle: shift.title,
+        shiftDate: format(new Date(shift.shift_date + "T00:00:00"), "MMMM d, yyyy"),
+        shiftTime: timeLabel(shift as any),
+        department: shift.departments?.name || "",
+        selectedSlots: slotSummary || undefined,
+      });
+    }
+
     onBooked();
     setSubmitting(false);
     onOpenChange(false);
