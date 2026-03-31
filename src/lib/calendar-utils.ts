@@ -81,7 +81,30 @@ export function downloadCSV(data: Record<string, any>[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
+export const SHIFT_TIME_DEFAULTS: Record<string, { start: string; end: string; label: string }> = {
+  morning: { start: "09:00", end: "12:00", label: "Morning" },
+  afternoon: { start: "13:00", end: "16:00", label: "Afternoon" },
+  all_day: { start: "09:00", end: "17:00", label: "All Day" },
+};
+
+function formatTime12(t: string): string {
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const hour = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, "0")} ${ampm}`;
+}
+
+export function getShiftTimes(s: { time_type: string; start_time?: string | null; end_time?: string | null }): { start: string; end: string } {
+  if (s.time_type === "custom" && s.start_time && s.end_time) {
+    return { start: s.start_time.slice(0, 5), end: s.end_time.slice(0, 5) };
+  }
+  const defaults = SHIFT_TIME_DEFAULTS[s.time_type];
+  if (defaults) return { start: defaults.start, end: defaults.end };
+  return { start: "09:00", end: "17:00" };
+}
+
 export function timeLabel(s: { time_type: string; start_time?: string | null; end_time?: string | null }): string {
-  if (s.time_type === "custom" && s.start_time && s.end_time) return `${s.start_time.slice(0, 5)} – ${s.end_time.slice(0, 5)}`;
-  return s.time_type.charAt(0).toUpperCase() + s.time_type.slice(1).replace("_", " ");
+  const times = getShiftTimes(s);
+  const label = s.time_type === "custom" ? "Custom" : (SHIFT_TIME_DEFAULTS[s.time_type]?.label || s.time_type);
+  return `${label} · ${formatTime12(times.start)} – ${formatTime12(times.end)}`;
 }
