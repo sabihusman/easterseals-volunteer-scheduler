@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Leaf, Mail, Lock, User, Phone } from "lucide-react";
 import { z } from "zod";
+import { sendEmail } from "@/lib/email-utils";
 
 const registerSchema = z.object({
   name: z.string().trim().min(1, "Full name is required").max(100, "Name must be under 100 characters"),
