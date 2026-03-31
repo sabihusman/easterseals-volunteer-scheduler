@@ -50,8 +50,9 @@ export function googleCalendarUrl(shift: Parameters<typeof generateICS>[0]): str
   let startTime = "090000";
   let endTime = "170000";
 
-  if (shift.time_type === "morning") { startTime = "080000"; endTime = "120000"; }
-  else if (shift.time_type === "afternoon") { startTime = "120000"; endTime = "170000"; }
+  if (shift.time_type === "morning") { startTime = "090000"; endTime = "120000"; }
+  else if (shift.time_type === "afternoon") { startTime = "130000"; endTime = "160000"; }
+  else if (shift.time_type === "all_day") { startTime = "090000"; endTime = "170000"; }
   else if (shift.time_type === "custom" && shift.start_time && shift.end_time) {
     startTime = shift.start_time.replace(/:/g, "").slice(0, 6);
     endTime = shift.end_time.replace(/:/g, "").slice(0, 6);
