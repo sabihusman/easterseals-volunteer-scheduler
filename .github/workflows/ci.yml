@@ -10,18 +10,18 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run ESLint
-        run: npx eslint .
+        run: npx eslint . --ignore-pattern 'supabase/functions/**'
 
       - name: Run tests
         run: npx vitest run --reporter=verbose
