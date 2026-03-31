@@ -26,6 +26,8 @@ export default function Auth() {
   const [showReset, setShowReset] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as { inactivitySignout?: boolean; accountDeleted?: boolean } | null;
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
