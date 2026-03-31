@@ -11,8 +11,9 @@ export function generateICS(shift: {
   let dtStart = `${date}T090000`;
   let dtEnd = `${date}T170000`;
 
-  if (shift.time_type === "morning") { dtStart = `${date}T080000`; dtEnd = `${date}T120000`; }
-  else if (shift.time_type === "afternoon") { dtStart = `${date}T120000`; dtEnd = `${date}T170000`; }
+  if (shift.time_type === "morning") { dtStart = `${date}T090000`; dtEnd = `${date}T120000`; }
+  else if (shift.time_type === "afternoon") { dtStart = `${date}T130000`; dtEnd = `${date}T160000`; }
+  else if (shift.time_type === "all_day") { dtStart = `${date}T090000`; dtEnd = `${date}T170000`; }
   else if (shift.time_type === "custom" && shift.start_time && shift.end_time) {
     dtStart = `${date}T${shift.start_time.replace(/:/g, "").slice(0, 6)}`;
     dtEnd = `${date}T${shift.end_time.replace(/:/g, "").slice(0, 6)}`;
