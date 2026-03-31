@@ -80,6 +80,19 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
   const selectedSlots = slots.filter(s => selected.has(s.id));
   const totalHours = selectedSlots.reduce((sum, s) => sum + slotHours(s.slot_start, s.slot_end), 0);
 
+  const handleBookingError = (msg: string) => {
+    if (msg.includes("overlaps with this shift time")) {
+      toast({ title: "Time conflict", description: "You already have a shift booked that overlaps with this time. Please check My Shifts before booking.", variant: "destructive" });
+    } else if (msg.includes("background check") || msg.includes("bg_check")) {
+      const status = profile?.bg_check_status || "pending";
+      toast({ title: "Background check required", description: `This shift requires a cleared background check. Your current status is: ${status}. Please contact your coordinator to update your status.`, variant: "destructive" });
+    } else if (msg.includes("restrict") || msg.includes("department")) {
+      toast({ title: "Unable to book", description: "You are not currently able to book shifts in this department. Please contact your coordinator if you believe this is an error.", variant: "destructive" });
+    } else {
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    }
+  };
+
   const handleConfirm = async () => {
     if (!user || !profile) return;
     if (hasSlots && selected.size === 0) return;
