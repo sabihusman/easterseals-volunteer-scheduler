@@ -32,15 +32,17 @@ export default function BrowseShifts() {
     maxDate.setDate(maxDate.getDate() + maxDays);
     const maxDateStr = maxDate.toISOString().split("T")[0];
     const todayStr = new Date().toISOString().split("T")[0];
+    const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60 * 1000)
+      .toTimeString().slice(0, 8);
 
     const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
       supabase.from("departments").select("id, name").eq("is_active", true),
       supabase
         .from("shifts")
         .select("*, departments(name, requires_bg_check)")
-        .gte("shift_date", todayStr)
         .lte("shift_date", maxDateStr)
         .in("status", ["open", "full"])
+        .or(`shift_date.gt.${todayStr},and(shift_date.eq.${todayStr},start_time.gt.${twoHoursFromNow}),and(shift_date.gte.${todayStr},start_time.is.null)`)
         .order("shift_date", { ascending: true }),
       user
         ? supabase.from("shift_bookings").select("shift_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
