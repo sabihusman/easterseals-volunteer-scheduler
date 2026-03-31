@@ -328,7 +328,7 @@ export default function ManageShifts() {
                   </Select>
                 </div>
               </div>
-              {timeType === "custom" && (
+              {timeType === "custom" ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -342,10 +342,14 @@ export default function ManageShifts() {
                   </div>
                   {startTime && endTime && previewSlotCount(startTime, endTime) > 0 && (
                     <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
-                      ⏱ This shift will be divided into {previewSlotCount(startTime, endTime)} × 2-hour slot{previewSlotCount(startTime, endTime) !== 1 ? "s" : ""} for volunteer booking
+                      ⏱ This shift will run from {formatSlotTime(startTime)} to {formatSlotTime(endTime)} and be divided into {previewSlotCount(startTime, endTime)} × 2-hour slot{previewSlotCount(startTime, endTime) !== 1 ? "s" : ""}
                     </p>
                   )}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                  ⏱ This shift will run from {formatSlotTime(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00")} to {formatSlotTime(SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00")} and be divided into {previewSlotCount(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00", SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00")} × 2-hour slot{previewSlotCount(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00", SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00") !== 1 ? "s" : ""}
+                </p>
               )}
               <div className="space-y-2">
                 <Label>Total Slots</Label>
