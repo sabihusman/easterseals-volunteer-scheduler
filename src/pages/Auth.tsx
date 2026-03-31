@@ -156,6 +156,16 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-4">
+        {locationState?.inactivitySignout && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 text-center">
+            You were signed out due to inactivity.
+          </div>
+        )}
+        {locationState?.accountDeleted && (
+          <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm text-foreground text-center">
+            Your account has been successfully deleted.
+          </div>
+        )}
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
