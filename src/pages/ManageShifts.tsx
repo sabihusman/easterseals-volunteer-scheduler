@@ -157,12 +157,13 @@ export default function ManageShifts() {
     }
     setFormErrors({});
     setLoading(true);
+    const times = getShiftTimes({ time_type: timeType, start_time: startTime, end_time: endTime });
     const payload = {
       title,
       shift_date: shiftDate,
       time_type: timeType as any,
-      start_time: timeType === "custom" ? startTime || null : null,
-      end_time: timeType === "custom" ? endTime || null : null,
+      start_time: times.start + ":00",
+      end_time: times.end + ":00",
       total_slots: parseInt(totalSlots) || 1,
       requires_bg_check: requiresBg,
       allows_group: allowsGroup,
