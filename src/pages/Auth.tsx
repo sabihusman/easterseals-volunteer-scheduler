@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Leaf, Mail, Lock, User, Phone, Shield, Users, UserCheck } from "lucide-react";
+import { Leaf, Mail, Lock, User, Phone } from "lucide-react";
 import { z } from "zod";
 
 const registerSchema = z.object({
