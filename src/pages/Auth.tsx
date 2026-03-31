@@ -94,6 +94,13 @@ export default function Auth() {
         tos_accepted_at: new Date().toISOString(),
       });
     }
+      // Send welcome email
+      sendEmail({
+        to: result.data.email,
+        type: "registration_welcome",
+        volunteerName: result.data.name,
+      });
+    }
     setLoading(false);
     toast({ title: "Account created", description: "Please check your email to verify your account." });
   };
