@@ -65,7 +65,7 @@ export default function BrowseShifts() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [user]);
+  useEffect(() => { fetchData(); }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
   const handleBooked = () => {
     fetchData();
