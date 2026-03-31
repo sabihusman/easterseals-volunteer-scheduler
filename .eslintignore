@@ -1,0 +1,4 @@
+supabase/functions/
+supabase/
+dist/
+node_modules/
