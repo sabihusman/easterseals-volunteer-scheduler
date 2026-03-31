@@ -26,12 +26,20 @@ export default function BrowseShifts() {
   const [slotDialogShift, setSlotDialogShift] = useState<any>(null);
 
   const fetchData = async () => {
+    // Calculate max booking date based on profile
+    const maxDays = profile?.extended_booking ? 21 : 14;
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + maxDays);
+    const maxDateStr = maxDate.toISOString().split("T")[0];
+    const todayStr = new Date().toISOString().split("T")[0];
+
     const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
       supabase.from("departments").select("id, name").eq("is_active", true),
       supabase
         .from("shifts")
-        .select("*, departments(name)")
-        .gte("shift_date", new Date().toISOString().split("T")[0])
+        .select("*, departments(name, requires_bg_check)")
+        .gte("shift_date", todayStr)
+        .lte("shift_date", maxDateStr)
         .in("status", ["open", "full"])
         .order("shift_date", { ascending: true }),
       user
@@ -42,13 +50,22 @@ export default function BrowseShifts() {
         : Promise.resolve({ data: [] }),
     ]);
     const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: any) => r.department_id));
+
+    // Filter out restricted depts and BG-check-required shifts if volunteer not cleared
+    const bgStatus = profile?.bg_check_status;
+    const filteredShifts = (shiftData || []).filter((s: any) => {
+      if (restrictedDeptIds.has(s.department_id)) return false;
+      if ((s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared") return false;
+      return true;
+    });
+
     setDepartments((depts || []).filter((d: any) => !restrictedDeptIds.has(d.id)));
-    setShifts((shiftData || []).filter((s: any) => !restrictedDeptIds.has(s.department_id)));
+    setShifts(filteredShifts);
     setBookingIds(new Set((myBookings || []).map((b: any) => b.shift_id)));
     setLoading(false);
   };
 
-  useEffect(() => { fetchData(); }, [user]);
+  useEffect(() => { fetchData(); }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
   const handleBooked = () => {
     fetchData();

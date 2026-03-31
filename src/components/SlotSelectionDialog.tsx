@@ -9,6 +9,7 @@ import { Calendar, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatSlotRange, slotHours } from "@/lib/slot-utils";
+import { WeatherForecast } from "@/components/WeatherForecast";
 
 interface Slot {
   id: string;
@@ -25,7 +26,8 @@ interface SlotSelectionDialogProps {
     id: string;
     title: string;
     shift_date: string;
-    departments?: { name: string } | null;
+    department_id?: string;
+    departments?: { name: string; requires_bg_check?: boolean } | null;
     status: string;
     total_slots: number;
     booked_slots: number;
@@ -209,6 +211,11 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
             )}
           </div>
         </div>
+
+        {/* Weather forecast for outdoor departments */}
+        {shift.departments && shift.departments.requires_bg_check === false && (
+          <WeatherForecast shiftDate={shift.shift_date} />
+        )}
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading time slots...</p>
