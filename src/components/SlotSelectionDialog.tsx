@@ -9,6 +9,7 @@ import { Calendar, Users } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatSlotRange, slotHours } from "@/lib/slot-utils";
+import { WeatherForecast } from "@/components/WeatherForecast";
 
 interface Slot {
   id: string;
