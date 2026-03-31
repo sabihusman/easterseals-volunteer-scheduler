@@ -262,13 +262,47 @@ export default function ManageShifts() {
   };
 
   const handleCancel = async (shiftId: string) => {
+    // Get the shift details for notification
+    const shift = shifts.find((s) => s.id === shiftId);
+
+    // Get booked volunteers before cancelling
+    const { data: bookings } = await supabase
+      .from("shift_bookings")
+      .select("id, volunteer_id")
+      .eq("shift_id", shiftId)
+      .eq("booking_status", "confirmed");
+
     const { error } = await supabase.from("shifts").update({ status: "cancelled" as any }).eq("id", shiftId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      setShifts((prev) => prev.map((s) => s.id === shiftId ? { ...s, status: "cancelled" } : s));
-      toast({ title: "Shift cancelled" });
+      return;
     }
+
+    const bookedCount = bookings?.length || 0;
+
+    // Cancel all confirmed bookings
+    if (bookedCount > 0) {
+      await supabase
+        .from("shift_bookings")
+        .update({ booking_status: "cancelled" as any, cancelled_at: new Date().toISOString() })
+        .eq("shift_id", shiftId)
+        .eq("booking_status", "confirmed");
+
+      // Notify each booked volunteer
+      if (shift) {
+        const notifications = bookings!.map((b: any) => ({
+          user_id: b.volunteer_id,
+          type: "shift_cancelled",
+          title: `Shift Cancelled — ${shift.title}`,
+          message: `Your shift "${shift.title}" on ${format(new Date(shift.shift_date), "MMM d, yyyy")} at ${timeLabel(shift)} has been cancelled by the coordinator.`,
+          link: "/dashboard",
+        }));
+        await supabase.from("notifications").insert(notifications);
+      }
+    }
+
+    setShifts((prev) => prev.map((s) => s.id === shiftId ? { ...s, status: "cancelled" } : s));
+    toast({ title: `Shift cancelled. ${bookedCount} volunteer${bookedCount !== 1 ? "s" : ""} notified.` });
   };
   const handleDeleteShift = async (shift: any) => {
     const { error } = await supabase.from("shifts").delete().eq("id", shift.id);
