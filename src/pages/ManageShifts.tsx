@@ -15,8 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Edit, Trash2, Calendar, Clock, Users, Repeat } from "lucide-react";
 import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { timeLabel } from "@/lib/calendar-utils";
-import { previewSlotCount } from "@/lib/slot-utils";
+import { timeLabel, SHIFT_TIME_DEFAULTS, getShiftTimes } from "@/lib/calendar-utils";
+import { previewSlotCount, formatSlotTime } from "@/lib/slot-utils";
 import { z } from "zod";
 
 const shiftSchema = z.object({
@@ -157,12 +157,13 @@ export default function ManageShifts() {
     }
     setFormErrors({});
     setLoading(true);
+    const times = getShiftTimes({ time_type: timeType, start_time: startTime, end_time: endTime });
     const payload = {
       title,
       shift_date: shiftDate,
       time_type: timeType as any,
-      start_time: timeType === "custom" ? startTime || null : null,
-      end_time: timeType === "custom" ? endTime || null : null,
+      start_time: times.start + ":00",
+      end_time: times.end + ":00",
       total_slots: parseInt(totalSlots) || 1,
       requires_bg_check: requiresBg,
       allows_group: allowsGroup,
@@ -209,8 +210,8 @@ export default function ManageShifts() {
         start_date: shiftDate,
         end_date: recurrenceEndDate,
         time_type: timeType as any,
-        start_time: timeType === "custom" ? startTime || null : null,
-        end_time: timeType === "custom" ? endTime || null : null,
+        start_time: times.start + ":00",
+        end_time: times.end + ":00",
         total_slots: parseInt(totalSlots) || 1,
         requires_bg_check: requiresBg,
         allows_group: allowsGroup,
@@ -327,7 +328,7 @@ export default function ManageShifts() {
                   </Select>
                 </div>
               </div>
-              {timeType === "custom" && (
+              {timeType === "custom" ? (
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -341,10 +342,14 @@ export default function ManageShifts() {
                   </div>
                   {startTime && endTime && previewSlotCount(startTime, endTime) > 0 && (
                     <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
-                      ⏱ This shift will be divided into {previewSlotCount(startTime, endTime)} × 2-hour slot{previewSlotCount(startTime, endTime) !== 1 ? "s" : ""} for volunteer booking
+                      ⏱ This shift will run from {formatSlotTime(startTime)} to {formatSlotTime(endTime)} and be divided into {previewSlotCount(startTime, endTime)} × 2-hour slot{previewSlotCount(startTime, endTime) !== 1 ? "s" : ""}
                     </p>
                   )}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                  ⏱ This shift will run from {formatSlotTime(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00")} to {formatSlotTime(SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00")} and be divided into {previewSlotCount(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00", SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00")} × 2-hour slot{previewSlotCount(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00", SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00") !== 1 ? "s" : ""}
+                </p>
               )}
               <div className="space-y-2">
                 <Label>Total Slots</Label>
