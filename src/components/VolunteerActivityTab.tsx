@@ -44,7 +44,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
       setBookings(filtered);
 
       // Fetch aggregate ratings for shifts in these departments
-      const shiftIds = [...new Set(filtered.map((b) => b.shift_id as string))];
+      const shiftIds = [...new Set(filtered.map((b) => b.shift_id))];
       if (shiftIds.length > 0) {
         const { data: reports } = await supabase
           .from("volunteer_shift_reports")
