@@ -126,6 +126,9 @@ export default function ShiftConfirmation() {
       return;
     }
 
+    // Save to volunteer_shift_reports — the DB trigger automatically syncs
+    // self_reported_hours to shift_bookings.volunteer_reported_hours and
+    // runs resolve_hours_discrepancy() via the sync_volunteer_reported_hours trigger.
     await supabase
       .from("volunteer_shift_reports")
       .update({
@@ -137,11 +140,6 @@ export default function ShiftConfirmation() {
       })
       .eq("booking_id", bookingId!);
 
-    await supabase
-      .from("shift_bookings")
-      .update({ volunteer_reported_hours: hoursNum })
-      .eq("id", bookingId!);
-
     // Private note
     if (privateNote.trim()) {
       await supabase.from("volunteer_private_notes").insert({
@@ -151,9 +149,6 @@ export default function ShiftConfirmation() {
         content: privateNote.trim(),
       });
     }
-
-    // Resolve hours discrepancy
-    await supabase.rpc("resolve_hours_discrepancy", { p_booking_id: bookingId! });
 
     toast({ title: "Confirmation submitted!" });
     navigate("/dashboard");

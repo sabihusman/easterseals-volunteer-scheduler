@@ -286,7 +286,9 @@ export default function AdminUsers() {
                     <SelectContent>
                       <SelectItem value="volunteer">Volunteer</SelectItem>
                       <SelectItem value="coordinator">Coordinator</SelectItem>
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="admin" disabled={adminCount >= 2 && p.role !== "admin"}>
+                        {adminCount >= 2 && p.role !== "admin" ? "Admin (limit reached)" : "Admin"}
+                      </SelectItem>
                     </SelectContent>
                   </Select>
 

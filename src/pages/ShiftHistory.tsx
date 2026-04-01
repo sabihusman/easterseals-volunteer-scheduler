@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Clock, FileText, Upload, Download, Award, UserPlus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Calendar, Clock, FileText, Upload, Download, Award, UserPlus, CheckCircle, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
@@ -29,7 +30,7 @@ export default function ShiftHistory() {
       const [{ data: bookingData }, { data: inviteData }] = await Promise.all([
         supabase
           .from("shift_bookings")
-          .select("id, booking_status, confirmation_status, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
+          .select("id, booking_status, confirmation_status, volunteer_reported_hours, coordinator_reported_hours, final_hours, hours_source, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
           .eq("volunteer_id", user.id)
           .order("created_at", { ascending: false }),
         supabase
@@ -216,6 +217,27 @@ export default function ShiftHistory() {
                         {statusBadge(b.confirmation_status)}
                       </div>
                       <BookedSlotsDisplay bookingId={b.id} />
+                      {/* Hours source display */}
+                      {b.final_hours != null && (
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-sm font-semibold">{b.final_hours}h recorded</span>
+                          {b.hours_source === "volunteer" && (
+                            <Badge className="text-xs bg-success/20 text-success-foreground">
+                              <CheckCircle className="h-3 w-3 mr-1" />Your hours accepted
+                            </Badge>
+                          )}
+                          {b.hours_source === "coordinator" && (
+                            <Badge className="text-xs bg-warning/20 text-warning-foreground">
+                              <AlertTriangle className="h-3 w-3 mr-1" />Coordinator hours recorded
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      {b.hours_source === "coordinator" && b.volunteer_reported_hours != null && b.coordinator_reported_hours != null && Math.abs(b.volunteer_reported_hours - b.coordinator_reported_hours) > 2 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          There was a discrepancy between your reported hours ({b.volunteer_reported_hours}h) and the coordinator's record ({b.coordinator_reported_hours}h). The coordinator's hours have been recorded.
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Dialog>
