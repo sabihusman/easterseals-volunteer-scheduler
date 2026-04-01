@@ -115,7 +115,9 @@ export default function CoordinatorDashboard() {
   const monthStart = startOfMonth(calMonth);
   const monthEnd = endOfMonth(calMonth);
   const calendarDays = eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(monthEnd) });
-  const deptIds = departments.map((d: any) => d.id);
+  const activeDeptIds = selectedDept === "all"
+    ? departments.map((d: any) => d.id)
+    : [selectedDept];
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
