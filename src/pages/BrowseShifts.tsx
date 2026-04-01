@@ -14,17 +14,32 @@ import { timeLabel } from "@/lib/calendar-utils";
 import { InviteFriendModal } from "@/components/InviteFriendModal";
 import { SlotSelectionDialog } from "@/components/SlotSelectionDialog";
 
+interface ShiftRow {
+  id: string;
+  title: string;
+  shift_date: string;
+  department_id: string;
+  status: string;
+  total_slots: number;
+  booked_slots: number;
+  requires_bg_check: boolean;
+  time_type: string;
+  start_time: string | null;
+  end_time: string | null;
+  departments: { name: string; requires_bg_check?: boolean } | null;
+}
+
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
-  const [slotDialogShift, setSlotDialogShift] = useState<Record<string, unknown> | null>(null);
+  const [slotDialogShift, setSlotDialogShift] = useState<ShiftRow | null>(null);
 
   const fetchData = useCallback(async () => {
     // Calculate max booking date based on profile
