@@ -58,8 +58,8 @@ export default function BrowseShifts() {
     const bgStatus = profile?.bg_check_status;
     const filteredShifts = (shiftData || []).filter((s: Record<string, unknown>) => {
       const sDepts = s.departments as Record<string, unknown> | null;
-      if (restrictedDeptIds.has(s.department_id)) return false;
-      if ((s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared") return false;
+      if (restrictedDeptIds.has(s.department_id as string)) return false;
+      if ((s.requires_bg_check || sDepts?.requires_bg_check) && bgStatus !== "cleared") return false;
       return true;
     });
 
