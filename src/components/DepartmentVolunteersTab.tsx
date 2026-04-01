@@ -43,7 +43,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     const seen = new Set<string>();
     const result: VolunteerEntry[] = [];
     for (const b of (bookings || [])) {
-      if (!b.shifts || !departmentIds.includes(b.shifts.department_id)) continue;
+      if (!b.shifts || (role !== "admin" && !departmentIds.includes(b.shifts.department_id))) continue;
       const key = `${b.volunteer_id}-${b.shifts.department_id}`;
       if (seen.has(key)) continue;
       seen.add(key);
