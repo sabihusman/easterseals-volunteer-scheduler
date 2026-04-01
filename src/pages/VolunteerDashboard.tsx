@@ -183,7 +183,7 @@ export default function VolunteerDashboard() {
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{upcomingBookings.filter(b => b.shifts).length}</div>
+            <div className="text-2xl font-bold">{eligibleBookings.length}</div>
             <p className="text-sm text-muted-foreground">Upcoming Shifts</p>
           </CardContent>
         </Card>
