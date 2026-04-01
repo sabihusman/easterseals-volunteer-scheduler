@@ -101,7 +101,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
               {statusBadge(b.confirmation_status)}
               {b.checked_in_at && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
             </div>
-            <BookedSlotsDisplay bookingId={b.id} compact />
+            <BookedSlotsDisplay bookingId={b.id as string} compact />
           </div>
         </div>
         {showHoursConfirm && (
