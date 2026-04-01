@@ -270,11 +270,11 @@ export default function CoordinatorDashboard() {
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
-          <VolunteerActivityTab departmentIds={deptIds} />
+          <VolunteerActivityTab departmentIds={activeDeptIds} />
         </TabsContent>
 
         <TabsContent value="volunteers" className="mt-4">
-          <DepartmentVolunteersTab departmentIds={deptIds} departments={departments} />
+          <DepartmentVolunteersTab departmentIds={activeDeptIds} departments={selectedDept === "all" ? departments : departments.filter(d => d.id === selectedDept)} />
         </TabsContent>
       </Tabs>
     </div>
