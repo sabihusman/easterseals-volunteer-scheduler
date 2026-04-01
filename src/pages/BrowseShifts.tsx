@@ -67,7 +67,7 @@ export default function BrowseShifts() {
         ? supabase.from("department_restrictions").select("department_id").eq("volunteer_id", user.id)
         : Promise.resolve({ data: [] }),
     ]);
-    const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: Record<string, unknown>) => r.department_id as string));
+    const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: { department_id: string }) => r.department_id));
 
     // Filter out restricted depts and BG-check-required shifts if volunteer not cleared
     const bgStatus = profile?.bg_check_status;
