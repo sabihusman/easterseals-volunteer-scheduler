@@ -29,7 +29,7 @@ export default function ShiftHistory() {
       const [{ data: bookingData }, { data: inviteData }] = await Promise.all([
         supabase
           .from("shift_bookings")
-          .select("id, booking_status, confirmation_status, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
+          .select("id, booking_status, confirmation_status, volunteer_reported_hours, coordinator_reported_hours, final_hours, hours_source, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
           .eq("volunteer_id", user.id)
           .order("created_at", { ascending: false }),
         supabase

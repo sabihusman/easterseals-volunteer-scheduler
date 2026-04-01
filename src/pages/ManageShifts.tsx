@@ -297,7 +297,8 @@ export default function ManageShifts() {
           message: `Your shift "${shift.title}" on ${format(new Date(shift.shift_date), "MMM d, yyyy")} at ${timeLabel(shift)} has been cancelled by the coordinator.`,
           link: "/dashboard",
         }));
-        await supabase.from("notifications").insert(notifications);
+        const { error: notifErr } = await supabase.from("notifications").insert(notifications);
+        if (notifErr) console.warn("Notification insert failed (RLS):", notifErr.message);
       }
     }
 
