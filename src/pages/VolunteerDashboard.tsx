@@ -213,15 +213,15 @@ export default function VolunteerDashboard() {
         <h3 className="text-lg font-semibold mb-3">Upcoming Shifts</h3>
         {loading ? (
           <p className="text-muted-foreground">Loading...</p>
-        ) : upcomingBookings.filter(b => b.shifts).length === 0 ? (
+        ) : eligibleBookings.length === 0 ? (
           <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">
-              <p>No upcoming shifts. <a href="/shifts" className="text-primary underline">Browse available shifts</a></p>
+              <p>{privilegesSuspended ? "Your booking privileges are suspended." : "No upcoming shifts."} <a href="/shifts" className="text-primary underline">Browse available shifts</a></p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-3">
-            {upcomingBookings.filter(b => b.shifts).map((booking) => {
+            {eligibleBookings.map((booking) => {
               const s = booking.shifts!;
               const isToday = s.shift_date === today;
               const alreadyCheckedIn = !!booking.checked_in_at;
