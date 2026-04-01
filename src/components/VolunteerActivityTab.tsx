@@ -42,7 +42,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
         .in("booking_status", ["confirmed", "waitlisted"])
         .order("created_at", { ascending: false })
         .limit(200);
-      const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && departmentIds.includes(b.shifts.department_id));
+      const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && (role === "admin" || departmentIds.includes(b.shifts.department_id)));
       setBookings(filtered);
 
       // Fetch aggregate ratings for shifts in these departments
