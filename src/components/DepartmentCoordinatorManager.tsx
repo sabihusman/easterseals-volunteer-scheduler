@@ -11,9 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 export function DepartmentCoordinatorManager() {
   const { role } = useAuth();
   const { toast } = useToast();
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [assignments, setAssignments] = useState<any[]>([]);
-  const [coordinators, setCoordinators] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [assignments, setAssignments] = useState<{ department_id: string; coordinator_id: string; profiles: { full_name: string; email: string } | null }[]>([]);
+  const [coordinators, setCoordinators] = useState<{ id: string; full_name: string; email: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedCoord, setSelectedCoord] = useState<string>("");
   const [loading, setLoading] = useState(true);

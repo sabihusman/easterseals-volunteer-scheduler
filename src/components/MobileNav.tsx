@@ -1,3 +1,4 @@
+import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NavLink } from "@/components/NavLink";
 import { Home, Calendar, ClipboardList, Building2, Shield, Cog } from "lucide-react";

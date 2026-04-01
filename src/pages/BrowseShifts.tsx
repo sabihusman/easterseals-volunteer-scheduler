@@ -63,13 +63,13 @@ export default function BrowseShifts() {
       return true;
     });
 
-    setDepartments((depts || []).filter((d: any) => !restrictedDeptIds.has(d.id)));
+    setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
-    setBookingIds(new Set((myBookings || []).map((b: any) => b.shift_id)));
+    setBookingIds(new Set((myBookings || []).map((b: Record<string, unknown>) => b.shift_id as string)));
     setLoading(false);
-  };
+  }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
-  useEffect(() => { fetchData(); }, [user, profile?.extended_booking, profile?.bg_check_status]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleBooked = () => {
     fetchData();

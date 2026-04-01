@@ -61,9 +61,9 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     result.sort((a, b) => a.volunteerName.localeCompare(b.volunteerName));
     setEntries(result);
     setLoading(false);
-  };
+  }, [departmentIds, departments, toast]);
 
-  useEffect(() => { fetchData(); }, [departmentIds]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleRemoveRestriction = async (restrictionId: string) => {
     const { error } = await supabase.from("department_restrictions").delete().eq("id", restrictionId);
