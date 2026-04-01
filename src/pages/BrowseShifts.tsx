@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays, AlertTriangle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
@@ -110,7 +111,7 @@ export default function BrowseShifts() {
               )}
               <Button
                 size="sm"
-                disabled={alreadyBooked || !profile?.booking_privileges}
+                disabled={alreadyBooked || !profile?.booking_privileges || privilegesSuspended}
                 onClick={() => setSlotDialogShift(s)}
               >
                 {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
@@ -122,8 +123,38 @@ export default function BrowseShifts() {
     );
   };
 
+  const privilegesSuspended = profile?.booking_privileges === false;
+  const bgNotCleared = profile?.bg_check_status !== "cleared";
+  const bgFailed = profile?.bg_check_status === "failed" || profile?.bg_check_status === "expired";
+  // Some BG-gated shifts were hidden by the query already, but show banner if relevant
+  const hasBgGatedShiftsHidden = bgNotCleared && shifts.length > 0;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {privilegesSuspended && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Booking Privileges Suspended</AlertTitle>
+          <AlertDescription>Your booking privileges have been suspended. Contact your coordinator.</AlertDescription>
+        </Alert>
+      )}
+
+      {!privilegesSuspended && bgFailed && (
+        <Alert className="border-warning/50 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Background Check {profile?.bg_check_status === "expired" ? "Expired" : "Failed"}</AlertTitle>
+          <AlertDescription>Some shifts are hidden because they require a cleared background check.</AlertDescription>
+        </Alert>
+      )}
+
+      {!privilegesSuspended && !bgFailed && bgNotCleared && hasBgGatedShiftsHidden && (
+        <Alert className="border-warning/50 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Background Check Pending</AlertTitle>
+          <AlertDescription>Some shifts are hidden because they require a cleared background check.</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Available Shifts</h2>
@@ -152,6 +183,8 @@ export default function BrowseShifts() {
 
       {loading ? (
         <p className="text-muted-foreground">Loading shifts...</p>
+      ) : privilegesSuspended ? (
+        <Card><CardContent className="pt-6 text-center text-muted-foreground">Your booking privileges have been suspended. Contact your coordinator.</CardContent></Card>
       ) : view === "list" ? (
         filtered.length === 0 ? (
           <Card><CardContent className="pt-6 text-center text-muted-foreground">No available shifts found.</CardContent></Card>

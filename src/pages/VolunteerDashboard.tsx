@@ -4,7 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Shield, Award, UserPlus } from "lucide-react";
+import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { format, differenceInHours } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
@@ -128,12 +129,39 @@ export default function VolunteerDashboard() {
   const milestoneBadges = [10, 25, 50, 100];
   const hours = profile?.total_hours ?? 0;
 
-  return (
+    const privilegesSuspended = profile?.booking_privileges === false;
+    const bgFailed = profile?.bg_check_status === "failed" || profile?.bg_check_status === "expired";
+
+    // Filter upcoming bookings based on eligibility
+    const eligibleBookings = upcomingBookings.filter(b => {
+      if (!b.shifts) return false;
+      if (privilegesSuspended) return false;
+      if (bgFailed && (b.shifts.requires_bg_check || b.shifts.departments?.requires_bg_check)) return false;
+      return true;
+    });
+
+    return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Welcome back, {profile?.full_name?.split(" ")[0]}</h2>
         <p className="text-muted-foreground">Here are your upcoming shifts</p>
       </div>
+
+      {privilegesSuspended && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Booking Privileges Suspended</AlertTitle>
+          <AlertDescription>Your booking privileges have been suspended. Please contact your coordinator.</AlertDescription>
+        </Alert>
+      )}
+
+      {!privilegesSuspended && bgFailed && (
+        <Alert className="border-warning/50 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Background Check {profile?.bg_check_status === "expired" ? "Expired" : "Failed"}</AlertTitle>
+          <AlertDescription>Your background check status is {profile?.bg_check_status}. You cannot book shifts that require a background check until this is resolved.</AlertDescription>
+        </Alert>
+      )}
 
       <OnboardingChecklist />
 
@@ -155,7 +183,7 @@ export default function VolunteerDashboard() {
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{upcomingBookings.filter(b => b.shifts).length}</div>
+            <div className="text-2xl font-bold">{eligibleBookings.length}</div>
             <p className="text-sm text-muted-foreground">Upcoming Shifts</p>
           </CardContent>
         </Card>
@@ -185,15 +213,15 @@ export default function VolunteerDashboard() {
         <h3 className="text-lg font-semibold mb-3">Upcoming Shifts</h3>
         {loading ? (
           <p className="text-muted-foreground">Loading...</p>
-        ) : upcomingBookings.filter(b => b.shifts).length === 0 ? (
+        ) : eligibleBookings.length === 0 ? (
           <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">
-              <p>No upcoming shifts. <a href="/shifts" className="text-primary underline">Browse available shifts</a></p>
+              <p>{privilegesSuspended ? "Your booking privileges are suspended." : "No upcoming shifts."} <a href="/shifts" className="text-primary underline">Browse available shifts</a></p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-3">
-            {upcomingBookings.filter(b => b.shifts).map((booking) => {
+            {eligibleBookings.map((booking) => {
               const s = booking.shifts!;
               const isToday = s.shift_date === today;
               const alreadyCheckedIn = !!booking.checked_in_at;
