@@ -81,15 +81,15 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
   const BookingRow = ({ b, showHoursConfirm }: { b: Record<string, unknown>; showHoursConfirm: boolean }) => {
     const bShifts = b.shifts as Record<string, unknown> | null;
     const bProfiles = b.profiles as Record<string, unknown> | null;
-    const rating = shiftRatings[b.shift_id];
+    const rating = shiftRatings[b.shift_id as string];
     return (
       <div className="flex flex-col gap-2 py-2 px-3 rounded-md bg-muted/50">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="space-y-0.5">
-            <div className="text-sm font-medium">{b.profiles?.full_name}</div>
+            <div className="text-sm font-medium">{bProfiles?.full_name as string}</div>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span>{b.shifts?.title}</span>
-              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{b.shifts?.shift_date ? format(new Date(b.shifts.shift_date), "MMM d, yyyy") : ""}</span>
+              <span>{bShifts?.title as string}</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{bShifts?.shift_date ? format(new Date(bShifts.shift_date as string), "MMM d, yyyy") : ""}</span>
               {rating && (
                 <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-warning text-warning" />★ {rating.avg} avg ({rating.count} rating{rating.count !== 1 ? "s" : ""})</span>
               )}
