@@ -46,7 +46,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
       if (seen.has(key)) continue;
       seen.add(key);
       const restriction = (restrictions || []).find(
-        (r: any) => r.volunteer_id === b.volunteer_id && r.department_id === b.shifts.department_id
+        (r) => r.volunteer_id === b.volunteer_id && r.department_id === b.shifts.department_id
       );
       const dept = departments.find((d) => d.id === b.shifts.department_id);
       result.push({
