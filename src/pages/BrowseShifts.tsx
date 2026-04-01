@@ -123,8 +123,38 @@ export default function BrowseShifts() {
     );
   };
 
+  const privilegesSuspended = profile?.booking_privileges === false;
+  const bgNotCleared = profile?.bg_check_status !== "cleared";
+  const bgFailed = profile?.bg_check_status === "failed" || profile?.bg_check_status === "expired";
+  // Some BG-gated shifts were hidden by the query already, but show banner if relevant
+  const hasBgGatedShiftsHidden = bgNotCleared && shifts.length > 0;
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
+      {privilegesSuspended && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Booking Privileges Suspended</AlertTitle>
+          <AlertDescription>Your booking privileges have been suspended. Contact your coordinator.</AlertDescription>
+        </Alert>
+      )}
+
+      {!privilegesSuspended && bgFailed && (
+        <Alert className="border-warning/50 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Background Check {profile?.bg_check_status === "expired" ? "Expired" : "Failed"}</AlertTitle>
+          <AlertDescription>Some shifts are hidden because they require a cleared background check.</AlertDescription>
+        </Alert>
+      )}
+
+      {!privilegesSuspended && !bgFailed && bgNotCleared && hasBgGatedShiftsHidden && (
+        <Alert className="border-warning/50 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Background Check Pending</AlertTitle>
+          <AlertDescription>Some shifts are hidden because they require a cleared background check.</AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Available Shifts</h2>
