@@ -52,7 +52,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
           .not("star_rating", "is", null);
         
         // Map booking_id to shift_id
-        const bookingToShift = new Map(filtered.map((b) => [b.id as string, b.shift_id as string]));
+        const bookingToShift = new Map(filtered.map((b) => [b.id, b.shift_id]));
         const ratingsByShift: Record<string, number[]> = {};
         for (const r of reports || []) {
           const sid = bookingToShift.get(r.booking_id);
