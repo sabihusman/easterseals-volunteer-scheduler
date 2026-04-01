@@ -14,7 +14,7 @@ import { VolunteerActivityTab } from "@/components/VolunteerActivityTab";
 import { DepartmentVolunteersTab } from "@/components/DepartmentVolunteersTab";
 
 export default function CoordinatorDashboard() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const [departments, setDepartments] = useState<any[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
@@ -27,18 +27,30 @@ export default function CoordinatorDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const { data: coords } = await supabase
-        .from("department_coordinators")
-        .select("department_id, departments(id, name)")
-        .eq("coordinator_id", user.id);
-      const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
-      setDepartments(depts);
-      if (depts.length > 0) setSelectedDept(depts[0].id);
+    const fetchDepts = async () => {
+      if (role === "admin") {
+        // Admins see ALL departments
+        const { data: allDepts } = await supabase
+          .from("departments")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name");
+        const depts = allDepts || [];
+        setDepartments(depts);
+        if (depts.length > 0) setSelectedDept(depts[0].id);
+      } else {
+        const { data: coords } = await supabase
+          .from("department_coordinators")
+          .select("department_id, departments(id, name)")
+          .eq("coordinator_id", user.id);
+        const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
+        setDepartments(depts);
+        if (depts.length > 0) setSelectedDept(depts[0].id);
+      }
       setLoading(false);
     };
-    fetch();
-  }, [user]);
+    fetchDepts();
+  }, [user, role]);
 
   useEffect(() => {
     if (!selectedDept) return;
