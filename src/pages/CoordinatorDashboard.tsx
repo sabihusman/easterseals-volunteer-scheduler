@@ -126,8 +126,17 @@ export default function CoordinatorDashboard() {
           <h2 className="text-2xl font-bold">Department Shifts</h2>
           <p className="text-muted-foreground">{role === "admin" ? "All department shifts" : "Manage shifts for your department"}</p>
         </div>
-        <div className="flex gap-2">
-          {departments.length > 0 && (
+        <div className="flex gap-2 items-center">
+          {role === "admin" && (
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger className="w-[220px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {role !== "admin" && departments.length > 0 && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
               <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
               <SelectContent>
