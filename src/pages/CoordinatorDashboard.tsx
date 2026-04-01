@@ -29,7 +29,6 @@ export default function CoordinatorDashboard() {
     if (!user) return;
     const fetchDepts = async () => {
       if (role === "admin") {
-        // Admins see ALL departments
         const { data: allDepts } = await supabase
           .from("departments")
           .select("id, name")
@@ -37,7 +36,7 @@ export default function CoordinatorDashboard() {
           .order("name");
         const depts = allDepts || [];
         setDepartments(depts);
-        if (depts.length > 0) setSelectedDept(depts[0].id);
+        setSelectedDept("all");
       } else {
         const { data: coords } = await supabase
           .from("department_coordinators")
@@ -54,12 +53,17 @@ export default function CoordinatorDashboard() {
 
   useEffect(() => {
     if (!selectedDept) return;
-    const fetch = async () => {
-      const { data: shiftData } = await supabase
+    const fetchShiftsAndBookings = async () => {
+      let query = supabase
         .from("shifts")
         .select("*")
-        .eq("department_id", selectedDept)
         .order("shift_date", { ascending: true });
+
+      if (selectedDept !== "all") {
+        query = query.eq("department_id", selectedDept);
+      }
+
+      const { data: shiftData } = await query;
       setShifts(shiftData || []);
 
       const shiftIds = (shiftData || []).map((s: any) => s.id);
@@ -74,7 +78,7 @@ export default function CoordinatorDashboard() {
         setBookings([]);
       }
     };
-    fetch();
+    fetchShiftsAndBookings();
   }, [selectedDept]);
 
   const handleConfirm = async (bookingId: string, status: "confirmed" | "no_show") => {
@@ -111,7 +115,9 @@ export default function CoordinatorDashboard() {
   const monthStart = startOfMonth(calMonth);
   const monthEnd = endOfMonth(calMonth);
   const calendarDays = eachDayOfInterval({ start: startOfWeek(monthStart), end: endOfWeek(monthEnd) });
-  const deptIds = departments.map((d: any) => d.id);
+  const activeDeptIds = selectedDept === "all"
+    ? departments.map((d: any) => d.id)
+    : [selectedDept];
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -120,8 +126,17 @@ export default function CoordinatorDashboard() {
           <h2 className="text-2xl font-bold">Department Shifts</h2>
           <p className="text-muted-foreground">{role === "admin" ? "All department shifts" : "Manage shifts for your department"}</p>
         </div>
-        <div className="flex gap-2">
-          {departments.length > 0 && (
+        <div className="flex gap-2 items-center">
+          {role === "admin" && (
+            <Select value={selectedDept} onValueChange={setSelectedDept}>
+              <SelectTrigger className="w-[220px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
+          {role !== "admin" && departments.length > 0 && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
               <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -255,11 +270,11 @@ export default function CoordinatorDashboard() {
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
-          <VolunteerActivityTab departmentIds={deptIds} />
+          <VolunteerActivityTab departmentIds={activeDeptIds} />
         </TabsContent>
 
         <TabsContent value="volunteers" className="mt-4">
-          <DepartmentVolunteersTab departmentIds={deptIds} departments={departments} />
+          <DepartmentVolunteersTab departmentIds={activeDeptIds} departments={selectedDept === "all" ? departments : departments.filter(d => d.id === selectedDept)} />
         </TabsContent>
       </Tabs>
     </div>
