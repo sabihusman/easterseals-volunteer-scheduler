@@ -1,3 +1,4 @@
+import React from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { NavLink } from "@/components/NavLink";
 import { Home, Calendar, ClipboardList, Building2, Shield, Cog } from "lucide-react";
@@ -5,7 +6,7 @@ import { Home, Calendar, ClipboardList, Building2, Shield, Cog } from "lucide-re
 export function MobileNav() {
   const { role } = useAuth();
 
-  const items: { title: string; url: string; icon: any }[] = [];
+  const items: { title: string; url: string; icon: React.ComponentType<{ className?: string }> }[] = [];
 
   if (role === "volunteer") {
     items.push(

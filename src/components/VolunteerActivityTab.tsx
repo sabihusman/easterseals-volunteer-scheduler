@@ -7,12 +7,27 @@ import { format } from "date-fns";
 import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
 import { CoordinatorHoursConfirmation } from "@/components/CoordinatorHoursConfirmation";
 
+interface BookingEntry {
+  id: string;
+  booking_status: string;
+  confirmation_status: string;
+  checked_in_at: string | null;
+  created_at: string;
+  volunteer_reported_hours: number | null;
+  coordinator_reported_hours: number | null;
+  final_hours: number | null;
+  hours_source: string | null;
+  shift_id: string;
+  profiles: { full_name: string; email: string } | null;
+  shifts: { title: string; shift_date: string; time_type: string; start_time: string | null; end_time: string | null; department_id: string } | null;
+}
+
 interface Props {
   departmentIds: string[];
 }
 
 export function VolunteerActivityTab({ departmentIds }: Props) {
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<BookingEntry[]>([]);
   const [shiftRatings, setShiftRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
 
@@ -25,11 +40,11 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
         .in("booking_status", ["confirmed", "waitlisted"])
         .order("created_at", { ascending: false })
         .limit(200);
-      const filtered = (data || []).filter((b: any) => b.shifts && departmentIds.includes(b.shifts.department_id));
+      const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && departmentIds.includes(b.shifts.department_id));
       setBookings(filtered);
 
       // Fetch aggregate ratings for shifts in these departments
-      const shiftIds = [...new Set(filtered.map((b: any) => b.shift_id))];
+      const shiftIds = [...new Set(filtered.map((b) => b.shift_id))];
       if (shiftIds.length > 0) {
         const { data: reports } = await supabase
           .from("volunteer_shift_reports")
@@ -37,7 +52,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
           .not("star_rating", "is", null);
         
         // Map booking_id to shift_id
-        const bookingToShift = new Map(filtered.map((b: any) => [b.id, b.shift_id]));
+        const bookingToShift = new Map(filtered.map((b) => [b.id, b.shift_id]));
         const ratingsByShift: Record<string, number[]> = {};
         for (const r of reports || []) {
           const sid = bookingToShift.get(r.booking_id);
@@ -59,8 +74,8 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
   }, [departmentIds]);
 
   const today = new Date().toISOString().split("T")[0];
-  const upcoming = bookings.filter((b: any) => b.shifts?.shift_date >= today);
-  const past = bookings.filter((b: any) => b.shifts?.shift_date < today);
+  const upcoming = bookings.filter((b) => b.shifts && b.shifts.shift_date >= today);
+  const past = bookings.filter((b) => b.shifts && b.shifts.shift_date < today);
 
   const statusBadge = (status: string) => {
     switch (status) {
@@ -75,7 +90,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
     setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, coordinator_reported_hours: hours } : b));
   };
 
-  const BookingRow = ({ b, showHoursConfirm }: { b: any; showHoursConfirm: boolean }) => {
+  const BookingRow = ({ b, showHoursConfirm }: { b: BookingEntry; showHoursConfirm: boolean }) => {
     const rating = shiftRatings[b.shift_id];
     return (
       <div className="flex flex-col gap-2 py-2 px-3 rounded-md bg-muted/50">

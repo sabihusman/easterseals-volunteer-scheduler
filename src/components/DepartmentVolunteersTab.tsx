@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
   const [entries, setEntries] = useState<VolunteerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (departmentIds.length === 0) return;
     const [{ data: bookings }, { data: restrictions }] = await Promise.all([
       supabase
@@ -46,7 +46,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
       if (seen.has(key)) continue;
       seen.add(key);
       const restriction = (restrictions || []).find(
-        (r: any) => r.volunteer_id === b.volunteer_id && r.department_id === b.shifts.department_id
+        (r) => r.volunteer_id === b.volunteer_id && r.department_id === b.shifts.department_id
       );
       const dept = departments.find((d) => d.id === b.shifts.department_id);
       result.push({
@@ -61,9 +61,9 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     result.sort((a, b) => a.volunteerName.localeCompare(b.volunteerName));
     setEntries(result);
     setLoading(false);
-  };
+  }, [departmentIds, departments, toast]);
 
-  useEffect(() => { fetchData(); }, [departmentIds]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleRemoveRestriction = async (restrictionId: string) => {
     const { error } = await supabase.from("department_restrictions").delete().eq("id", restrictionId);

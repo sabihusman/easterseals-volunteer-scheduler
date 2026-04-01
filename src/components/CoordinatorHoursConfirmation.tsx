@@ -6,8 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Save, AlertTriangle, CheckCircle } from "lucide-react";
 
+interface BookingData {
+  id: string;
+  coordinator_reported_hours: number | null;
+  volunteer_reported_hours: number | null;
+}
+
 interface Props {
-  booking: any;
+  booking: BookingData;
   onUpdate: (bookingId: string, hours: number) => void;
 }
 

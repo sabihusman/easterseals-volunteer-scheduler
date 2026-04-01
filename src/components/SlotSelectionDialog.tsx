@@ -33,6 +33,9 @@ interface SlotSelectionDialogProps {
     status: string;
     total_slots: number;
     booked_slots: number;
+    time_type: string;
+    start_time?: string | null;
+    end_time?: string | null;
   };
   onBooked: () => void;
 }
@@ -197,7 +200,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
         type: "shift_booked",
         shiftTitle: shift.title,
         shiftDate: format(new Date(shift.shift_date + "T00:00:00"), "MMMM d, yyyy"),
-        shiftTime: timeLabel(shift as any),
+        shiftTime: timeLabel(shift),
         department: shift.departments?.name || "",
         selectedSlots: slotSummary || undefined,
       }).catch(console.error);

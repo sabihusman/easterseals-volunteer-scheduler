@@ -42,7 +42,7 @@ export default function ShiftHistory() {
       const bookingsArr = (bookingData as any) || [];
       // Fetch booked slots for all bookings to calculate hours
       const bookingIds = bookingsArr.map((b: any) => b.id);
-      let slotMap: Record<string, number> = {};
+      const slotMap: Record<string, number> = {};
       if (bookingIds.length > 0) {
         const { data: slotData } = await supabase
           .from("shift_booking_slots")

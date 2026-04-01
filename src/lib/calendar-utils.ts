@@ -69,7 +69,7 @@ export function googleCalendarUrl(shift: Parameters<typeof generateICS>[0]): str
 }
 
 // CSV export utility
-export function downloadCSV(data: Record<string, any>[], filename: string) {
+export function downloadCSV(data: Record<string, unknown>[], filename: string) {
   if (data.length === 0) return;
   const headers = Object.keys(data[0]);
   const rows = data.map((row) => headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(","));

@@ -26,7 +26,7 @@ export function BookedSlotsDisplay({ bookingId, compact = false }: Props) {
       .select("slot_id, shift_time_slots(slot_start, slot_end)")
       .eq("booking_id", bookingId)
       .then(({ data }) => {
-        setSlots((data as any) || []);
+        setSlots((data as SlotData[]) || []);
       });
   }, [bookingId]);
 

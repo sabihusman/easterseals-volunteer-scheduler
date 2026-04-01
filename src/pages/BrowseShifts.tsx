@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,19 +14,34 @@ import { timeLabel } from "@/lib/calendar-utils";
 import { InviteFriendModal } from "@/components/InviteFriendModal";
 import { SlotSelectionDialog } from "@/components/SlotSelectionDialog";
 
+interface ShiftRow {
+  id: string;
+  title: string;
+  shift_date: string;
+  department_id: string;
+  status: string;
+  total_slots: number;
+  booked_slots: number;
+  requires_bg_check: boolean;
+  time_type: string;
+  start_time: string | null;
+  end_time: string | null;
+  departments: { name: string; requires_bg_check?: boolean } | null;
+}
+
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [shifts, setShifts] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<ShiftRow[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
-  const [slotDialogShift, setSlotDialogShift] = useState<any>(null);
+  const [slotDialogShift, setSlotDialogShift] = useState<ShiftRow | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     // Calculate max booking date based on profile
     const maxDays = profile?.extended_booking ? 21 : 14;
     const maxDate = new Date();
@@ -52,23 +67,23 @@ export default function BrowseShifts() {
         ? supabase.from("department_restrictions").select("department_id").eq("volunteer_id", user.id)
         : Promise.resolve({ data: [] }),
     ]);
-    const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: any) => r.department_id));
+    const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: { department_id: string }) => r.department_id));
 
     // Filter out restricted depts and BG-check-required shifts if volunteer not cleared
     const bgStatus = profile?.bg_check_status;
-    const filteredShifts = (shiftData || []).filter((s: any) => {
+    const filteredShifts = ((shiftData || []) as ShiftRow[]).filter((s) => {
       if (restrictedDeptIds.has(s.department_id)) return false;
       if ((s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared") return false;
       return true;
     });
 
-    setDepartments((depts || []).filter((d: any) => !restrictedDeptIds.has(d.id)));
+    setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
-    setBookingIds(new Set((myBookings || []).map((b: any) => b.shift_id)));
+    setBookingIds(new Set((myBookings || []).map((b: { shift_id: string }) => b.shift_id)));
     setLoading(false);
-  };
+  }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
-  useEffect(() => { fetchData(); }, [user, profile?.extended_booking, profile?.bg_check_status]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleBooked = () => {
     fetchData();
@@ -85,7 +100,7 @@ export default function BrowseShifts() {
     return filtered.filter((s) => s.shift_date === dateStr);
   };
 
-  const ShiftCard = ({ s }: { s: any }) => {
+  const ShiftCard = ({ s }: { s: ShiftRow }) => {
     const slotsLeft = s.total_slots - s.booked_slots;
     const isFull = slotsLeft <= 0;
     const alreadyBooked = bookingIds.has(s.id);
