@@ -102,7 +102,7 @@ export default function BrowseShifts() {
     return filtered.filter((s) => s.shift_date === dateStr);
   };
 
-  const ShiftCard = ({ s }: { s: any }) => {
+  const ShiftCard = ({ s }: { s: ShiftRow }) => {
     const slotsLeft = s.total_slots - s.booked_slots;
     const isFull = slotsLeft <= 0;
     const alreadyBooked = bookingIds.has(s.id);

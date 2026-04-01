@@ -107,11 +107,11 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
           </div>
           <div className="space-y-1">
             <div className="flex gap-2 items-center">
-              <Badge variant="outline" className="text-xs">{b.booking_status as string}</Badge>
-              {statusBadge(b.confirmation_status as string)}
+              <Badge variant="outline" className="text-xs">{b.booking_status}</Badge>
+              {statusBadge(b.confirmation_status)}
               {b.checked_in_at && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
             </div>
-            <BookedSlotsDisplay bookingId={b.id as string} compact />
+            <BookedSlotsDisplay bookingId={b.id} compact />
           </div>
         </div>
         {showHoursConfirm && (
