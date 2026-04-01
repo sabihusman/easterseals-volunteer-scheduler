@@ -21,8 +21,8 @@ interface InviteFriendModalProps {
   shiftTime?: string;
 }
 
-export function InviteFriendModal({ shiftId, shiftTitle }: InviteFriendModalProps) {
-  const { user } = useAuth();
+export function InviteFriendModal({ shiftId, shiftTitle, shiftDate, shiftTime }: InviteFriendModalProps) {
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -54,6 +54,41 @@ export function InviteFriendModal({ shiftId, shiftTitle }: InviteFriendModalProp
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: `Invite sent to ${result.data.name}!` });
+
+      // Fire-and-forget email
+      const volunteerName = profile?.full_name || "A volunteer";
+      const inviteName = result.data.name;
+      const inviteEmail = result.data.email;
+      supabase.functions.invoke("send-email", {
+        body: {
+          to: inviteEmail,
+          subject: `${volunteerName} invited you to volunteer at Easterseals Iowa!`,
+          html: `
+            <div style="font-family: Arial; max-width: 600px;">
+              <div style="background: #006B3E; padding: 20px; color: white; text-align: center;">
+                <h1>Easterseals Iowa</h1>
+                <p>Volunteer Invitation</p>
+              </div>
+              <div style="padding: 30px;">
+                <p>Hi ${inviteName},</p>
+                <p><strong>${volunteerName}</strong> has invited you to join them for a volunteer shift at Easterseals Iowa!</p>
+                <h3>${shiftTitle}</h3>
+                ${shiftDate ? `<p>📅 ${shiftDate}</p>` : ""}
+                ${shiftTime ? `<p>🕐 ${shiftTime}</p>` : ""}
+                <p>📍 Grounds & Facilities — Johnston, IA</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="https://easterseals-volunteer-scheduler.vercel.app/auth" style="background: #006B3E; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px;">
+                    Sign Up & Join the Shift
+                  </a>
+                </div>
+                <p style="color: #666; font-size: 12px;">This invitation expires in 7 days.</p>
+              </div>
+            </div>
+          `,
+          type: "friend_invite",
+        },
+      }).catch((err) => console.log("Invite email failed:", err));
+
       setName("");
       setEmail("");
       setErrors({});

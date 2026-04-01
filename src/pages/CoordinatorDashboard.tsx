@@ -118,10 +118,10 @@ export default function CoordinatorDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Department Shifts</h2>
-          <p className="text-muted-foreground">Manage shifts for your department</p>
+          <p className="text-muted-foreground">{role === "admin" ? "All department shifts" : "Manage shifts for your department"}</p>
         </div>
         <div className="flex gap-2">
-          {departments.length > 1 && (
+          {departments.length > 0 && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
               <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
               <SelectContent>
