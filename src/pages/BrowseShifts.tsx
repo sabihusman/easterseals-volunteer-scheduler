@@ -183,6 +183,8 @@ export default function BrowseShifts() {
 
       {loading ? (
         <p className="text-muted-foreground">Loading shifts...</p>
+      ) : privilegesSuspended ? (
+        <Card><CardContent className="pt-6 text-center text-muted-foreground">Your booking privileges have been suspended. Contact your coordinator.</CardContent></Card>
       ) : view === "list" ? (
         filtered.length === 0 ? (
           <Card><CardContent className="pt-6 text-center text-muted-foreground">No available shifts found.</CardContent></Card>

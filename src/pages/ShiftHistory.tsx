@@ -143,11 +143,22 @@ export default function ShiftHistory() {
     downloadCSV(data, `shift_history_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
-  const statusBadge = (status: string) => {
+  const statusBadge = (booking: any) => {
+    const status = booking.booking_status === "cancelled" ? "cancelled" : booking.confirmation_status;
     switch (status) {
       case "confirmed": return <Badge className="text-xs bg-success text-success-foreground">Confirmed</Badge>;
       case "no_show": return <Badge variant="destructive" className="text-xs">No Show</Badge>;
-      case "cancelled": return <Badge variant="secondary" className="text-xs">Cancelled</Badge>;
+      case "cancelled": {
+        // Determine cancellation reason
+        const bgFailed = profile?.bg_check_status === "failed" || profile?.bg_check_status === "expired";
+        const privSuspended = profile?.booking_privileges === false;
+        const shift = booking.shifts;
+        const isBgShift = shift?.requires_bg_check || shift?.departments?.requires_bg_check;
+        let reason = "Cancelled";
+        if (privSuspended && booking.cancelled_at) reason = "Cancelled: booking privileges revoked";
+        else if (bgFailed && isBgShift && booking.cancelled_at) reason = "Cancelled: background check status changed";
+        return <Badge variant="destructive" className="text-xs">{reason}</Badge>;
+      }
       default: return <Badge variant="secondary" className="text-xs">{status.replace("_", " ")}</Badge>;
     }
   };
