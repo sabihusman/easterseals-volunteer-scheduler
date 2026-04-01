@@ -81,7 +81,7 @@ export default function BrowseShifts() {
 
     setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
-    setBookingIds(new Set((myBookings || []).map((b: Record<string, unknown>) => b.shift_id as string)));
+    setBookingIds(new Set((myBookings || []).map((b: { shift_id: string }) => b.shift_id)));
     setLoading(false);
   }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
