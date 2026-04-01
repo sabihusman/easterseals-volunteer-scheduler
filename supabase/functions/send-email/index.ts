@@ -8,6 +8,9 @@ const BRAND_COLOR = "#006B3E";
 const APP_NAME = "Easterseals Iowa Volunteer Scheduler";
 const APP_URL = "https://easterseals-volunteer-scheduler.vercel.app";
 
+const SANDBOX_MODE = true; // Set to false once domain is verified at resend.com/domains
+const SANDBOX_EMAIL = "sabih.usman@gmail.com";
+
 function brandedHtml(bodyContent: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -260,6 +263,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Sandbox mode: redirect all emails to test address
+    const actualTo = SANDBOX_MODE ? SANDBOX_EMAIL : to;
+    const actualSubject = SANDBOX_MODE ? `[TEST] ${subject}` : subject;
+    if (SANDBOX_MODE) {
+      console.log(`Sandbox mode: redirecting email for ${to} to ${SANDBOX_EMAIL}`);
+    }
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -268,8 +278,8 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         from: `${APP_NAME} <onboarding@resend.dev>`,
-        to: [to],
-        subject,
+        to: [actualTo],
+        subject: actualSubject,
         html,
       }),
     });
