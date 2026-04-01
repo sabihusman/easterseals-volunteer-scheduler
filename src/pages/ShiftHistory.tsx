@@ -225,7 +225,7 @@ export default function ShiftHistory() {
                       </div>
                       <div className="flex gap-2">
                         <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
-                        {statusBadge(b.confirmation_status)}
+                        {statusBadge(b)}
                       </div>
                       <BookedSlotsDisplay bookingId={b.id} />
                       {/* Hours source display */}
