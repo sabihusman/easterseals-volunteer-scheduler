@@ -62,8 +62,8 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
   }, [departmentIds]);
 
   const today = new Date().toISOString().split("T")[0];
-  const upcoming = bookings.filter((b: any) => b.shifts?.shift_date >= today);
-  const past = bookings.filter((b: any) => b.shifts?.shift_date < today);
+  const upcoming = bookings.filter((b) => { const s = b.shifts as Record<string, unknown> | null; return s && (s.shift_date as string) >= today; });
+  const past = bookings.filter((b) => { const s = b.shifts as Record<string, unknown> | null; return s && (s.shift_date as string) < today; });
 
   const statusBadge = (status: string) => {
     switch (status) {
