@@ -29,7 +29,6 @@ export default function CoordinatorDashboard() {
     if (!user) return;
     const fetchDepts = async () => {
       if (role === "admin") {
-        // Admins see ALL departments
         const { data: allDepts } = await supabase
           .from("departments")
           .select("id, name")
@@ -37,7 +36,7 @@ export default function CoordinatorDashboard() {
           .order("name");
         const depts = allDepts || [];
         setDepartments(depts);
-        if (depts.length > 0) setSelectedDept(depts[0].id);
+        setSelectedDept("all");
       } else {
         const { data: coords } = await supabase
           .from("department_coordinators")
@@ -54,12 +53,17 @@ export default function CoordinatorDashboard() {
 
   useEffect(() => {
     if (!selectedDept) return;
-    const fetch = async () => {
-      const { data: shiftData } = await supabase
+    const fetchShiftsAndBookings = async () => {
+      let query = supabase
         .from("shifts")
         .select("*")
-        .eq("department_id", selectedDept)
         .order("shift_date", { ascending: true });
+
+      if (selectedDept !== "all") {
+        query = query.eq("department_id", selectedDept);
+      }
+
+      const { data: shiftData } = await query;
       setShifts(shiftData || []);
 
       const shiftIds = (shiftData || []).map((s: any) => s.id);
@@ -74,7 +78,7 @@ export default function CoordinatorDashboard() {
         setBookings([]);
       }
     };
-    fetch();
+    fetchShiftsAndBookings();
   }, [selectedDept]);
 
   const handleConfirm = async (bookingId: string, status: "confirmed" | "no_show") => {
