@@ -12,7 +12,7 @@ interface Props {
 }
 
 export function VolunteerActivityTab({ departmentIds }: Props) {
-  const [bookings, setBookings] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<Record<string, unknown>[]>([]);
   const [shiftRatings, setShiftRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
 
