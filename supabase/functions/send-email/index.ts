@@ -277,9 +277,9 @@ Deno.serve(async (req) => {
     const data = await res.json();
 
     if (!res.ok) {
+      // Log error but return 200 so callers never break
       console.error("Resend API error:", data);
-      return new Response(JSON.stringify({ error: data }), {
-        status: res.status,
+      return new Response(JSON.stringify({ success: false, warning: "Email sending failed silently" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -288,9 +288,9 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
+    // Log error but return 200 so callers never break
     console.error("send-email error:", e);
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ success: false, warning: "Email sending failed silently" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

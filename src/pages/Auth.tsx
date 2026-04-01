@@ -93,12 +93,12 @@ export default function Auth() {
         onboarding_complete: false,
         tos_accepted_at: new Date().toISOString(),
       });
-      // Send welcome email
+      // Fire and forget welcome email
       sendEmail({
         to: result.data.email,
         type: "registration_welcome",
         volunteerName: result.data.name,
-      });
+      }).catch(console.error);
     }
     setLoading(false);
     toast({ title: "Account created", description: "Please check your email to verify your account." });
