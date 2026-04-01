@@ -189,7 +189,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
 
     toast({ title: isFull ? "Added to waitlist" : "Shift booked!", description: hasSlots ? `${totalHours} hours selected` : "Booking confirmed" });
 
-    // Send booking confirmation email
+    // Fire and forget booking confirmation email
     if (profile?.email) {
       const slotSummary = selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ");
       sendEmail({
@@ -200,7 +200,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
         shiftTime: timeLabel(shift as any),
         department: shift.departments?.name || "",
         selectedSlots: slotSummary || undefined,
-      });
+      }).catch(console.error);
     }
 
     onBooked();
