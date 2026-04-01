@@ -111,7 +111,7 @@ export default function BrowseShifts() {
               )}
               <Button
                 size="sm"
-                disabled={alreadyBooked || !profile?.booking_privileges}
+                disabled={alreadyBooked || !profile?.booking_privileges || privilegesSuspended}
                 onClick={() => setSlotDialogShift(s)}
               >
                 {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
