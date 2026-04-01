@@ -83,22 +83,38 @@ export default function ManageShifts() {
     return generateRecurringDates(shiftDate, recurrenceEndDate, recurrenceType).length;
   }, [isRecurring, shiftDate, recurrenceEndDate, recurrenceType]);
 
+  const { role } = useAuth();
+
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const { data: coords } = await supabase
-        .from("department_coordinators")
-        .select("department_id, departments(id, name)")
-        .eq("coordinator_id", user.id);
-      const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
-      setDepartments(depts);
-      if (depts.length > 0) {
-        setDeptId(depts[0].id);
-        fetchShifts(depts.map((d: any) => d.id));
+    const fetchDepts = async () => {
+      if (role === "admin") {
+        const { data: allDepts } = await supabase
+          .from("departments")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name");
+        const depts = allDepts || [];
+        setDepartments(depts);
+        if (depts.length > 0) {
+          setDeptId(depts[0].id);
+          fetchShifts(depts.map((d: any) => d.id));
+        }
+      } else {
+        const { data: coords } = await supabase
+          .from("department_coordinators")
+          .select("department_id, departments(id, name)")
+          .eq("coordinator_id", user.id);
+        const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
+        setDepartments(depts);
+        if (depts.length > 0) {
+          setDeptId(depts[0].id);
+          fetchShifts(depts.map((d: any) => d.id));
+        }
       }
     };
-    fetch();
-  }, [user]);
+    fetchDepts();
+  }, [user, role]);
 
   const fetchShifts = async (deptIds: string[]) => {
     const { data } = await supabase

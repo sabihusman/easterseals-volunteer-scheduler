@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { VolunteerActivityTab } from "@/components/VolunteerActivityTab";
 import { DepartmentVolunteersTab } from "@/components/DepartmentVolunteersTab";
 
 export default function CoordinatorDashboard() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { toast } = useToast();
   const [departments, setDepartments] = useState<any[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("");
@@ -27,18 +27,30 @@ export default function CoordinatorDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const fetch = async () => {
-      const { data: coords } = await supabase
-        .from("department_coordinators")
-        .select("department_id, departments(id, name)")
-        .eq("coordinator_id", user.id);
-      const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
-      setDepartments(depts);
-      if (depts.length > 0) setSelectedDept(depts[0].id);
+    const fetchDepts = async () => {
+      if (role === "admin") {
+        // Admins see ALL departments
+        const { data: allDepts } = await supabase
+          .from("departments")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name");
+        const depts = allDepts || [];
+        setDepartments(depts);
+        if (depts.length > 0) setSelectedDept(depts[0].id);
+      } else {
+        const { data: coords } = await supabase
+          .from("department_coordinators")
+          .select("department_id, departments(id, name)")
+          .eq("coordinator_id", user.id);
+        const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
+        setDepartments(depts);
+        if (depts.length > 0) setSelectedDept(depts[0].id);
+      }
       setLoading(false);
     };
-    fetch();
-  }, [user]);
+    fetchDepts();
+  }, [user, role]);
 
   useEffect(() => {
     if (!selectedDept) return;
@@ -106,10 +118,10 @@ export default function CoordinatorDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Department Shifts</h2>
-          <p className="text-muted-foreground">Manage shifts for your department</p>
+          <p className="text-muted-foreground">{role === "admin" ? "All department shifts" : "Manage shifts for your department"}</p>
         </div>
         <div className="flex gap-2">
-          {departments.length > 1 && (
+          {departments.length > 0 && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
               <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
               <SelectContent>

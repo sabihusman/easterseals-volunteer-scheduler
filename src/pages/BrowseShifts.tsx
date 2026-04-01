@@ -122,7 +122,7 @@ export default function BrowseShifts() {
             </div>
             <div className="flex gap-2 items-center">
               {alreadyBooked && !s.requires_bg_check && !s.departments?.requires_bg_check && (
-                <InviteFriendModal shiftId={s.id} shiftTitle={s.title} />
+                <InviteFriendModal shiftId={s.id} shiftTitle={s.title} shiftDate={s.shift_date} shiftTime={timeLabel(s)} />
               )}
               <Button
                 size="sm"

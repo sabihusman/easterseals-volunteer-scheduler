@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShieldCheck } from "lucide-react";
@@ -22,11 +23,12 @@ interface VolunteerEntry {
 
 export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
   const { toast } = useToast();
+  const { role } = useAuth();
   const [entries, setEntries] = useState<VolunteerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (departmentIds.length === 0) return;
+    if (departmentIds.length === 0 && role !== "admin") return;
     const [{ data: bookings }, { data: restrictions }] = await Promise.all([
       supabase
         .from("shift_bookings")
@@ -41,7 +43,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     const seen = new Set<string>();
     const result: VolunteerEntry[] = [];
     for (const b of (bookings || [])) {
-      if (!b.shifts || !departmentIds.includes(b.shifts.department_id)) continue;
+      if (!b.shifts || (role !== "admin" && !departmentIds.includes(b.shifts.department_id))) continue;
       const key = `${b.volunteer_id}-${b.shifts.department_id}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -61,7 +63,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     result.sort((a, b) => a.volunteerName.localeCompare(b.volunteerName));
     setEntries(result);
     setLoading(false);
-  }, [departmentIds, departments, toast]);
+  }, [departmentIds, departments, toast, role]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

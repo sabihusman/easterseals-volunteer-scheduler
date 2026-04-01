@@ -258,7 +258,7 @@ export default function VolunteerDashboard() {
                             </a>
                           </Button>
                           {!s.requires_bg_check && (
-                            <InviteFriendModal shiftId={s.id} shiftTitle={s.title} />
+                            <InviteFriendModal shiftId={s.id} shiftTitle={s.title} shiftDate={s.shift_date} shiftTime={timeLabel(s)} />
                           )}
                         </div>
                         <Button variant="outline" size="sm" onClick={() => handleCancel(booking.id, s)}>Cancel</Button>

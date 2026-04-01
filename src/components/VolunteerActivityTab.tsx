@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,12 +28,13 @@ interface Props {
 }
 
 export function VolunteerActivityTab({ departmentIds }: Props) {
+  const { role } = useAuth();
   const [bookings, setBookings] = useState<BookingEntry[]>([]);
   const [shiftRatings, setShiftRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (departmentIds.length === 0) return;
+    if (departmentIds.length === 0 && role !== "admin") return;
     const fetchActivity = async () => {
       const { data } = await supabase
         .from("shift_bookings")
@@ -40,7 +42,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
         .in("booking_status", ["confirmed", "waitlisted"])
         .order("created_at", { ascending: false })
         .limit(200);
-      const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && departmentIds.includes(b.shifts.department_id));
+      const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && (role === "admin" || departmentIds.includes(b.shifts.department_id)));
       setBookings(filtered);
 
       // Fetch aggregate ratings for shifts in these departments
@@ -71,7 +73,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
       setLoading(false);
     };
     fetchActivity();
-  }, [departmentIds]);
+  }, [departmentIds, role]);
 
   const today = new Date().toISOString().split("T")[0];
   const upcoming = bookings.filter((b) => b.shifts && b.shifts.shift_date >= today);
