@@ -78,7 +78,9 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
     setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, coordinator_reported_hours: hours } : b));
   };
 
-  const BookingRow = ({ b, showHoursConfirm }: { b: any; showHoursConfirm: boolean }) => {
+  const BookingRow = ({ b, showHoursConfirm }: { b: Record<string, unknown>; showHoursConfirm: boolean }) => {
+    const bShifts = b.shifts as Record<string, unknown> | null;
+    const bProfiles = b.profiles as Record<string, unknown> | null;
     const rating = shiftRatings[b.shift_id];
     return (
       <div className="flex flex-col gap-2 py-2 px-3 rounded-md bg-muted/50">
