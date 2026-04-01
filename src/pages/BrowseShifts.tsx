@@ -76,8 +76,6 @@ export default function BrowseShifts() {
       if ((s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared") return false;
       return true;
     });
-      return true;
-    });
 
     setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
