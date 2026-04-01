@@ -25,7 +25,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
   const [entries, setEntries] = useState<VolunteerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (departmentIds.length === 0) return;
     const [{ data: bookings }, { data: restrictions }] = await Promise.all([
       supabase
