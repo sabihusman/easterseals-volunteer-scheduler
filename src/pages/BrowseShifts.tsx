@@ -24,7 +24,7 @@ export default function BrowseShifts() {
   const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
-  const [slotDialogShift, setSlotDialogShift] = useState<any>(null);
+  const [slotDialogShift, setSlotDialogShift] = useState<Record<string, unknown> | null>(null);
 
   const fetchData = async () => {
     // Calculate max booking date based on profile
