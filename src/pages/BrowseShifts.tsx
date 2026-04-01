@@ -71,10 +71,11 @@ export default function BrowseShifts() {
 
     // Filter out restricted depts and BG-check-required shifts if volunteer not cleared
     const bgStatus = profile?.bg_check_status;
-    const filteredShifts = (shiftData || []).filter((s: Record<string, unknown>) => {
-      const sDepts = s.departments as Record<string, unknown> | null;
-      if (restrictedDeptIds.has(s.department_id as string)) return false;
-      if ((s.requires_bg_check || sDepts?.requires_bg_check) && bgStatus !== "cleared") return false;
+    const filteredShifts = ((shiftData || []) as ShiftRow[]).filter((s) => {
+      if (restrictedDeptIds.has(s.department_id)) return false;
+      if ((s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared") return false;
+      return true;
+    });
       return true;
     });
 
