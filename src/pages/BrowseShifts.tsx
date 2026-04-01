@@ -17,8 +17,8 @@ import { SlotSelectionDialog } from "@/components/SlotSelectionDialog";
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
-  const [shifts, setShifts] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
