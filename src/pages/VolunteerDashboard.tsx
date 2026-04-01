@@ -129,12 +129,39 @@ export default function VolunteerDashboard() {
   const milestoneBadges = [10, 25, 50, 100];
   const hours = profile?.total_hours ?? 0;
 
-  return (
+    const privilegesSuspended = profile?.booking_privileges === false;
+    const bgFailed = profile?.bg_check_status === "failed" || profile?.bg_check_status === "expired";
+
+    // Filter upcoming bookings based on eligibility
+    const eligibleBookings = upcomingBookings.filter(b => {
+      if (!b.shifts) return false;
+      if (privilegesSuspended) return false;
+      if (bgFailed && (b.shifts.requires_bg_check || b.shifts.departments?.requires_bg_check)) return false;
+      return true;
+    });
+
+    return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Welcome back, {profile?.full_name?.split(" ")[0]}</h2>
         <p className="text-muted-foreground">Here are your upcoming shifts</p>
       </div>
+
+      {privilegesSuspended && (
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Booking Privileges Suspended</AlertTitle>
+          <AlertDescription>Your booking privileges have been suspended. Please contact your coordinator.</AlertDescription>
+        </Alert>
+      )}
+
+      {!privilegesSuspended && bgFailed && (
+        <Alert className="border-warning/50 bg-warning/10 text-warning-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Background Check {profile?.bg_check_status === "expired" ? "Expired" : "Failed"}</AlertTitle>
+          <AlertDescription>Your background check status is {profile?.bg_check_status}. You cannot book shifts that require a background check until this is resolved.</AlertDescription>
+        </Alert>
+      )}
 
       <OnboardingChecklist />
 
