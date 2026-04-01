@@ -17,6 +17,8 @@ const inviteSchema = z.object({
 interface InviteFriendModalProps {
   shiftId: string;
   shiftTitle: string;
+  shiftDate?: string;
+  shiftTime?: string;
 }
 
 export function InviteFriendModal({ shiftId, shiftTitle }: InviteFriendModalProps) {
