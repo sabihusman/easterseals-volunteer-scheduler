@@ -34,7 +34,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (departmentIds.length === 0) return;
+    if (departmentIds.length === 0 && role !== "admin") return;
     const fetchActivity = async () => {
       const { data } = await supabase
         .from("shift_bookings")
