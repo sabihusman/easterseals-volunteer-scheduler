@@ -73,7 +73,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
       setLoading(false);
     };
     fetchActivity();
-  }, [departmentIds]);
+  }, [departmentIds, role]);
 
   const today = new Date().toISOString().split("T")[0];
   const upcoming = bookings.filter((b) => b.shifts && b.shifts.shift_date >= today);

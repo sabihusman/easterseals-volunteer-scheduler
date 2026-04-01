@@ -63,7 +63,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     result.sort((a, b) => a.volunteerName.localeCompare(b.volunteerName));
     setEntries(result);
     setLoading(false);
-  }, [departmentIds, departments, toast]);
+  }, [departmentIds, departments, toast, role]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
