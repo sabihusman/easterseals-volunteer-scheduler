@@ -33,6 +33,9 @@ interface SlotSelectionDialogProps {
     status: string;
     total_slots: number;
     booked_slots: number;
+    time_type: string;
+    start_time?: string | null;
+    end_time?: string | null;
   };
   onBooked: () => void;
 }
