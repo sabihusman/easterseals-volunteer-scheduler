@@ -8,6 +8,9 @@ const BRAND_COLOR = "#006B3E";
 const APP_NAME = "Easterseals Iowa Volunteer Scheduler";
 const APP_URL = "https://easterseals-volunteer-scheduler.vercel.app";
 
+const SANDBOX_MODE = true; // Set to false once domain is verified at resend.com/domains
+const SANDBOX_EMAIL = "sabih.usman@gmail.com";
+
 function brandedHtml(bodyContent: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
