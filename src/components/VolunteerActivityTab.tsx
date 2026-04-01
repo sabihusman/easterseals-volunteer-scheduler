@@ -27,6 +27,7 @@ interface Props {
 }
 
 export function VolunteerActivityTab({ departmentIds }: Props) {
+  const { role } = useAuth();
   const [bookings, setBookings] = useState<BookingEntry[]>([]);
   const [shiftRatings, setShiftRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
