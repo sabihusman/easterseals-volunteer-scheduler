@@ -31,8 +31,8 @@ export default function BrowseShifts() {
     const maxDays = profile?.extended_booking ? 21 : 14;
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + maxDays);
-    const maxDateStr = maxDate.toISOString().split("T")[0];
-    const todayStr = new Date().toISOString().split("T")[0];
+    const maxDateStr = format(maxDate, "yyyy-MM-dd");
+    const todayStr = format(new Date(), "yyyy-MM-dd");
     const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60 * 1000)
       .toTimeString().slice(0, 8);
 
