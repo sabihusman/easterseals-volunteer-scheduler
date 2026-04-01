@@ -7,12 +7,27 @@ import { format } from "date-fns";
 import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
 import { CoordinatorHoursConfirmation } from "@/components/CoordinatorHoursConfirmation";
 
+interface BookingEntry {
+  id: string;
+  booking_status: string;
+  confirmation_status: string;
+  checked_in_at: string | null;
+  created_at: string;
+  volunteer_reported_hours: number | null;
+  coordinator_reported_hours: number | null;
+  final_hours: number | null;
+  hours_source: string | null;
+  shift_id: string;
+  profiles: { full_name: string; email: string } | null;
+  shifts: { title: string; shift_date: string; time_type: string; start_time: string | null; end_time: string | null; department_id: string } | null;
+}
+
 interface Props {
   departmentIds: string[];
 }
 
 export function VolunteerActivityTab({ departmentIds }: Props) {
-  const [bookings, setBookings] = useState<Record<string, unknown>[]>([]);
+  const [bookings, setBookings] = useState<BookingEntry[]>([]);
   const [shiftRatings, setShiftRatings] = useState<Record<string, { avg: number; count: number }>>({});
   const [loading, setLoading] = useState(true);
 
