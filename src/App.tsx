@@ -23,6 +23,9 @@ import ShiftConfirmation from "./pages/ShiftConfirmation";
 import MyNotes from "./pages/MyNotes";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import AdminDepartments from "./pages/AdminDepartments";
+import AdminEvents from "./pages/AdminEvents";
+import VolunteerEvents from "./pages/VolunteerEvents";
 
 const queryClient = new QueryClient();
 
@@ -71,8 +74,10 @@ const App = () => (
             <Route path="/admin" element={<ProtectedRoute requiredRole={["admin"]}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute requiredRole={["admin"]}><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/reminders" element={<ProtectedRoute requiredRole={["admin"]}><AdminReminders /></ProtectedRoute>} />
-            <Route path="/admin/departments" element={<ProtectedRoute requiredRole={["admin"]}><DepartmentManagement /></ProtectedRoute>} />
+            <Route path="/admin/departments" element={<ProtectedRoute requiredRole={["admin"]}><AdminDepartments /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole={["admin"]}><AdminSettings /></ProtectedRoute>} />
+            <Route path="/admin/events" element={<ProtectedRoute requiredRole={["admin"]}><AdminEvents /></ProtectedRoute>} />
+            <Route path="/events" element={<ProtectedRoute><VolunteerEvents /></ProtectedRoute>} />
 
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
