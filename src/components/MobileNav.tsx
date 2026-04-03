@@ -33,7 +33,7 @@ interface NavItem {
 }
 
 interface MobileNavProps {
-  userRole: "volunteer" | "coordinator" | "admin";
+  userRole?: "volunteer" | "coordinator" | "admin";
   userName?: string;
 }
 
@@ -65,7 +65,7 @@ const NAV_ITEMS: NavItem[] = [
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function MobileNav({ userRole, userName }: MobileNavProps) {
+export function MobileNav({ userRole = "volunteer", userName }: MobileNavProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
