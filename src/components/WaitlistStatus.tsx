@@ -55,7 +55,7 @@ export default function WaitlistStatus() {
      * 1. Fetch the current user's waitlisted bookings with shift info.
      */
     const { data: mine } = await supabase
-      .from("bookings")
+      .from("shift_bookings")
       .select(
         "id, shift_id, volunteer_id, status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
       )
@@ -75,7 +75,7 @@ export default function WaitlistStatus() {
 
       // Fetch all waitlisted bookings for these shifts to compute position
       const { data: allWaitlisted } = await supabase
-        .from("bookings")
+        .from("shift_bookings")
         .select("id, shift_id, created_at")
         .in("shift_id", shiftIds)
         .eq("status", "waitlisted")
@@ -119,7 +119,7 @@ export default function WaitlistStatus() {
      */
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: recentConfirmed } = await supabase
-      .from("bookings")
+      .from("shift_bookings")
       .select(
         "id, shift_id, volunteer_id, status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
       )

@@ -85,7 +85,7 @@ export default function CoverageAlert() {
     // Fetch booking counts per shift
     const shiftIds = allShifts.map((s) => s.id);
     const { data: bookings } = await supabase
-      .from("bookings")
+      .from("shift_bookings")
       .select("shift_id")
       .in("shift_id", shiftIds)
       .eq("status", "confirmed");
@@ -133,7 +133,7 @@ export default function CoverageAlert() {
 
     // Fetch already-booked volunteer IDs for this shift
     const { data: booked } = await supabase
-      .from("bookings")
+      .from("shift_bookings")
       .select("volunteer_id")
       .eq("shift_id", shift.id)
       .in("status", ["confirmed", "waitlisted"]);
