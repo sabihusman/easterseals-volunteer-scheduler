@@ -5,7 +5,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog } from "lucide-react";
+import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -30,6 +30,7 @@ export function AppSidebar() {
     { title: "All Shifts", url: "/admin", icon: Calendar },
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "Departments", url: "/admin/departments", icon: Building2 },
+    { title: "Events", url: "/admin/events", icon: CalendarDays },
     { title: "Reminders", url: "/admin/reminders", icon: Bell },
     { title: "Admin Settings", url: "/admin/settings", icon: Shield },
   ];

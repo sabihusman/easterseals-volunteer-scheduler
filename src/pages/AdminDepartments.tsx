@@ -327,7 +327,7 @@ export default function AdminDepartments() {
                     variant={dept.is_active ? "default" : "secondary"}
                     className={
                       dept.is_active
-                        ? "cursor-pointer bg-[#006B3E] hover:bg-[#005a33]"
+                        ? "cursor-pointer bg-[#006B3E] text-white hover:bg-[#005a33]"
                         : "cursor-pointer"
                     }
                     onClick={() => toggleActive(dept)}
