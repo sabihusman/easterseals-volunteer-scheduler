@@ -1,554 +1,430 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Edit, Trash2, Calendar, Clock, Users, Repeat } from "lucide-react";
-import { format, addDays, addWeeks, addMonths, differenceInDays } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { timeLabel, SHIFT_TIME_DEFAULTS, getShiftTimes } from "@/lib/calendar-utils";
-import { previewSlotCount, formatSlotTime } from "@/lib/slot-utils";
-import { z } from "zod";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Loader2,
+  Plus,
+  Pencil,
+  Trash2,
+  StickyNote,
+  AlertCircle,
+} from "lucide-react";
 
-const shiftSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(100, "Title must be under 100 characters"),
-  totalSlots: z.number().int().min(1, "At least 1 slot required").max(100, "Maximum 100 slots"),
-  description: z.string().max(500, "Description must be under 500 characters").optional(),
-});
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
 
-function generateRecurringDates(startDate: string, endDate: string, frequency: string): string[] {
-  const dates: string[] = [];
-  let current = new Date(startDate + "T00:00:00");
-  const end = new Date(endDate + "T00:00:00");
-
-  while (current <= end) {
-    dates.push(format(current, "yyyy-MM-dd"));
-    switch (frequency) {
-      case "daily": current = addDays(current, 1); break;
-      case "weekly": current = addWeeks(current, 1); break;
-      case "biweekly": current = addWeeks(current, 2); break;
-      case "monthly": current = addMonths(current, 1); break;
-      default: current = addDays(current, 1);
-    }
-  }
-  return dates;
+interface Department {
+  id: string;
+  name: string;
 }
 
+interface Shift {
+  id: string;
+  department_id: string;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  max_volunteers: number;
+  coordinator_note: string | null;
+  departments?: { name: string };
+}
+
+interface ShiftForm {
+  department_id: string;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  max_volunteers: number;
+  coordinator_note: string;
+}
+
+const EMPTY_FORM: ShiftForm = {
+  department_id: "",
+  shift_date: "",
+  start_time: "",
+  end_time: "",
+  max_volunteers: 1,
+  coordinator_note: "",
+};
+
+const NOTE_MAX = 500;
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+/** Returns true if the shift starts more than 1 hour from now. */
+function canEditNote(shiftDate: string, startTime: string): boolean {
+  const shiftStart = new Date(`${shiftDate}T${startTime}`);
+  const cutoff = new Date(shiftStart.getTime() - 60 * 60 * 1000);
+  return new Date() < cutoff;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
 export default function ManageShifts() {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [shifts, setShifts] = useState<any[]>([]);
+
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingShift, setEditingShift] = useState<any>(null);
-  const [editRecurringPrompt, setEditRecurringPrompt] = useState<any>(null);
-  const [deleteShiftPrompt, setDeleteShiftPrompt] = useState<any>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<ShiftForm>(EMPTY_FORM);
 
-  // Form state
-  const [title, setTitle] = useState("");
-  const [shiftDate, setShiftDate] = useState("");
-  const [timeType, setTimeType] = useState<string>("morning");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
-  const [totalSlots, setTotalSlots] = useState("1");
-  const [requiresBg, setRequiresBg] = useState(true);
-  const [allowsGroup, setAllowsGroup] = useState(false);
-  const [deptId, setDeptId] = useState("");
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  /* ---------- Fetch ---------- */
 
-  // Recurring state
-  const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceType, setRecurrenceType] = useState("weekly");
-  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
-
-  const maxEndDate = useMemo(() => {
-    if (!shiftDate) return "";
-    const d = new Date(shiftDate + "T00:00:00");
-    return format(addMonths(d, 6), "yyyy-MM-dd");
-  }, [shiftDate]);
-
-  const recurringPreview = useMemo(() => {
-    if (!isRecurring || !shiftDate || !recurrenceEndDate) return 0;
-    return generateRecurringDates(shiftDate, recurrenceEndDate, recurrenceType).length;
-  }, [isRecurring, shiftDate, recurrenceEndDate, recurrenceType]);
-
-  const { role } = useAuth();
-
-  useEffect(() => {
-    if (!user) return;
-    const fetchDepts = async () => {
-      if (role === "admin") {
-        const { data: allDepts } = await supabase
-          .from("departments")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("name");
-        const depts = allDepts || [];
-        setDepartments(depts);
-        if (depts.length > 0) {
-          setDeptId(depts[0].id);
-          fetchShifts(depts.map((d: any) => d.id));
-        }
-      } else {
-        const { data: coords } = await supabase
-          .from("department_coordinators")
-          .select("department_id, departments(id, name)")
-          .eq("coordinator_id", user.id);
-        const depts = (coords || []).map((c: any) => c.departments).filter(Boolean);
-        setDepartments(depts);
-        if (depts.length > 0) {
-          setDeptId(depts[0].id);
-          fetchShifts(depts.map((d: any) => d.id));
-        }
-      }
-    };
-    fetchDepts();
-  }, [user, role]);
-
-  const fetchShifts = async (deptIds: string[]) => {
+  async function fetchShifts() {
     const { data } = await supabase
       .from("shifts")
       .select("*, departments(name)")
-      .in("department_id", deptIds)
-      .order("shift_date", { ascending: false })
-      .limit(100);
-    setShifts(data || []);
-  };
+      .order("shift_date", { ascending: true });
 
-  const resetForm = () => {
-    setTitle(""); setShiftDate(""); setTimeType("morning"); setStartTime(""); setEndTime("");
-    setTotalSlots("1"); setRequiresBg(true); setAllowsGroup(false); setDescription("");
-    setEditingShift(null); setIsRecurring(false); setRecurrenceType("weekly"); setRecurrenceEndDate("");
-  };
+    if (data) setShifts(data as Shift[]);
+  }
 
-  const openEdit = (shift: any) => {
-    if (shift.is_recurring && shift.recurrence_parent) {
-      setEditRecurringPrompt(shift);
-      return;
-    }
-    doOpenEdit(shift);
-  };
+  async function fetchDepartments() {
+    const { data } = await supabase
+      .from("departments")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name");
 
-  const doOpenEdit = (shift: any) => {
-    setEditingShift(shift);
-    setTitle(shift.title); setShiftDate(shift.shift_date); setTimeType(shift.time_type);
-    setStartTime(shift.start_time || ""); setEndTime(shift.end_time || "");
-    setTotalSlots(String(shift.total_slots)); setRequiresBg(shift.requires_bg_check);
-    setAllowsGroup(shift.allows_group); setDeptId(shift.department_id);
-    setDescription(shift.description || "");
-    setIsRecurring(false);
+    if (data) setDepartments(data);
+  }
+
+  useEffect(() => {
+    Promise.all([fetchShifts(), fetchDepartments()]).then(() =>
+      setLoading(false)
+    );
+  }, []);
+
+  /* ---------- Open dialog ---------- */
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
     setDialogOpen(true);
-  };
+  }
 
-  const handleEditFuture = async (shift: any) => {
-    setEditRecurringPrompt(null);
-    // Edit all future shifts in the series
-    const parentId = shift.recurrence_parent || shift.id;
-    doOpenEdit({ ...shift, _editFuture: true, _parentId: parentId });
-  };
-
-  const handleSave = async () => {
-    if (!shiftDate || !deptId || !user) return;
-    const result = shiftSchema.safeParse({
-      title,
-      totalSlots: parseInt(totalSlots) || 0,
-      description: description || undefined,
+  function openEdit(shift: Shift) {
+    setEditingId(shift.id);
+    setForm({
+      department_id: shift.department_id,
+      shift_date: shift.shift_date,
+      start_time: shift.start_time,
+      end_time: shift.end_time,
+      max_volunteers: shift.max_volunteers,
+      coordinator_note: shift.coordinator_note ?? "",
     });
-    if (!result.success) {
-      const fieldErrors: Record<string, string> = {};
-      result.error.errors.forEach((e) => { fieldErrors[e.path[0] as string] = e.message; });
-      setFormErrors(fieldErrors);
+    setDialogOpen(true);
+  }
+
+  /* ---------- Save ---------- */
+
+  async function handleSave() {
+    if (!form.department_id || !form.shift_date || !form.start_time || !form.end_time) {
+      toast({
+        variant: "destructive",
+        title: "Missing fields",
+        description: "Please complete all required fields.",
+      });
       return;
     }
-    setFormErrors({});
-    setLoading(true);
-    const times = getShiftTimes({ time_type: timeType, start_time: startTime, end_time: endTime });
+
+    setSaving(true);
+
     const payload = {
-      title,
-      shift_date: shiftDate,
-      time_type: timeType as any,
-      start_time: times.start + ":00",
-      end_time: times.end + ":00",
-      total_slots: parseInt(totalSlots) || 1,
-      requires_bg_check: requiresBg,
-      allows_group: allowsGroup,
-      department_id: deptId,
-      description: description || null,
+      department_id: form.department_id,
+      shift_date: form.shift_date,
+      start_time: form.start_time,
+      end_time: form.end_time,
+      max_volunteers: form.max_volunteers,
+      coordinator_note: form.coordinator_note.trim() || null,
     };
 
-    if (editingShift?._editFuture) {
-      // Update all future shifts in series
-      const { error } = await supabase
-        .from("shifts")
-        .update({ title, total_slots: parseInt(totalSlots) || 1, requires_bg_check: requiresBg, allows_group: allowsGroup, description: description || null })
-        .eq("recurrence_parent", editingShift._parentId)
-        .gte("shift_date", shiftDate);
-      setLoading(false);
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-      } else {
-        toast({ title: "All future shifts updated" });
-        setDialogOpen(false); resetForm();
-        fetchShifts(departments.map((d: any) => d.id));
-      }
-      return;
-    }
+    const { error } = editingId
+      ? await supabase.from("shifts").update(payload).eq("id", editingId)
+      : await supabase.from("shifts").insert(payload);
 
-    let error;
-    if (editingShift) {
-      ({ error } = await supabase.from("shifts").update(payload).eq("id", editingShift.id));
-    } else if (isRecurring && recurrenceEndDate) {
-      // Create recurring shifts
-      const dates = generateRecurringDates(shiftDate, recurrenceEndDate, recurrenceType);
-      if (dates.length === 0) {
-        toast({ title: "No shifts to create", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
+    setSaving(false);
 
-      // Insert recurrence rule
-      await supabase.from("shift_recurrence_rules").insert({
-        department_id: deptId,
-        title,
-        created_by: user.id,
-        recurrence_type: recurrenceType as any,
-        start_date: shiftDate,
-        end_date: recurrenceEndDate,
-        time_type: timeType as any,
-        start_time: times.start + ":00",
-        end_time: times.end + ":00",
-        total_slots: parseInt(totalSlots) || 1,
-        requires_bg_check: requiresBg,
-        allows_group: allowsGroup,
-        description: description || null,
-      });
-
-      // Create all shifts
-      const firstShift = { ...payload, shift_date: dates[0], created_by: user.id, is_recurring: true };
-      const { data: first, error: firstErr } = await supabase.from("shifts").insert(firstShift).select("id").single();
-      if (firstErr || !first) {
-        toast({ title: "Error creating first shift", description: firstErr?.message, variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-
-      const parentId = first.id;
-      // Update first shift with its own parent
-      await supabase.from("shifts").update({ recurrence_parent: parentId }).eq("id", parentId);
-
-      if (dates.length > 1) {
-        const remaining = dates.slice(1).map((d) => ({
-          ...payload,
-          shift_date: d,
-          created_by: user.id,
-          is_recurring: true,
-          recurrence_parent: parentId,
-        }));
-        const { error: batchErr } = await supabase.from("shifts").insert(remaining);
-        if (batchErr) {
-          toast({ title: "Some shifts may not have been created", description: batchErr.message, variant: "destructive" });
-        }
-      }
-
-      toast({ title: `${dates.length} recurring shifts created through ${format(new Date(recurrenceEndDate), "MMM d, yyyy")}` });
-      error = undefined;
-    } else {
-      ({ error } = await supabase.from("shifts").insert({ ...payload, created_by: user.id }));
-    }
-    setLoading(false);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ variant: "destructive", title: "Error", description: error.message });
     } else {
-      if (!isRecurring) toast({ title: editingShift ? "Shift updated" : "Shift created" });
+      toast({ title: editingId ? "Shift updated" : "Shift created" });
       setDialogOpen(false);
-      resetForm();
-      fetchShifts(departments.map((d: any) => d.id));
+      fetchShifts();
     }
-  };
+  }
 
-  const handleCancel = async (shiftId: string) => {
-    // Get the shift details for notification
-    const shift = shifts.find((s) => s.id === shiftId);
+  /* ---------- Delete ---------- */
 
-    // Get booked volunteers before cancelling
-    const { data: bookings } = await supabase
-      .from("shift_bookings")
-      .select("id, volunteer_id")
-      .eq("shift_id", shiftId)
-      .eq("booking_status", "confirmed");
+  async function handleDelete(id: string) {
+    if (!confirm("Delete this shift? This cannot be undone.")) return;
 
-    const { error } = await supabase.from("shifts").update({ status: "cancelled" as any }).eq("id", shiftId);
+    const { error } = await supabase.from("shifts").delete().eq("id", id);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      return;
-    }
-
-    const bookedCount = bookings?.length || 0;
-
-    // Cancel all confirmed bookings
-    if (bookedCount > 0) {
-      await supabase
-        .from("shift_bookings")
-        .update({ booking_status: "cancelled" as any, cancelled_at: new Date().toISOString() })
-        .eq("shift_id", shiftId)
-        .eq("booking_status", "confirmed");
-
-      // Notify each booked volunteer
-      if (shift) {
-        const notifications = bookings!.map((b: any) => ({
-          user_id: b.volunteer_id,
-          type: "shift_cancelled",
-          title: `Shift Cancelled — ${shift.title}`,
-          message: `Your shift "${shift.title}" on ${format(new Date(shift.shift_date), "MMM d, yyyy")} at ${timeLabel(shift)} has been cancelled by the coordinator.`,
-          link: "/dashboard",
-        }));
-        const { error: notifErr } = await supabase.from("notifications").insert(notifications);
-        if (notifErr) console.warn("Notification insert failed (RLS):", notifErr.message);
-      }
-    }
-
-    setShifts((prev) => prev.map((s) => s.id === shiftId ? { ...s, status: "cancelled" } : s));
-    toast({ title: `Shift cancelled. ${bookedCount} volunteer${bookedCount !== 1 ? "s" : ""} notified.` });
-  };
-  const handleDeleteShift = async (shift: any) => {
-    const { error } = await supabase.from("shifts").delete().eq("id", shift.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ variant: "destructive", title: "Error", description: error.message });
     } else {
-      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
-      toast({ title: "Shift deleted." });
+      toast({ title: "Shift deleted" });
+      fetchShifts();
     }
-    setDeleteShiftPrompt(null);
-  };
+  }
 
+  /* ---------- Note editability for the currently-open shift ---------- */
+
+  const noteEditable = useMemo(() => {
+    if (!editingId) return true; // new shift
+    return canEditNote(form.shift_date, form.start_time);
+  }, [editingId, form.shift_date, form.start_time]);
+
+  /* ---------- Render ---------- */
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-6 w-6 animate-spin text-[#006B3E]" />
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Manage Shifts</h2>
-          <p className="text-muted-foreground">Create and manage shifts for your department</p>
-        </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" />Create Shift</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editingShift ? "Edit Shift" : "Create New Shift"}</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Title</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Shift title" maxLength={100} />
-                {formErrors.title && <p className="text-xs text-destructive">{formErrors.title}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Department</Label>
-                <Select value={deptId} onValueChange={setDeptId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Date</Label>
-                  <Input type="date" value={shiftDate} onChange={(e) => setShiftDate(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Time Type</Label>
-                  <Select value={timeType} onValueChange={setTimeType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="morning">Morning</SelectItem>
-                      <SelectItem value="afternoon">Afternoon</SelectItem>
-                      <SelectItem value="all_day">All Day</SelectItem>
-                      <SelectItem value="custom">Custom</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              {timeType === "custom" ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Start Time</Label>
-                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>End Time</Label>
-                      <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                    </div>
-                  </div>
-                  {startTime && endTime && previewSlotCount(startTime, endTime) > 0 && (
-                    <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
-                      ⏱ This shift will run from {formatSlotTime(startTime)} to {formatSlotTime(endTime)} and be divided into {previewSlotCount(startTime, endTime)} × 2-hour slot{previewSlotCount(startTime, endTime) !== 1 ? "s" : ""}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground bg-muted rounded px-2 py-1">
-                  ⏱ This shift will run from {formatSlotTime(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00")} to {formatSlotTime(SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00")} and be divided into {previewSlotCount(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00", SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00")} × 2-hour slot{previewSlotCount(SHIFT_TIME_DEFAULTS[timeType]?.start || "09:00", SHIFT_TIME_DEFAULTS[timeType]?.end || "17:00") !== 1 ? "s" : ""}
-                </p>
-              )}
-              <div className="space-y-2">
-                <Label>Total Slots</Label>
-                <Input type="number" min="1" max="100" value={totalSlots} onChange={(e) => setTotalSlots(e.target.value)} />
-                {formErrors.totalSlots && <p className="text-xs text-destructive">{formErrors.totalSlots}</p>}
-              </div>
-              <div className="space-y-2">
-                <Label>Description (optional)</Label>
-                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} />
-                {formErrors.description && <p className="text-xs text-destructive">{formErrors.description}</p>}
-                <p className="text-xs text-muted-foreground">{description.length}/500</p>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Requires Background Check</Label>
-                <Switch checked={requiresBg} onCheckedChange={setRequiresBg} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Allow Group Bookings</Label>
-                <Switch checked={allowsGroup} onCheckedChange={setAllowsGroup} />
-              </div>
-
-              {/* Recurring section */}
-              {!editingShift && (
-                <div className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="flex items-center gap-2"><Repeat className="h-4 w-4" />Make this a recurring shift</Label>
-                    <Switch checked={isRecurring} onCheckedChange={setIsRecurring} />
-                  </div>
-                  {isRecurring && (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Repeat frequency</Label>
-                        <RadioGroup value={recurrenceType} onValueChange={setRecurrenceType} className="flex flex-wrap gap-3">
-                          <div className="flex items-center space-x-1"><RadioGroupItem value="daily" id="daily" /><Label htmlFor="daily" className="text-sm">Daily</Label></div>
-                          <div className="flex items-center space-x-1"><RadioGroupItem value="weekly" id="weekly" /><Label htmlFor="weekly" className="text-sm">Weekly</Label></div>
-                          <div className="flex items-center space-x-1"><RadioGroupItem value="biweekly" id="biweekly" /><Label htmlFor="biweekly" className="text-sm">Bi-weekly</Label></div>
-                          <div className="flex items-center space-x-1"><RadioGroupItem value="monthly" id="monthly" /><Label htmlFor="monthly" className="text-sm">Monthly</Label></div>
-                        </RadioGroup>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>End date</Label>
-                        <Input
-                          type="date"
-                          value={recurrenceEndDate}
-                          onChange={(e) => setRecurrenceEndDate(e.target.value)}
-                          min={shiftDate}
-                          max={maxEndDate}
-                        />
-                        {recurrenceEndDate && maxEndDate && recurrenceEndDate > maxEndDate && (
-                          <p className="text-xs text-destructive">Recurring shifts cannot extend beyond 6 months</p>
-                        )}
-                      </div>
-                      {recurringPreview > 0 && (
-                        <p className="text-sm text-muted-foreground bg-muted rounded px-3 py-2">
-                          📅 This will create <span className="font-medium">{recurringPreview} shifts</span>
-                          {recurrenceEndDate && ` through ${format(new Date(recurrenceEndDate + "T00:00:00"), "MMM d, yyyy")}`}
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-
-              <Button onClick={handleSave} disabled={loading || !title || !shiftDate || (isRecurring && (!recurrenceEndDate || recurrenceEndDate > maxEndDate))} className="w-full">
-                {loading ? "Saving..." : editingShift ? "Update Shift" : isRecurring ? `Create ${recurringPreview} Shifts` : "Create Shift"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <h1 className="text-2xl font-bold text-gray-900">Manage Shifts</h1>
+        <Button onClick={openCreate} className="bg-[#006B3E] hover:bg-[#005a33]">
+          <Plus className="mr-2 h-4 w-4" /> New Shift
+        </Button>
       </div>
 
-      {/* Edit recurring prompt */}
-      <AlertDialog open={!!editRecurringPrompt} onOpenChange={() => setEditRecurringPrompt(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Edit Recurring Shift</AlertDialogTitle>
-            <AlertDialogDescription>This shift is part of a recurring series. How would you like to edit it?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { doOpenEdit(editRecurringPrompt); setEditRecurringPrompt(null); }}>
-              This shift only
-            </AlertDialogAction>
-            <AlertDialogAction onClick={() => handleEditFuture(editRecurringPrompt)}>
-              All future shifts
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete cancelled shift dialog */}
-      <AlertDialog open={!!deleteShiftPrompt} onOpenChange={() => setDeleteShiftPrompt(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this shift permanently?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will also remove all booking records associated with it. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => handleDeleteShift(deleteShiftPrompt)}>
-              Delete Permanently
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <div className="grid gap-3">
-        {shifts.map((s) => (
-          <Card key={s.id}>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{s.title}</span>
-                    <Badge variant={s.status === "open" ? "default" : s.status === "cancelled" ? "destructive" : "secondary"}>{s.status}</Badge>
-                    {s.is_recurring && <Badge variant="outline" className="text-xs"><Repeat className="h-3 w-3 mr-1" />Recurring</Badge>}
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date), "MMM d, yyyy")}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
-                    <span className="flex items-center gap-1"><Users className="h-3 w-3" />{s.booked_slots}/{s.total_slots}</span>
-                  </div>
-                  <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
-                </div>
-                <div className="flex gap-2">
-                  {s.status !== "cancelled" && (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => openEdit(s)}>
-                        <Edit className="h-3 w-3 mr-1" />Edit
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleCancel(s.id)}>
-                        <Trash2 className="h-3 w-3 mr-1" />Cancel
-                      </Button>
-                    </>
+      {/* ---- Table ---- */}
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Department</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Time</TableHead>
+              <TableHead className="text-center">Max</TableHead>
+              <TableHead className="text-center">Note</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {shifts.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-8 text-center text-gray-500">
+                  No shifts yet. Create one to get started.
+                </TableCell>
+              </TableRow>
+            )}
+            {shifts.map((s) => (
+              <TableRow key={s.id}>
+                <TableCell className="font-medium">
+                  {s.departments?.name ?? "—"}
+                </TableCell>
+                <TableCell>{s.shift_date}</TableCell>
+                <TableCell>
+                  {s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}
+                </TableCell>
+                <TableCell className="text-center">{s.max_volunteers}</TableCell>
+                <TableCell className="text-center">
+                  {s.coordinator_note ? (
+                    <StickyNote className="mx-auto h-4 w-4 text-[#006B3E]" />
+                  ) : (
+                    <span className="text-gray-300">—</span>
                   )}
-                  {s.status === "cancelled" && (
-                    <Button variant="destructive" size="sm" onClick={() => setDeleteShiftPrompt(s)}>
-                      <Trash2 className="h-3 w-3 mr-1" />Delete
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                      <Pencil className="h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => handleDelete(s.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
+
+      {/* ---- Create / Edit Dialog ---- */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingId ? "Edit Shift" : "Create Shift"}
+            </DialogTitle>
+            <DialogDescription>
+              Fill in the shift details below.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Department */}
+            <div className="space-y-1.5">
+              <Label>Department *</Label>
+              <Select
+                value={form.department_id}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, department_id: v }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date */}
+            <div className="space-y-1.5">
+              <Label>Date *</Label>
+              <Input
+                type="date"
+                value={form.shift_date}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, shift_date: e.target.value }))
+                }
+              />
+            </div>
+
+            {/* Time row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Start Time *</Label>
+                <Input
+                  type="time"
+                  value={form.start_time}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, start_time: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Time *</Label>
+                <Input
+                  type="time"
+                  value={form.end_time}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, end_time: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            {/* Max volunteers */}
+            <div className="space-y-1.5">
+              <Label>Max Volunteers *</Label>
+              <Input
+                type="number"
+                min={1}
+                value={form.max_volunteers}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    max_volunteers: Math.max(1, Number(e.target.value)),
+                  }))
+                }
+              />
+            </div>
+
+            {/* Coordinator Note */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <StickyNote className="h-3.5 w-3.5 text-[#006B3E]" />
+                Coordinator Note
+              </Label>
+
+              {!noteEditable && (
+                <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  This note can no longer be edited — the shift starts in less
+                  than 1 hour.
+                </div>
+              )}
+
+              <Textarea
+                value={form.coordinator_note}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    coordinator_note: e.target.value.slice(0, NOTE_MAX),
+                  }))
+                }
+                placeholder="Optional note visible to assigned volunteers…"
+                rows={3}
+                disabled={!noteEditable}
+                className="resize-none disabled:opacity-60"
+              />
+              <p className="text-right text-xs text-gray-400">
+                {form.coordinator_note.length}/{NOTE_MAX}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-[#006B3E] hover:bg-[#005a33]"
+            >
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingId ? "Update Shift" : "Create Shift"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
