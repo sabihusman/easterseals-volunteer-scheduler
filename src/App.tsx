@@ -18,7 +18,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminReminders from "./pages/AdminReminders";
 import AdminSettings from "./pages/AdminSettings";
-import DepartmentManagement from "./pages/DepartmentManagement";
+
 import ShiftConfirmation from "./pages/ShiftConfirmation";
 import MyNotes from "./pages/MyNotes";
 import Settings from "./pages/Settings";
