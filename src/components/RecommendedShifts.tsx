@@ -24,9 +24,8 @@ interface RecommendedShift {
 }
 
 interface RecommendedShiftsProps {
-  onBookShift: (shiftId: string) => void;
+  onBookShift: (shiftId: string, shiftData?: RecommendedShift) => void;
 }
-
 export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
   const [shifts, setShifts] = useState<RecommendedShift[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,7 +217,7 @@ export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
               <Button
                 size="sm"
                 className="w-full bg-[#006B3E] hover:bg-[#005a32] text-white text-xs h-8"
-                onClick={() => onBookShift(shift.shift_id)}
+                onClick={() => onBookShift(shift.shift_id, shift)}
               >
                 Book Shift
               </Button>

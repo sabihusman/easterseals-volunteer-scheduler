@@ -207,9 +207,11 @@ export default function BrowseShifts() {
         <>
           {!privilegesSuspended && (
             <RecommendedShifts
-              onBookShift={(shiftId) => {
-                const shift = shifts.find((s) => s.id === shiftId);
-                if (shift) { setSlotDialogShift(shift); trackViewed(shiftId); }
+              onBookShift={(shiftId, shiftData) => {
+                if (shiftData) { 
+                  setSlotDialogShift(shiftData as ShiftRow); 
+                  trackViewed(shiftId); 
+                }
               }}
             />
           )}
