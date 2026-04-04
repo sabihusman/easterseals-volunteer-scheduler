@@ -39,9 +39,18 @@ export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
         } = await supabase.auth.getUser();
         if (!user) return;
 
+        // Get volunteer's booking window from their profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('extended_booking')
+          .eq('id', user.id)
+          .single();
+
+        const maxDays = profileData?.extended_booking ? 21 : 14;
+
         const { data, error } = await (supabase as any).rpc(
           'score_shifts_for_volunteer',
-          { p_volunteer_id: user.id }
+          { p_volunteer_id: user.id, p_max_days: maxDays }
         );
 
         if (error) throw error;
