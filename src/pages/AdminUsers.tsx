@@ -16,6 +16,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { VolunteerReliabilityBadge } from "@/components/VolunteerReliabilityBadge";
+
 
 type UserRole = "volunteer" | "coordinator" | "admin";
 
@@ -269,8 +271,16 @@ export default function AdminUsers() {
                       {p.role}
                     </Badge>
                     {!p.is_active && <Badge variant="destructive" className="text-xs">Inactive</Badge>}
+                    {p.role === "volunteer" && (
+                      <VolunteerReliabilityBadge volunteerId={p.id} />
+                    )}
                   </div>
-                  <div className="text-sm text-muted-foreground">{p.email}</div>
+                 <div className="text-sm text-muted-foreground">{p.email}</div>
+                  {p.role === "volunteer" && (p.emergency_contact_name || p.emergency_contact_phone) && (
+                    <div className="text-xs text-muted-foreground">
+                      Emergency: {p.emergency_contact_name}{p.emergency_contact_name && p.emergency_contact_phone ? " · " : ""}{p.emergency_contact_phone}
+                    </div>
+                  )}
                   <div className="flex gap-2 flex-wrap">
                     {bgBadge(p.bg_check_status)}
                     {!p.booking_privileges && <Badge variant="outline" className="text-xs">No Booking</Badge>}

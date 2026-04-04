@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
 import { InviteFriendModal } from "@/components/InviteFriendModal";
 import { SlotSelectionDialog } from "@/components/SlotSelectionDialog";
+import { RecommendedShifts } from "@/components/RecommendedShifts";
+import { useInteractionTracking } from "@/hooks/useInteractionTracking";
 
 interface ShiftRow {
   id: string;
@@ -32,6 +34,7 @@ interface ShiftRow {
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const { trackViewed, trackSignedUp, trackCancelled } = useInteractionTracking();
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("all");
@@ -127,7 +130,7 @@ export default function BrowseShifts() {
               <Button
                 size="sm"
                 disabled={alreadyBooked || !profile?.booking_privileges || privilegesSuspended}
-                onClick={() => setSlotDialogShift(s)}
+                onClick={() => { setSlotDialogShift(s); trackViewed(s.id); }}
               >
                 {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
               </Button>
@@ -201,14 +204,23 @@ export default function BrowseShifts() {
       ) : privilegesSuspended ? (
         <Card><CardContent className="pt-6 text-center text-muted-foreground">Your booking privileges have been suspended. Contact your coordinator.</CardContent></Card>
       ) : view === "list" ? (
-        filtered.length === 0 ? (
+        <>
+          {!privilegesSuspended && (
+            <RecommendedShifts
+              onBookShift={(shiftId) => {
+                const shift = shifts.find((s) => s.id === shiftId);
+                if (shift) { setSlotDialogShift(shift); trackViewed(shiftId); }
+              }}
+            />
+          )}
+        {filtered.length === 0 ? (
           <Card><CardContent className="pt-6 text-center text-muted-foreground">No available shifts found.</CardContent></Card>
         ) : (
           <div className="grid gap-3">
             {filtered.map((s) => <ShiftCard key={s.id} s={s} />)}
           </div>
-        )
-      ) : (
+        )}
+        </>      ) : (
         <div>
           <div className="flex items-center justify-between mb-4">
             <Button variant="outline" size="sm" onClick={() => setCalMonth(subMonths(calMonth, 1))}>← Prev</Button>
