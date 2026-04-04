@@ -163,7 +163,7 @@ export default function VolunteerDashboard() {
         </Alert>
       )}
 
-      <OnboardingChecklist />
+      
 
       {pendingConfirmations.length > 0 && (
         <Card className="border-primary/30 bg-primary/5">
