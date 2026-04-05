@@ -208,9 +208,25 @@ export default function BrowseShifts() {
           {!privilegesSuspended && (
             <RecommendedShifts
               onBookShift={(shiftId, shiftData) => {
-                if (shiftData) { 
-                  setSlotDialogShift(shiftData as ShiftRow); 
-                  trackViewed(shiftId); 
+                if (shiftData) {
+                  setSlotDialogShift({
+                    id: shiftData.shift_id,
+                    title: shiftData.title,
+                    shift_date: shiftData.shift_date,
+                    department_id: '',
+                    departments: {
+                      name: shiftData.department_name,
+                      requires_bg_check: shiftData.requires_bg_check,
+                    },
+                    status: 'open',
+                    total_slots: shiftData.total_slots,
+                    booked_slots: shiftData.booked_slots,
+                    requires_bg_check: shiftData.requires_bg_check,
+                    time_type: shiftData.time_type,
+                    start_time: shiftData.start_time,
+                    end_time: shiftData.end_time,
+                  });
+                  trackViewed(shiftId);
                 }
               }}
             />
