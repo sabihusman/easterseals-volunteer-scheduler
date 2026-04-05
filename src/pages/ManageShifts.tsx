@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -48,30 +49,33 @@ interface Department {
 
 interface Shift {
   id: string;
+  title: string;
   department_id: string;
   shift_date: string;
   start_time: string;
   end_time: string;
-  max_volunteers: number;
+  total_slots: number;
   coordinator_note: string | null;
   departments?: { name: string };
 }
 
 interface ShiftForm {
+  title: string;
   department_id: string;
   shift_date: string;
   start_time: string;
   end_time: string;
-  max_volunteers: number;
+  total_slots: number;
   coordinator_note: string;
 }
 
 const EMPTY_FORM: ShiftForm = {
+  title: "",
   department_id: "",
   shift_date: "",
   start_time: "",
   end_time: "",
-  max_volunteers: 1,
+  total_slots: 1,
   coordinator_note: "",
 };
 
@@ -94,6 +98,7 @@ function canEditNote(shiftDate: string, startTime: string): boolean {
 
 export default function ManageShifts() {
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -142,11 +147,12 @@ export default function ManageShifts() {
   function openEdit(shift: Shift) {
     setEditingId(shift.id);
     setForm({
+      title: shift.title ?? "",
       department_id: shift.department_id,
       shift_date: shift.shift_date,
       start_time: shift.start_time,
       end_time: shift.end_time,
-      max_volunteers: shift.max_volunteers,
+      total_slots: shift.total_slots,
       coordinator_note: shift.coordinator_note ?? "",
     });
     setDialogOpen(true);
@@ -155,7 +161,7 @@ export default function ManageShifts() {
   /* ---------- Save ---------- */
 
   async function handleSave() {
-    if (!form.department_id || !form.shift_date || !form.start_time || !form.end_time) {
+    if (!form.title || !form.department_id || !form.shift_date || !form.start_time || !form.end_time) {
       toast({
         variant: "destructive",
         title: "Missing fields",
@@ -167,17 +173,18 @@ export default function ManageShifts() {
     setSaving(true);
 
     const payload = {
+      title: form.title,
       department_id: form.department_id,
       shift_date: form.shift_date,
       start_time: form.start_time,
       end_time: form.end_time,
-      max_volunteers: form.max_volunteers,
+      total_slots: form.total_slots,
       coordinator_note: form.coordinator_note.trim() || null,
     };
 
     const { error } = editingId
       ? await supabase.from("shifts").update(payload).eq("id", editingId)
-      : await supabase.from("shifts").insert(payload);
+      : await supabase.from("shifts").insert({ ...payload, created_by: user!.id });
 
     setSaving(false);
 
@@ -260,7 +267,7 @@ export default function ManageShifts() {
                 <TableCell>
                   {s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}
                 </TableCell>
-                <TableCell className="text-center">{s.max_volunteers}</TableCell>
+                <TableCell className="text-center">{s.total_slots}</TableCell>
                 <TableCell className="text-center">
                   {s.coordinator_note ? (
                     <StickyNote className="mx-auto h-4 w-4 text-[#006B3E]" />
@@ -302,6 +309,16 @@ export default function ManageShifts() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* Title */}
+            <div className="space-y-1.5">
+              <Label>Shift Title *</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="e.g. Morning Grounds Keeping"
+              />
+            </div>
+
             {/* Department */}
             <div className="space-y-1.5">
               <Label>Department *</Label>
@@ -366,11 +383,11 @@ export default function ManageShifts() {
               <Input
                 type="number"
                 min={1}
-                value={form.max_volunteers}
+                value={form.total_slots}
                 onChange={(e) =>
                   setForm((f) => ({
                     ...f,
-                    max_volunteers: Math.max(1, Number(e.target.value)),
+                    total_slots: Math.max(1, Number(e.target.value)),
                   }))
                 }
               />
