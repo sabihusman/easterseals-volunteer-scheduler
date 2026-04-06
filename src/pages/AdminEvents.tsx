@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -87,6 +88,7 @@ const EMPTY_FORM: EventForm = {
 /* ------------------------------------------------------------------ */
 
 export default function AdminEvents() {
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -156,7 +158,7 @@ export default function AdminEvents() {
 
     const { error } = editingId
       ? await supabase.from("events").update(payload).eq("id", editingId)
-      : await supabase.from("events").insert(payload);
+      : await supabase.from("events").insert({ ...payload, created_by: user!.id });
 
     setSaving(false);
 
