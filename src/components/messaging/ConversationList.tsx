@@ -57,16 +57,30 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
 
     if (!convos) { setConversations([]); setLoading(false); return; }
 
-    // Get all participants for these conversations
-    const { data: allParts } = await (supabase as any)
-      .from("conversation_participants")
-      .select("conversation_id, user_id")
+    // Get other participants by looking up message sender IDs
+    // (conversation_participants RLS only returns own rows)
+    const { data: allMsgs } = await (supabase as any)
+      .from("messages")
+      .select("conversation_id, sender_id")
       .in("conversation_id", convoIds);
 
-    // Get profiles for other participants
-    const otherUserIds: string[] = [...new Set<string>(
-      (allParts || []).filter((p: any) => p.user_id !== user.id).map((p: any) => p.user_id)
-    )];
+    // Build a map of conversation_id -> other user IDs
+    const convoToOthers: Record<string, string> = {};
+    const otherUserIds: string[] = [];
+    (allMsgs || []).forEach((m: any) => {
+      if (m.sender_id !== user.id && !convoToOthers[m.conversation_id]) {
+        convoToOthers[m.conversation_id] = m.sender_id;
+        if (!otherUserIds.includes(m.sender_id)) otherUserIds.push(m.sender_id);
+      }
+    });
+
+    // Also check conversations created_by (for convos where the other person sent no messages yet)
+    (convos || []).forEach((c: any) => {
+      if (c.created_by !== user.id && !otherUserIds.includes(c.created_by)) {
+        otherUserIds.push(c.created_by);
+        if (!convoToOthers[c.id]) convoToOthers[c.id] = c.created_by;
+      }
+    });
 
     const { data: profiles } = otherUserIds.length > 0
       ? await supabase.from("profiles").select("id, full_name, email").in("id", otherUserIds)
@@ -87,11 +101,8 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
         .limit(1);
 
       const myPart = myParts.find((p) => p.conversation_id === convo.id);
-      const otherParts = (allParts || []).filter(
-        (p) => p.conversation_id === convo.id && p.user_id !== user.id
-      );
-      const otherName = otherParts.map((p) => profileMap[p.user_id] || "Unknown").join(", ");
-      const otherId = otherParts[0]?.user_id || "";
+      const otherId = convoToOthers[convo.id] || "";
+      const otherName = otherId ? (profileMap[otherId] || "Unknown") : "Unknown";
 
       const lastMessage = lastMsg?.[0];
       const hasUnread = lastMessage

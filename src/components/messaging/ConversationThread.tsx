@@ -31,18 +31,22 @@ export function ConversationThread({ conversationId, participantNames: externalN
   const scrollRef = useRef<HTMLDivElement>(null);
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
 
-  // Fetch participant names for this conversation
+  // Fetch participant names by looking up sender IDs from messages
+  // (avoids RLS issue where conversation_participants only returns own row)
   const fetchParticipantNames = async () => {
     if (!user) return;
     const names: Record<string, string> = { [user.id]: profile?.full_name || "You" };
 
-    const { data: parts } = await (supabase as any)
-      .from("conversation_participants")
-      .select("user_id")
+    // Get all unique sender IDs from messages in this conversation
+    const { data: msgs } = await (supabase as any)
+      .from("messages")
+      .select("sender_id")
       .eq("conversation_id", conversationId);
 
-    if (parts) {
-      const otherIds = (parts as any[]).filter((p: any) => p.user_id !== user.id).map((p: any) => p.user_id);
+    if (msgs) {
+      const otherIds = [...new Set<string>(
+        (msgs as any[]).map((m: any) => m.sender_id).filter((id: string) => id !== user.id)
+      )];
       if (otherIds.length > 0) {
         const { data: profiles } = await supabase.from("profiles").select("id, full_name, email").in("id", otherIds);
         (profiles || []).forEach((p) => { names[p.id] = p.full_name || p.email || "Unknown"; });
