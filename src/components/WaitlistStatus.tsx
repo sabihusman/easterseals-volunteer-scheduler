@@ -60,7 +60,7 @@ export default function WaitlistStatus() {
         "id, shift_id, volunteer_id, status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
       )
       .eq("volunteer_id", user.id)
-      .eq("status", "waitlisted")
+      .eq("booking_status", "waitlisted")
       .order("created_at", { ascending: true });
 
     /*
@@ -78,7 +78,7 @@ export default function WaitlistStatus() {
         .from("shift_bookings")
         .select("id, shift_id, created_at")
         .in("shift_id", shiftIds)
-        .eq("status", "waitlisted")
+        .eq("booking_status", "waitlisted")
         .order("created_at", { ascending: true });
 
       const positionMap = new Map<string, number>();
@@ -124,7 +124,7 @@ export default function WaitlistStatus() {
         "id, shift_id, volunteer_id, status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
       )
       .eq("volunteer_id", user.id)
-      .eq("status", "confirmed")
+      .eq("booking_status", "confirmed")
       .gte("updated_at", oneDayAgo)
       .not("promoted_at", "is", null);
 

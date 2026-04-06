@@ -45,7 +45,7 @@ interface EligibleVolunteer {
   id: string;
   full_name: string;
   email: string;
-  bg_check_cleared: boolean;
+  bg_check_status: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,7 +88,7 @@ export default function CoverageAlert() {
       .from("shift_bookings")
       .select("shift_id")
       .in("shift_id", shiftIds)
-      .eq("status", "confirmed");
+      .eq("booking_status", "confirmed");
 
     const countMap: Record<string, number> = {};
     if (bookings) {
@@ -136,20 +136,19 @@ export default function CoverageAlert() {
       .from("shift_bookings")
       .select("volunteer_id")
       .eq("shift_id", shift.id)
-      .in("status", ["confirmed", "waitlisted"]);
+      .in("booking_status", ["confirmed", "waitlisted"]);
 
     const bookedIds = new Set((booked ?? []).map((b) => b.volunteer_id));
 
     // Fetch all active volunteers
     let query = supabase
       .from("profiles")
-      .select("id, full_name, email, bg_check_cleared")
+      .select("id, full_name, email, bg_check_status")
       .eq("role", "volunteer")
-      .eq("is_active", true)
-      .eq("is_restricted", false);
+      .eq("is_active", true);
 
     if (shift.requires_bg_check) {
-      query = query.eq("bg_check_cleared", true);
+      query = query.eq("bg_check_status", "cleared");
     }
 
     const { data: vols } = await query.order("full_name");

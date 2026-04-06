@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,7 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Lock, Trash2, Shield } from "lucide-react";
+import { Lock, Trash2, Shield, Upload, X } from "lucide-react";
+import Avatar from "@/components/Avatar";
 import { format } from "date-fns";
 
 function getPasswordStrength(pw: string) {
@@ -36,6 +37,10 @@ export default function Settings() {
   const { user, profile, session, role, signOut, refreshProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Avatar
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Profile
   const [fullName, setFullName] = useState("");
@@ -165,6 +170,76 @@ export default function Settings() {
     toast({ title: "2FA removed", description: "Two-factor authentication has been disabled." });
   };
 
+  // ── Avatar Upload ──
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please choose an image under 2 MB.", variant: "destructive" });
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setAvatarUploading(true);
+    const ext = file.name.split(".").pop() ?? "png";
+    const path = `avatars/${user.id}/avatar.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("volunteer-documents")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("volunteer-documents")
+      .getPublicUrl(path);
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: urlData.publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+
+    if (updateError) {
+      toast({ title: "Error", description: updateError.message, variant: "destructive" });
+    } else {
+      toast({ title: "Photo updated", description: "Your avatar has been uploaded." });
+    }
+
+    await refreshProfile();
+    setAvatarUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!user) return;
+    setAvatarUploading(true);
+
+    // Remove from storage (best-effort; the folder may have multiple extensions)
+    const { data: files } = await supabase.storage
+      .from("volunteer-documents")
+      .list(`avatars/${user.id}`);
+
+    if (files && files.length > 0) {
+      const paths = files.map((f) => `avatars/${user.id}/${f.name}`);
+      await supabase.storage.from("volunteer-documents").remove(paths);
+    }
+
+    await supabase
+      .from("profiles")
+      .update({ avatar_url: null, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+
+    await refreshProfile();
+    setAvatarUploading(false);
+    toast({ title: "Photo removed", description: "Your avatar has been removed." });
+  };
+
   // ── Profile Save ──
   const handleSaveProfile = async () => {
     if (!user) return;
@@ -263,6 +338,42 @@ export default function Settings() {
           <CardTitle>Profile Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Avatar Upload */}
+          <div className="flex items-center gap-4">
+            <Avatar avatarUrl={profile?.avatar_url} fullName={profile?.full_name || "User"} size="lg" />
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={avatarUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                {avatarUploading ? "Uploading..." : "Upload Photo"}
+              </Button>
+              {profile?.avatar_url && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={avatarUploading}
+                  onClick={handleAvatarRemove}
+                >
+                  <X className="h-3.5 w-3.5 mr-1.5" />
+                  Remove Photo
+                </Button>
+              )}
+            </div>
+          </div>
+          <Separator />
           <div className="space-y-2">
             <Label>Display Name</Label>
             <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />

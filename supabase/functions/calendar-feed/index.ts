@@ -9,18 +9,27 @@ Deno.serve(async (req) => {
 
   if (!token) return new Response(emptyIcs, { status: 401, headers: icsHeaders });
 
+  // Use service role to look up the long-lived calendar_token (not a JWT)
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return new Response(emptyIcs, { status: 401, headers: icsHeaders });
+  // Find the user by their calendar_token (UUID, never expires)
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("calendar_token", token)
+    .single();
+
+  if (profileError || !profile) return new Response(emptyIcs, { status: 401, headers: icsHeaders });
+
+  const volunteerId = profile.id;
 
   // Fetch upcoming confirmed bookings
   const { data: bookings } = await supabase
     .from("shift_bookings")
     .select("id, shifts(id, title, shift_date, start_time, end_time, coordinator_note, departments(name, locations(name, address)))")
-    .eq("volunteer_id", user.id)
+    .eq("volunteer_id", volunteerId)
     .eq("booking_status", "confirmed")
     .gte("shifts.shift_date", new Date().toISOString().split("T")[0]);
 

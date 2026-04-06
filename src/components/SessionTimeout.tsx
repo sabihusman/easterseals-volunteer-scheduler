@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
-const EXCLUDED_PATHS = ["/auth", "/reset-password", "/forgot-password"];
+const EXCLUDED_PATHS = ["/auth", "/reset-password", "/forgot-password", "/mfa-verify"];
 
 export function SessionTimeout() {
   const { user, role } = useAuth();

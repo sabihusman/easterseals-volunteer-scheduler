@@ -36,6 +36,8 @@ export function VolunteerLeaderboard() {
         .eq("role", "volunteer")
         .gt("volunteer_points", 0)
         .order("volunteer_points", { ascending: false })
+        .order("consistency_score", { ascending: false })
+        .order("created_at", { ascending: true })
         .limit(10);
 
       const top10 = (data as LeaderboardEntry[]) || [];
