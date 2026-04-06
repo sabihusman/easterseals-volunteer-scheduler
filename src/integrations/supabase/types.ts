@@ -573,6 +573,7 @@ export type Database = {
           bg_check_status: Database["public"]["Enums"]["bg_check_status"]
           bg_check_updated_at: string | null
           booking_privileges: boolean
+          calendar_token: string | null
           consistency_score: number
           created_at: string
           email: string
@@ -607,6 +608,7 @@ export type Database = {
           bg_check_status?: Database["public"]["Enums"]["bg_check_status"]
           bg_check_updated_at?: string | null
           booking_privileges?: boolean
+          calendar_token?: string | null
           consistency_score?: number
           created_at?: string
           email: string
@@ -641,6 +643,7 @@ export type Database = {
           bg_check_status?: Database["public"]["Enums"]["bg_check_status"]
           bg_check_updated_at?: string | null
           booking_privileges?: boolean
+          calendar_token?: string | null
           consistency_score?: number
           created_at?: string
           email?: string
