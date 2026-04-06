@@ -11,6 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Leaf, Mail, Lock, User, Phone } from "lucide-react";
 import { z } from "zod";
 import { sendEmail } from "@/lib/email-utils";
+import { Turnstile } from "@marsidev/react-turnstile";
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 
 const registerSchema = z.object({
   name: z.string().trim().min(1, "Full name is required").max(100, "Name must be under 100 characters"),
@@ -41,19 +44,34 @@ export default function Auth() {
   const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
   const [resetEmail, setResetEmail] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!turnstileToken) {
+      toast({ title: "Verification required", description: "Please complete the security check.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
       password: loginPassword,
+      options: { captchaToken: turnstileToken },
     });
     setLoading(false);
+    setTurnstileToken(null);
     if (error) {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
     } else {
-      navigate("/");
+      // Check if MFA verification is needed
+      const currentLevel = data.session?.user?.factors?.length
+        ? data.session.user.factors.some((f: any) => f.status === "verified") ? "aal2_needed" : null
+        : null;
+      if (currentLevel === "aal2_needed") {
+        navigate("/mfa-verify");
+      } else {
+        navigate("/");
+      }
     }
   };
 
@@ -71,12 +89,17 @@ export default function Auth() {
       toast({ title: "Terms required", description: "Please accept the Terms of Service and Code of Conduct.", variant: "destructive" });
       return;
     }
+    if (!turnstileToken) {
+      toast({ title: "Verification required", description: "Please complete the security check.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email: result.data.email,
       password: result.data.password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin, captchaToken: turnstileToken },
     });
+    setTurnstileToken(null);
     if (error) {
       setLoading(false);
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
@@ -204,8 +227,16 @@ export default function Auth() {
                       <Input id="login-password" type="password" className="pl-10" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? "Signing in..." : "Sign In"}
+                  <div className="flex justify-center">
+                    <Turnstile
+                      siteKey={TURNSTILE_SITE_KEY}
+                      onSuccess={(token) => setTurnstileToken(token)}
+                      onExpire={() => setTurnstileToken(null)}
+                      options={{ theme: "light", size: "normal" }}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading || !turnstileToken}>
+                    {loading ? "Signing in..." : !turnstileToken ? "Verifying..." : "Sign In"}
                   </Button>
                   <div className="text-center">
                     <Link to="/forgot-password" className="text-sm text-primary hover:underline">
@@ -260,8 +291,16 @@ export default function Auth() {
                       I agree to the Terms of Service and Code of Conduct
                     </Label>
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || !tosAccepted}>
-                    {loading ? "Creating account..." : "Create Account"}
+                  <div className="flex justify-center">
+                    <Turnstile
+                      siteKey={TURNSTILE_SITE_KEY}
+                      onSuccess={(token) => setTurnstileToken(token)}
+                      onExpire={() => setTurnstileToken(null)}
+                      options={{ theme: "light", size: "normal" }}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={loading || !tosAccepted || !turnstileToken}>
+                    {loading ? "Creating account..." : !turnstileToken ? "Verifying..." : "Create Account"}
                   </Button>
                 </form>
               </TabsContent>
