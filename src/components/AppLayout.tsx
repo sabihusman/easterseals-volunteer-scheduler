@@ -5,7 +5,8 @@ import { MobileNav } from "@/components/MobileNav";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { Leaf, MessageSquare } from "lucide-react";
+import { Leaf, MessageSquare, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useNavigate } from "react-router-dom";
 
@@ -14,6 +15,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const { unreadCount } = useUnreadCount();
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
 
   return (
     <SidebarProvider>
@@ -31,6 +33,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <h1 className="text-lg font-bold text-foreground hidden sm:block">Easterseals Iowa</h1>
               <h1 className="text-lg font-bold text-foreground sm:hidden">Easterseals</h1>
             </div>
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 rounded-md hover:bg-muted transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
             <button
               onClick={() => navigate("/messages")}
               className="relative p-2 rounded-md hover:bg-muted transition-colors"

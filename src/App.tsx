@@ -10,6 +10,7 @@ import OnboardingModal from "@/components/OnboardingModal";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import MfaVerify from "./pages/MfaVerify";
 import VolunteerDashboard from "./pages/VolunteerDashboard";
 import BrowseShifts from "./pages/BrowseShifts";
 import ShiftHistory from "./pages/ShiftHistory";
@@ -67,6 +68,7 @@ const App = () => (
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/mfa-verify" element={<MfaVerify />} />
 
             <Route path="/dashboard" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>} />
             <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />

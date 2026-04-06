@@ -1,4 +1,3 @@
-npm warn exec The following package was not found and will be installed: supabase@2.85.0
 export type Json =
   | string
   | number
@@ -15,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_action_log: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string | null
+          id: string
+          payload: Json | null
+          volunteer_id: string
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+          volunteer_id: string
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string | null
+          id?: string
+          payload?: Json | null
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_action_log_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_action_log_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       confirmation_reminders: {
         Row: {
           booking_id: string
@@ -484,6 +525,7 @@ export type Database = {
       notifications: {
         Row: {
           created_at: string
+          data: Json | null
           id: string
           is_read: boolean
           link: string | null
@@ -494,6 +536,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          data?: Json | null
           id?: string
           is_read?: boolean
           link?: string | null
@@ -504,6 +547,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          data?: Json | null
           id?: string
           is_read?: boolean
           link?: string | null
@@ -524,6 +568,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           bg_check_expires_at: string | null
           bg_check_status: Database["public"]["Enums"]["bg_check_status"]
           bg_check_updated_at: string | null
@@ -539,8 +584,13 @@ export type Database = {
           id: string
           is_active: boolean
           location_id: string | null
+          notif_booking_changes: boolean | null
+          notif_document_expiry: boolean | null
           notif_email: boolean
           notif_in_app: boolean
+          notif_milestone: boolean | null
+          notif_new_messages: boolean | null
+          notif_shift_reminders: boolean | null
           notif_sms: boolean
           onboarding_complete: boolean
           phone: string | null
@@ -549,8 +599,10 @@ export type Database = {
           tos_accepted_at: string | null
           total_hours: number
           updated_at: string
+          volunteer_points: number | null
         }
         Insert: {
+          avatar_url?: string | null
           bg_check_expires_at?: string | null
           bg_check_status?: Database["public"]["Enums"]["bg_check_status"]
           bg_check_updated_at?: string | null
@@ -566,8 +618,13 @@ export type Database = {
           id: string
           is_active?: boolean
           location_id?: string | null
+          notif_booking_changes?: boolean | null
+          notif_document_expiry?: boolean | null
           notif_email?: boolean
           notif_in_app?: boolean
+          notif_milestone?: boolean | null
+          notif_new_messages?: boolean | null
+          notif_shift_reminders?: boolean | null
           notif_sms?: boolean
           onboarding_complete?: boolean
           phone?: string | null
@@ -576,8 +633,10 @@ export type Database = {
           tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
+          volunteer_points?: number | null
         }
         Update: {
+          avatar_url?: string | null
           bg_check_expires_at?: string | null
           bg_check_status?: Database["public"]["Enums"]["bg_check_status"]
           bg_check_updated_at?: string | null
@@ -593,8 +652,13 @@ export type Database = {
           id?: string
           is_active?: boolean
           location_id?: string | null
+          notif_booking_changes?: boolean | null
+          notif_document_expiry?: boolean | null
           notif_email?: boolean
           notif_in_app?: boolean
+          notif_milestone?: boolean | null
+          notif_new_messages?: boolean | null
+          notif_shift_reminders?: boolean | null
           notif_sms?: boolean
           onboarding_complete?: boolean
           phone?: string | null
@@ -603,6 +667,7 @@ export type Database = {
           tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
+          volunteer_points?: number | null
         }
         Relationships: [
           {
@@ -1448,6 +1513,10 @@ export type Database = {
       process_confirmation_reminders: { Args: never; Returns: undefined }
       recalculate_consistency: {
         Args: { p_volunteer_id: string }
+        Returns: undefined
+      }
+      recalculate_points: {
+        Args: { volunteer_uuid: string }
         Returns: undefined
       }
       resolve_hours_discrepancy: {

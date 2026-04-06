@@ -10,6 +10,7 @@ import { Calendar, Users, Download, Trash2, XCircle, Search } from "lucide-react
 import { format } from "date-fns";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
 import { DepartmentCoordinatorManager } from "@/components/DepartmentCoordinatorManager";
+import { VolunteerLeaderboard } from "@/components/VolunteerLeaderboard";
 import { useToast } from "@/hooks/use-toast";
 
 const DEPT_COLORS: Record<string, string> = {
@@ -183,6 +184,9 @@ export default function AdminDashboard() {
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{stats.totalBookings}</div><p className="text-sm text-muted-foreground">Total Bookings</p></CardContent></Card>
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{stats.totalVolunteers}</div><p className="text-sm text-muted-foreground">Volunteers</p></CardContent></Card>
       </div>
+
+      {/* Top Volunteers Leaderboard */}
+      <VolunteerLeaderboard />
 
       {/* Filters */}
       <div className="space-y-3">

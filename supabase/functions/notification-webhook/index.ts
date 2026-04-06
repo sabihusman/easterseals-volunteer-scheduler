@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     // Get the user's email, phone, and notification preferences
     const { data: profile } = await supabase
       .from("profiles")
-      .select("email, full_name, phone, notif_email, notif_sms")
+      .select("email, full_name, phone, notif_email, notif_sms, notif_shift_reminders, notif_new_messages, notif_milestone, notif_document_expiry, notif_booking_changes")
       .eq("id", record.user_id)
       .single();
 
@@ -56,16 +56,43 @@ Deno.serve(async (req) => {
       self_confirmation_reminder: true,
       late_cancellation: true,
       shift_reminder: true,
+      shift_reminder_auto: true,
       coordinator_confirmation_reminder: true,
       admin_escalation: true,
       waitlist_notification: true,
       hours_milestone: true,
       new_message: true,
+      document_expired: true,
+      document_expiry_warning: true,
+      bg_check_status_change: true,
+      booking_confirmed: true,
+      booking_cancelled: true,
     };
 
     if (!typeMap[record.type]) {
       // Not a type we send notifications for via webhook
       return new Response(JSON.stringify({ skipped: true, reason: "type not mapped" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Type-specific preference check
+    const typePrefs: Record<string, string> = {
+      shift_reminder: "notif_shift_reminders",
+      shift_reminder_auto: "notif_shift_reminders",
+      self_confirmation_reminder: "notif_shift_reminders",
+      new_message: "notif_new_messages",
+      hours_milestone: "notif_milestone",
+      document_expired: "notif_document_expiry",
+      document_expiry_warning: "notif_document_expiry",
+      booking_confirmed: "notif_booking_changes",
+      booking_cancelled: "notif_booking_changes",
+      late_cancellation: "notif_booking_changes",
+      waitlist_notification: "notif_booking_changes",
+    };
+    const prefCol = typePrefs[record.type];
+    if (prefCol && (profile as any)[prefCol] === false) {
+      return new Response(JSON.stringify({ skipped: true, reason: "type preference disabled" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -87,7 +114,12 @@ Deno.serve(async (req) => {
     // ── Send SMS ──
     if (profile.notif_sms && profile.phone) {
       // Build a concise SMS message from notification
-      const smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
+      let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
+
+      // For auto shift reminders, include location if available
+      if (record.type === "shift_reminder_auto" && record.data?.location) {
+        smsBody = `[Easterseals Iowa] ${record.title || "Shift Reminder"} at ${record.data.location}: ${(record.message || "").slice(0, 120)}`;
+      }
 
       const { error: smsError } = await supabase.functions.invoke("send-sms", {
         body: { to: profile.phone, body: smsBody },

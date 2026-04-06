@@ -35,7 +35,7 @@ interface LowCoverageShift {
   shift_date: string;
   start_time: string;
   end_time: string;
-  max_volunteers: number;
+  total_slots: number;
   booked_count: number;
   department_name: string;
   requires_bg_check: boolean;
@@ -73,7 +73,7 @@ export default function CoverageAlert() {
     // Fetch upcoming shifts with department info
     const { data: allShifts } = await supabase
       .from("shifts")
-      .select("id, shift_date, start_time, end_time, max_volunteers, department_id, departments(name, requires_bg_check)")
+      .select("id, shift_date, start_time, end_time, total_slots, department_id, departments(name, requires_bg_check)")
       .gte("shift_date", today)
       .order("shift_date");
 
@@ -101,14 +101,14 @@ export default function CoverageAlert() {
     const low: LowCoverageShift[] = [];
     for (const s of allShifts) {
       const booked = countMap[s.id] ?? 0;
-      const pct = s.max_volunteers > 0 ? booked / s.max_volunteers : 1;
+      const pct = s.total_slots > 0 ? booked / s.total_slots : 1;
       if (pct < 0.5) {
         low.push({
           id: s.id,
           shift_date: s.shift_date,
           start_time: s.start_time,
           end_time: s.end_time,
-          max_volunteers: s.max_volunteers,
+          total_slots: s.total_slots,
           booked_count: booked,
           department_name: (s.departments as any)?.name ?? "Unknown",
           requires_bg_check: (s.departments as any)?.requires_bg_check ?? false,
@@ -236,7 +236,7 @@ export default function CoverageAlert() {
           <ul className="divide-y">
             {shifts.map((s) => {
               const pct = Math.round(
-                (s.booked_count / s.max_volunteers) * 100
+                (s.booked_count / s.total_slots) * 100
               );
               return (
                 <li
@@ -259,7 +259,7 @@ export default function CoverageAlert() {
                         variant="outline"
                         className="border-amber-300 bg-amber-50 text-amber-700 text-[10px]"
                       >
-                        {s.booked_count}/{s.max_volunteers} ({pct}%)
+                        {s.booked_count}/{s.total_slots} ({pct}%)
                       </Badge>
                     </div>
                   </div>

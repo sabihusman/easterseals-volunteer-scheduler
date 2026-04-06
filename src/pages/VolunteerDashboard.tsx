@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle, ChevronDown } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { format, differenceInHours } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -12,6 +12,8 @@ import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { downloadICS, googleCalendarUrl, timeLabel } from "@/lib/calendar-utils";
 import { InviteFriendModal } from "@/components/InviteFriendModal";
 import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
+import { VolunteerImpactCharts } from "@/components/VolunteerImpactCharts";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function VolunteerDashboard() {
   const { user, profile } = useAuth();
@@ -180,7 +182,7 @@ export default function VolunteerDashboard() {
         </Card>
       )}
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
             <div className="text-2xl font-bold">{eligibleBookings.length}</div>
@@ -205,6 +207,12 @@ export default function VolunteerDashboard() {
             <div className="text-2xl font-bold">{profile?.consistency_score ?? 0}%</div>
             <p className="text-sm text-muted-foreground">Consistency Score</p>
             <p className="text-xs text-muted-foreground mt-1">Based on last 5 shifts</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{profile?.volunteer_points || 0}</div>
+            <p className="text-sm text-muted-foreground">Points</p>
           </CardContent>
         </Card>
       </div>
@@ -271,6 +279,15 @@ export default function VolunteerDashboard() {
           </div>
         )}
       </div>
+
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost">My Impact Over Time <ChevronDown className="ml-1 h-4 w-4" /></Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <VolunteerImpactCharts />
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

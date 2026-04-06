@@ -14,7 +14,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Lock, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Lock, Trash2, Shield } from "lucide-react";
 import { format } from "date-fns";
 
 function getPasswordStrength(pw: string) {
@@ -51,6 +55,22 @@ export default function Settings() {
   const [notifInApp, setNotifInApp] = useState(true);
   const [notifSms, setNotifSms] = useState(false);
 
+  // Per-type notification preferences
+  const [notifShiftReminders, setNotifShiftReminders] = useState(true);
+  const [notifNewMessages, setNotifNewMessages] = useState(true);
+  const [notifMilestone, setNotifMilestone] = useState(true);
+  const [notifDocumentExpiry, setNotifDocumentExpiry] = useState(true);
+  const [notifBookingChanges, setNotifBookingChanges] = useState(true);
+
+  // MFA
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaEnrolled, setMfaEnrolled] = useState(false);
+  const [mfaQrCode, setMfaQrCode] = useState<string | null>(null);
+  const [mfaEnrollFactorId, setMfaEnrollFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaDialogOpen, setMfaDialogOpen] = useState(false);
+
   // Delete
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -65,8 +85,85 @@ export default function Settings() {
       setNotifEmail(profile.notif_email);
       setNotifInApp(profile.notif_in_app);
       setNotifSms(profile.notif_sms);
+      setNotifShiftReminders((profile as any).notif_shift_reminders ?? true);
+      setNotifNewMessages((profile as any).notif_new_messages ?? true);
+      setNotifMilestone((profile as any).notif_milestone ?? true);
+      setNotifDocumentExpiry((profile as any).notif_document_expiry ?? true);
+      setNotifBookingChanges((profile as any).notif_booking_changes ?? true);
     }
   }, [profile]);
+
+  // ── MFA Status ──
+  useEffect(() => {
+    const checkMfa = async () => {
+      const { data } = await supabase.auth.mfa.listFactors();
+      if (data?.totp && data.totp.length > 0) {
+        const verified = data.totp.find((f) => f.status === "verified");
+        if (verified) {
+          setMfaEnrolled(true);
+          setMfaFactorId(verified.id);
+        }
+      }
+    };
+    checkMfa();
+  }, []);
+
+  const handleEnableMfa = async () => {
+    setMfaLoading(true);
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
+    setMfaLoading(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    if (data) {
+      setMfaQrCode(data.totp.qr_code);
+      setMfaEnrollFactorId(data.id);
+      setMfaDialogOpen(true);
+    }
+  };
+
+  const handleVerifyMfaEnrollment = async () => {
+    if (!mfaEnrollFactorId || mfaCode.length !== 6) return;
+    setMfaLoading(true);
+    const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: mfaEnrollFactorId });
+    if (challengeError) {
+      setMfaLoading(false);
+      toast({ title: "Error", description: challengeError.message, variant: "destructive" });
+      return;
+    }
+    const { error: verifyError } = await supabase.auth.mfa.verify({
+      factorId: mfaEnrollFactorId,
+      challengeId: challengeData.id,
+      code: mfaCode,
+    });
+    setMfaLoading(false);
+    if (verifyError) {
+      toast({ title: "Verification failed", description: verifyError.message, variant: "destructive" });
+      setMfaCode("");
+      return;
+    }
+    setMfaEnrolled(true);
+    setMfaFactorId(mfaEnrollFactorId);
+    setMfaDialogOpen(false);
+    setMfaQrCode(null);
+    setMfaCode("");
+    toast({ title: "2FA enabled", description: "Two-factor authentication is now active on your account." });
+  };
+
+  const handleRemoveMfa = async () => {
+    if (!mfaFactorId) return;
+    setMfaLoading(true);
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+    setMfaLoading(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setMfaEnrolled(false);
+    setMfaFactorId(null);
+    toast({ title: "2FA removed", description: "Two-factor authentication has been disabled." });
+  };
 
   // ── Profile Save ──
   const handleSaveProfile = async () => {
@@ -226,6 +323,64 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* ── Security / MFA ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Shield className="h-4 w-4" /> Two-Factor Authentication</CardTitle>
+          <CardDescription>Add an extra layer of security to your account</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {mfaEnrolled ? (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-primary/10 text-primary hover:bg-primary/10">Active</Badge>
+                <p className="text-sm text-muted-foreground">2FA is enabled on your account</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleRemoveMfa} disabled={mfaLoading}>
+                {mfaLoading ? "Removing..." : "Remove 2FA"}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Protect your account with a TOTP authenticator app</p>
+              <Dialog open={mfaDialogOpen} onOpenChange={setMfaDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" onClick={handleEnableMfa} disabled={mfaLoading}>
+                    {mfaLoading ? "Setting up..." : "Enable 2FA"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Set Up Two-Factor Authentication</DialogTitle>
+                    <DialogDescription>Scan the QR code with your authenticator app, then enter the 6-digit code.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {mfaQrCode && (
+                      <div className="flex justify-center">
+                        <img src={mfaQrCode} alt="MFA QR Code" className="w-48 h-48" />
+                      </div>
+                    )}
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={mfaCode}
+                      onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      className="text-center text-xl tracking-widest"
+                    />
+                    <Button className="w-full" onClick={handleVerifyMfaEnrollment} disabled={mfaLoading || mfaCode.length !== 6}>
+                      {mfaLoading ? "Verifying..." : "Verify & Enable"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Notifications ── */}
       <Card>
         <CardHeader>
@@ -268,9 +423,59 @@ export default function Settings() {
               onCheckedChange={(v) => { setNotifSms(v); updateNotif("notif_sms", v); }}
             />
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            You will be notified for: shift confirmations, reminders, cancellations, and milestone achievements.
-          </p>
+          <Separator />
+          <p className="text-sm font-medium">Notify me about...</p>
+          <p className="text-xs text-muted-foreground">These preferences control email and SMS delivery. In-app notifications are always shown.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Shift reminders</p>
+              <p className="text-xs text-muted-foreground">24h and 2h shift reminders</p>
+            </div>
+            <Switch
+              checked={notifShiftReminders}
+              onCheckedChange={(v) => { setNotifShiftReminders(v); updateNotif("notif_shift_reminders", v); }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">New messages</p>
+              <p className="text-xs text-muted-foreground">When you receive a new message</p>
+            </div>
+            <Switch
+              checked={notifNewMessages}
+              onCheckedChange={(v) => { setNotifNewMessages(v); updateNotif("notif_new_messages", v); }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Milestones & badges</p>
+              <p className="text-xs text-muted-foreground">Hours milestones and achievements</p>
+            </div>
+            <Switch
+              checked={notifMilestone}
+              onCheckedChange={(v) => { setNotifMilestone(v); updateNotif("notif_milestone", v); }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Document expiry</p>
+              <p className="text-xs text-muted-foreground">Document expiration warnings</p>
+            </div>
+            <Switch
+              checked={notifDocumentExpiry}
+              onCheckedChange={(v) => { setNotifDocumentExpiry(v); updateNotif("notif_document_expiry", v); }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Booking changes</p>
+              <p className="text-xs text-muted-foreground">Confirmations, cancellations, waitlist updates</p>
+            </div>
+            <Switch
+              checked={notifBookingChanges}
+              onCheckedChange={(v) => { setNotifBookingChanges(v); updateNotif("notif_booking_changes", v); }}
+            />
+          </div>
         </CardContent>
       </Card>
 
