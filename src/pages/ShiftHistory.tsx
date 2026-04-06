@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
 import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
+import { VolunteerHoursLetter } from "@/components/VolunteerHoursLetter";
 
 export default function ShiftHistory() {
   const { user, profile } = useAuth();
@@ -173,9 +174,12 @@ export default function ShiftHistory() {
           <h2 className="text-2xl font-bold">Shift History</h2>
           <p className="text-muted-foreground">View your past volunteer shifts and hours</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportCSV}>
-          <Download className="h-4 w-4 mr-1" />Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <VolunteerHoursLetter />
+          <Button variant="outline" size="sm" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-1" />Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Milestone badges */}
