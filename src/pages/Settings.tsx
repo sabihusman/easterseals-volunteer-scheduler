@@ -255,12 +255,18 @@ export default function Settings() {
             />
           </div>
           <Separator />
-          <div className="flex items-center justify-between opacity-50">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium">SMS / Text notifications</p>
-              <p className="text-xs text-muted-foreground">Coming soon — requires phone number</p>
+              <p className="text-xs text-muted-foreground">
+                {phone || emergencyPhone ? "Shift reminders, cancellations, and messages via text" : "Add a phone number above to enable SMS"}
+              </p>
             </div>
-            <Switch checked={false} disabled />
+            <Switch
+              checked={notifSms}
+              disabled={!phone && !emergencyPhone}
+              onCheckedChange={(v) => { setNotifSms(v); updateNotif("notif_sms", v); }}
+            />
           </div>
           <p className="text-xs text-muted-foreground mt-2">
             You will be notified for: shift confirmations, reminders, cancellations, and milestone achievements.
