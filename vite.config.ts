@@ -52,12 +52,21 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         runtimeCaching: [
           {
+            // Booking/shift data — short cache to prevent phantom slots
+            urlPattern: /^https:\/\/esycmohgumryeqteiwla\.supabase\.co\/rest\/v1\/(shifts|shift_bookings|shift_time_slots|shift_booking_slots).*/i,
+            handler: "NetworkOnly",
+            options: {
+              cacheName: "supabase-booking-nocache",
+            },
+          },
+          {
+            // Other API data — short fallback cache
             urlPattern: /^https:\/\/esycmohgumryeqteiwla\.supabase\.co\/rest\/v1\/.*/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "supabase-api-cache",
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 },
-              networkTimeoutSeconds: 10,
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 },
+              networkTimeoutSeconds: 5,
             },
           },
           {

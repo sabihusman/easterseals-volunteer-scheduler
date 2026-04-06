@@ -39,9 +39,9 @@ export function VolunteerHoursLetter() {
       return;
     }
 
-    // Filter only past shifts
+    // Filter shifts that have ended (include same-day completed shifts)
     const completedShifts: CompletedShift[] = bookings
-      .filter((b: any) => b.shifts?.shift_date && b.shifts.shift_date < today)
+      .filter((b: any) => b.shifts?.shift_date && b.shifts.shift_date <= today)
       .map((b: any) => ({
         shift_date: b.shifts.shift_date,
         title: b.shifts.title || "Volunteer Shift",
@@ -60,11 +60,12 @@ export function VolunteerHoursLetter() {
     const earliestDate = completedShifts[0].shift_date;
     const latestDate = completedShifts[completedShifts.length - 1].shift_date;
 
-    // Fetch admin name for signature
+    // Fetch admin name for signature (oldest admin = primary signer)
     const { data: adminProfile } = await supabase
       .from("profiles")
       .select("full_name")
       .eq("role", "admin")
+      .order("created_at", { ascending: true })
       .limit(1)
       .single();
 

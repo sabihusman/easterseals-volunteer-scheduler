@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
+const ACTIVITY_KEY = "es_last_activity";
+
 interface UseInactivityTimeoutOptions {
   warningMinutes: number;
   logoutMinutes: number;
@@ -17,6 +19,7 @@ export function useInactivityTimeout({ warningMinutes, logoutMinutes, enabled }:
   const countdownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const warningMs = warningMinutes * 60 * 1000;
+  const logoutMs = logoutMinutes * 60 * 1000;
   const countdownSeconds = (logoutMinutes - warningMinutes) * 60;
 
   const clearAllTimers = useCallback(() => {
@@ -31,6 +34,7 @@ export function useInactivityTimeout({ warningMinutes, logoutMinutes, enabled }:
   const doSignOut = useCallback(async () => {
     clearAllTimers();
     setShowWarning(false);
+    localStorage.removeItem(ACTIVITY_KEY);
     await supabase.auth.signOut();
     navigate("/auth", { state: { inactivitySignout: true } });
   }, [clearAllTimers, navigate]);
@@ -40,6 +44,9 @@ export function useInactivityTimeout({ warningMinutes, logoutMinutes, enabled }:
     clearAllTimers();
     setShowWarning(false);
     setCountdown(countdownSeconds);
+
+    // Sync activity timestamp across tabs via localStorage
+    localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
 
     warningTimer.current = setTimeout(() => {
       setShowWarning(true);
@@ -54,16 +61,15 @@ export function useInactivityTimeout({ warningMinutes, logoutMinutes, enabled }:
 
     logoutTimer.current = setTimeout(() => {
       doSignOut();
-    }, logoutMinutes * 60 * 1000);
-  }, [enabled, clearAllTimers, countdownSeconds, warningMs, logoutMinutes, doSignOut]);
+    }, logoutMs);
+  }, [enabled, clearAllTimers, countdownSeconds, warningMs, logoutMs, doSignOut]);
 
-  // Activity listeners
+  // Activity listeners — DOM events only (not network)
   useEffect(() => {
     if (!enabled) return;
 
     const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
     const handler = () => {
-      // Any activity resets timer, even during warning
       resetTimer();
     };
 
@@ -75,6 +81,21 @@ export function useInactivityTimeout({ warningMinutes, logoutMinutes, enabled }:
       clearAllTimers();
     };
   }, [enabled, resetTimer, clearAllTimers]);
+
+  // Cross-tab sync: listen for activity in other tabs via localStorage
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === ACTIVITY_KEY && e.newValue) {
+        // Another tab had activity — reset our timer too
+        resetTimer();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [enabled, resetTimer]);
 
   // Handle countdown reaching 0
   useEffect(() => {
