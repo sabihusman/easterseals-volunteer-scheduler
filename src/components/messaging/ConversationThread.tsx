@@ -22,13 +22,37 @@ interface ConversationThreadProps {
   onMessageSent?: () => void;
 }
 
-export function ConversationThread({ conversationId, participantNames, onMessageSent }: ConversationThreadProps) {
-  const { user } = useAuth();
+export function ConversationThread({ conversationId, participantNames: externalNames, onMessageSent }: ConversationThreadProps) {
+  const { user, profile } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+
+  // Fetch participant names for this conversation
+  const fetchParticipantNames = async () => {
+    if (!user) return;
+    const names: Record<string, string> = { [user.id]: profile?.full_name || "You" };
+
+    const { data: parts } = await (supabase as any)
+      .from("conversation_participants")
+      .select("user_id")
+      .eq("conversation_id", conversationId);
+
+    if (parts) {
+      const otherIds = (parts as any[]).filter((p: any) => p.user_id !== user.id).map((p: any) => p.user_id);
+      if (otherIds.length > 0) {
+        const { data: profiles } = await supabase.from("profiles").select("id, full_name, email").in("id", otherIds);
+        (profiles || []).forEach((p) => { names[p.id] = p.full_name || p.email || "Unknown"; });
+      }
+    }
+    setResolvedNames(names);
+  };
+
+  // Use external names if provided, otherwise fetch
+  const participantNames = Object.keys(externalNames).length > 1 ? externalNames : resolvedNames;
 
   const fetchMessages = async () => {
     const { data } = await (supabase as any)
@@ -54,6 +78,7 @@ export function ConversationThread({ conversationId, participantNames, onMessage
     setLoading(true);
     setMessages([]);
     fetchMessages();
+    fetchParticipantNames();
     markRead();
 
     // Real-time subscription
