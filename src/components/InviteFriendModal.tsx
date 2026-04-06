@@ -77,9 +77,10 @@ export function InviteFriendModal({ shiftId, shiftTitle, shiftDate, shiftTime }:
                 ${shiftTime ? `<p>🕐 ${shiftTime}</p>` : ""}
                 <p>📍 Grounds & Facilities — Johnston, IA</p>
                 <div style="text-align: center; margin: 30px 0;">
-                  <a href="https://easterseals-volunteer-scheduler.vercel.app/auth" style="background: #006B3E; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px;">
-                    Sign Up & Join the Shift
+                  <a href="https://easterseals-volunteer-scheduler.vercel.app/auth" data-resend-track="false" style="background: #006B3E; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px;">
+                    Sign Up &amp; Join the Shift
                   </a>
+                  <p style="margin-top: 12px; font-size: 12px; color: #666;">Or visit: https://easterseals-volunteer-scheduler.vercel.app/auth</p>
                 </div>
                 <p style="color: #666; font-size: 12px;">This invitation expires in 7 days.</p>
               </div>

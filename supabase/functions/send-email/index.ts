@@ -39,7 +39,7 @@ ${APP_NAME} · Easterseals Iowa<br>
 
 function button(text: string, href: string): string {
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td>
-<a href="${href}" style="display:inline-block;padding:12px 28px;background:${BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">${text}</a>
+<a href="${href}" data-resend-track="false" style="display:inline-block;padding:12px 28px;background:${BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">${text}</a>
 </td></tr></table>`;
 }
 
