@@ -44,7 +44,7 @@ export function SessionTimeout() {
               <span className="font-semibold text-foreground">
                 {mins > 0 ? `${mins}:${secs.toString().padStart(2, "0")}` : `${secs}`}
               </span>{" "}
-              seconds due to inactivity.
+              {mins > 0 ? "minutes" : "seconds"} due to inactivity.
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>

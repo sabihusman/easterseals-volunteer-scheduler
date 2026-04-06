@@ -116,16 +116,16 @@ export default function OnboardingModal() {
         emergency_contact_phone: profile.emergency_contact_phone ?? "",
       });
       setOpen(true);
+
+      // Pre-fetch departments for step 3
+      const { data: depts } = await supabase
+        .from("departments")
+        .select("id, name, description")
+        .eq("is_active", true)
+        .order("name");
+
+      if (depts) setDepartments(depts as Department[]);
     }
-
-    // Pre-fetch departments for step 3
-    const { data: depts } = await supabase
-      .from("departments")
-      .select("id, name, description")
-      .eq("is_active", true)
-      .order("name");
-
-    if (depts) setDepartments(depts as Department[]);
   }, []);
 
   useEffect(() => {

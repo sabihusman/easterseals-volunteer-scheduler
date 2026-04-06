@@ -22,7 +22,7 @@ interface WaitlistBooking {
   id: string;
   shift_id: string;
   volunteer_id: string;
-  status: "waitlisted" | "confirmed" | "cancelled";
+  booking_status: "waitlisted" | "confirmed" | "cancelled";
   created_at: string;
   /** Position on the waitlist (1-indexed). Only relevant when status = waitlisted. */
   position?: number;
@@ -57,7 +57,7 @@ export default function WaitlistStatus() {
     const { data: mine } = await supabase
       .from("shift_bookings")
       .select(
-        "id, shift_id, volunteer_id, status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
+        "id, shift_id, volunteer_id, booking_status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
       )
       .eq("volunteer_id", user.id)
       .eq("booking_status", "waitlisted")
@@ -121,7 +121,7 @@ export default function WaitlistStatus() {
     const { data: recentConfirmed } = await supabase
       .from("shift_bookings")
       .select(
-        "id, shift_id, volunteer_id, status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
+        "id, shift_id, volunteer_id, booking_status, created_at, shifts(shift_date, start_time, end_time, departments(name))"
       )
       .eq("volunteer_id", user.id)
       .eq("booking_status", "confirmed")

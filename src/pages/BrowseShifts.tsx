@@ -31,6 +31,53 @@ interface ShiftRow {
   departments: { name: string; requires_bg_check?: boolean } | null;
 }
 
+interface ShiftCardProps {
+  s: ShiftRow;
+  bookingIds: Set<string>;
+  profile: { booking_privileges?: boolean; bg_check_status?: string } | null;
+  privilegesSuspended: boolean;
+  setSlotDialogShift: (shift: ShiftRow) => void;
+  trackViewed: (shiftId: string) => void;
+}
+
+function ShiftCard({ s, bookingIds, profile, privilegesSuspended, setSlotDialogShift, trackViewed }: ShiftCardProps) {
+  const slotsLeft = s.total_slots - s.booked_slots;
+  const isFull = slotsLeft <= 0;
+  const alreadyBooked = bookingIds.has(s.id);
+  return (
+    <Card key={s.id}>
+      <CardContent className="pt-4 pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="font-medium">{s.title}</div>
+            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
+              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
+              <span className="flex items-center gap-1"><Users className="h-3 w-3" />{isFull ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}</span>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
+              {s.requires_bg_check && <Badge variant="outline" className="text-xs"><Shield className="h-3 w-3 mr-1" />BG Check Required</Badge>}
+            </div>
+          </div>
+          <div className="flex gap-2 items-center">
+            {alreadyBooked && !s.requires_bg_check && !s.departments?.requires_bg_check && (
+              <InviteFriendModal shiftId={s.id} shiftTitle={s.title} shiftDate={s.shift_date} shiftTime={timeLabel(s)} />
+            )}
+            <Button
+              size="sm"
+              disabled={alreadyBooked || !profile?.booking_privileges || privilegesSuspended}
+              onClick={() => { setSlotDialogShift(s); trackViewed(s.id); }}
+            >
+              {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function BrowseShifts() {
   const { user, profile } = useAuth();
   const { toast } = useToast();
@@ -101,44 +148,6 @@ export default function BrowseShifts() {
   const getShiftsForDay = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd");
     return filtered.filter((s) => s.shift_date === dateStr);
-  };
-
-  const ShiftCard = ({ s }: { s: ShiftRow }) => {
-    const slotsLeft = s.total_slots - s.booked_slots;
-    const isFull = slotsLeft <= 0;
-    const alreadyBooked = bookingIds.has(s.id);
-    return (
-      <Card key={s.id}>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="font-medium">{s.title}</div>
-              <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
-                <span className="flex items-center gap-1"><Users className="h-3 w-3" />{isFull ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}</span>
-              </div>
-              <div className="flex gap-2">
-                <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
-                {s.requires_bg_check && <Badge variant="outline" className="text-xs"><Shield className="h-3 w-3 mr-1" />BG Check Required</Badge>}
-              </div>
-            </div>
-            <div className="flex gap-2 items-center">
-              {alreadyBooked && !s.requires_bg_check && !s.departments?.requires_bg_check && (
-                <InviteFriendModal shiftId={s.id} shiftTitle={s.title} shiftDate={s.shift_date} shiftTime={timeLabel(s)} />
-              )}
-              <Button
-                size="sm"
-                disabled={alreadyBooked || !profile?.booking_privileges || privilegesSuspended}
-                onClick={() => { setSlotDialogShift(s); trackViewed(s.id); }}
-              >
-                {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
   };
 
   const privilegesSuspended = profile?.booking_privileges === false;
@@ -235,7 +244,7 @@ export default function BrowseShifts() {
           <Card><CardContent className="pt-6 text-center text-muted-foreground">No available shifts found.</CardContent></Card>
         ) : (
           <div className="grid gap-3">
-            {filtered.map((s) => <ShiftCard key={s.id} s={s} />)}
+            {filtered.map((s) => <ShiftCard key={s.id} s={s} bookingIds={bookingIds} profile={profile} privilegesSuspended={privilegesSuspended} setSlotDialogShift={setSlotDialogShift} trackViewed={trackViewed} />)}
           </div>
         )}
         </>      ) : (

@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   // Fetch upcoming confirmed bookings
   const { data: bookings } = await supabase
     .from("shift_bookings")
-    .select("id, shifts(id, title, shift_date, start_time, end_time, coordinator_note, departments(name, locations(name, address)))")
+    .select("id, shifts(id, title, shift_date, start_time, end_time, coordinator_note, departments(name, locations(name, address, timezone)))")
     .eq("volunteer_id", volunteerId)
     .eq("booking_status", "confirmed")
     .gte("shifts.shift_date", new Date().toISOString().split("T")[0]);
@@ -43,13 +43,14 @@ Deno.serve(async (req) => {
     const start = (s.start_time || "09:00:00").replace(/:/g, "").slice(0, 6);
     const end = (s.end_time || "17:00:00").replace(/:/g, "").slice(0, 6);
     const location = loc?.address || loc?.name || "";
+    const tz = loc?.timezone || "America/Chicago";
     const description = [dept?.name, s.coordinator_note, "Managed via Easterseals Iowa Volunteer Scheduler"].filter(Boolean).join("\\n");
 
     return [
       "BEGIN:VEVENT",
       `UID:${s.id}@easterseals-volunteer-scheduler`,
-      `DTSTART;TZID=America/Chicago:${date}T${start}`,
-      `DTEND;TZID=America/Chicago:${date}T${end}`,
+      `DTSTART;TZID=${tz}:${date}T${start}`,
+      `DTEND;TZID=${tz}:${date}T${end}`,
       `SUMMARY:${s.title}`,
       `LOCATION:${location}`,
       `DESCRIPTION:${description}`,

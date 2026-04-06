@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
       bg_check_status_change: true,
       booking_confirmed: true,
       booking_cancelled: true,
+      shift_invitation: true,
     };
 
     if (!typeMap[record.type]) {

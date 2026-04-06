@@ -187,7 +187,7 @@ export default function CoverageAlert() {
     setSending(true);
 
     const notifications = [...selected].map((volId) => ({
-      volunteer_id: volId,
+      user_id: volId,
       type: "shift_invitation",
       title: "You're invited to volunteer!",
       body: `A shift on ${inviteShift.shift_date} (${inviteShift.start_time?.slice(0, 5)}–${inviteShift.end_time?.slice(0, 5)}) in ${inviteShift.department_name} needs coverage.`,
