@@ -19,6 +19,8 @@ import {
   Shield,
   LogOut,
   Loader2,
+  FolderOpen,
+  MessageSquare,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -46,6 +48,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Browse Shifts", to: "/shifts", icon: Calendar },
   { label: "My Shifts", to: "/my-shifts", icon: Clock },
   { label: "Events", to: "/events", icon: Users },
+  { label: "Documents", to: "/documents", icon: FolderOpen },
+  { label: "Messages", to: "/messages", icon: MessageSquare },
   { label: "Settings", to: "/settings", icon: Settings },
   {
     label: "Coverage",

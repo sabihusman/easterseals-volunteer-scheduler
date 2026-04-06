@@ -37,6 +37,8 @@ export default function Settings() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
 
   // Password
@@ -58,6 +60,8 @@ export default function Settings() {
       setFullName(profile.full_name || "");
       setEmail(profile.email || "");
       setPhone(profile.phone || "");
+      setEmergencyName(profile.emergency_contact_name || "");
+      setEmergencyPhone(profile.emergency_contact_phone || "");
       setNotifEmail(profile.notif_email);
       setNotifInApp(profile.notif_in_app);
       setNotifSms(profile.notif_sms);
@@ -72,7 +76,13 @@ export default function Settings() {
     // Update profiles table
     const { error: profileError } = await supabase
       .from("profiles")
-      .update({ full_name: fullName, phone: phone || null, updated_at: new Date().toISOString() })
+      .update({
+        full_name: fullName,
+        phone: phone || null,
+        emergency_contact_name: emergencyName.trim() || null,
+        emergency_contact_phone: emergencyPhone.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", user.id);
 
     if (profileError) {
@@ -168,6 +178,16 @@ export default function Settings() {
           <div className="space-y-2">
             <Label>Phone Number</Label>
             <Input type="tel" placeholder="(XXX) XXX-XXXX" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <Separator />
+          <p className="text-sm font-medium text-muted-foreground">Emergency Contact</p>
+          <div className="space-y-2">
+            <Label>Emergency Contact Name</Label>
+            <Input placeholder="Jane Doe" value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Emergency Contact Phone</Label>
+            <Input type="tel" placeholder="(XXX) XXX-XXXX" value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
           </div>
           <Button onClick={handleSaveProfile} disabled={profileLoading}>
             {profileLoading ? "Saving..." : "Save Changes"}

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import { SessionTimeout } from "@/components/SessionTimeout";
+import OnboardingModal from "@/components/OnboardingModal";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -26,6 +27,10 @@ import NotFound from "./pages/NotFound";
 import AdminDepartments from "./pages/AdminDepartments";
 import AdminEvents from "./pages/AdminEvents";
 import VolunteerEvents from "./pages/VolunteerEvents";
+import AdminDocumentTypes from "./pages/AdminDocumentTypes";
+import DocumentCompliance from "./pages/DocumentCompliance";
+import VolunteerDocuments from "./pages/VolunteerDocuments";
+import Messages from "./pages/Messages";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +61,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <SessionTimeout />
+          <OnboardingModal />
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
@@ -67,6 +73,7 @@ const App = () => (
             <Route path="/history" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftHistory /></ProtectedRoute>} />
             <Route path="/my-shifts/confirm/:bookingId" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftConfirmation /></ProtectedRoute>} />
             <Route path="/notes" element={<ProtectedRoute requiredRole={["volunteer"]}><MyNotes /></ProtectedRoute>} />
+            <Route path="/documents" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDocuments /></ProtectedRoute>} />
 
             <Route path="/coordinator" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><CoordinatorDashboard /></ProtectedRoute>} />
             <Route path="/coordinator/manage" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><ManageShifts /></ProtectedRoute>} />
@@ -77,8 +84,11 @@ const App = () => (
             <Route path="/admin/departments" element={<ProtectedRoute requiredRole={["admin"]}><AdminDepartments /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole={["admin"]}><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/events" element={<ProtectedRoute requiredRole={["admin"]}><AdminEvents /></ProtectedRoute>} />
+            <Route path="/admin/documents" element={<ProtectedRoute requiredRole={["admin"]}><AdminDocumentTypes /></ProtectedRoute>} />
+            <Route path="/admin/compliance" element={<ProtectedRoute requiredRole={["admin"]}><DocumentCompliance /></ProtectedRoute>} />
             <Route path="/events" element={<ProtectedRoute><VolunteerEvents /></ProtectedRoute>} />
 
+            <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />

@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -52,6 +52,93 @@ export type Database = {
             columns: ["recipient_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_participants: {
+        Row: {
+          conversation_id: string
+          id: string
+          is_archived: boolean
+          joined_at: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          is_archived?: boolean
+          joined_at?: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          is_archived?: boolean
+          joined_at?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          conversation_type: string
+          created_at: string
+          created_by: string
+          department_id: string | null
+          id: string
+          subject: string | null
+          updated_at: string
+        }
+        Insert: {
+          conversation_type?: string
+          created_at?: string
+          created_by: string
+          department_id?: string | null
+          id?: string
+          subject?: string | null
+          updated_at?: string
+        }
+        Update: {
+          conversation_type?: string
+          created_at?: string
+          created_by?: string
+          department_id?: string | null
+          id?: string
+          subject?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]
@@ -182,6 +269,53 @@ export type Database = {
           },
         ]
       }
+      document_types: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          expiry_days: number | null
+          has_expiry: boolean
+          id: string
+          is_active: boolean
+          is_required: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          expiry_days?: number | null
+          has_expiry?: boolean
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          expiry_days?: number | null
+          has_expiry?: boolean
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_types_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_registrations: {
         Row: {
           event_id: string
@@ -306,6 +440,45 @@ export type Database = {
           timezone?: string
         }
         Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -949,6 +1122,79 @@ export type Database = {
           },
         ]
       }
+      volunteer_documents: {
+        Row: {
+          document_type_id: string
+          expires_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string
+          id: string
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          storage_path: string
+          updated_at: string
+          uploaded_at: string
+          volunteer_id: string
+        }
+        Insert: {
+          document_type_id: string
+          expires_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type: string
+          id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path: string
+          updated_at?: string
+          uploaded_at?: string
+          volunteer_id: string
+        }
+        Update: {
+          document_type_id?: string
+          expires_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string
+          id?: string
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_at?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_documents_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_documents_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_documents_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       volunteer_preferences: {
         Row: {
           avg_advance_booking_days: number
@@ -1207,28 +1453,51 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
-      score_shifts_for_volunteer: {
-        Args: { p_volunteer_id: string }
-        Returns: {
-          booked_slots: number
-          department_id: string
-          department_name: string
-          end_time: string
-          fill_ratio: number
-          novelty_bonus: number
-          organizational_need: number
-          preference_match: number
-          requires_bg_check: boolean
-          score_breakdown: Json
-          shift_date: string
-          shift_id: string
-          start_time: string
-          time_type: Database["public"]["Enums"]["shift_time_type"]
-          title: string
-          total_score: number
-          total_slots: number
-        }[]
-      }
+      score_shifts_for_volunteer:
+        | {
+            Args: { p_volunteer_id: string }
+            Returns: {
+              booked_slots: number
+              department_id: string
+              department_name: string
+              end_time: string
+              fill_ratio: number
+              novelty_bonus: number
+              organizational_need: number
+              preference_match: number
+              requires_bg_check: boolean
+              score_breakdown: Json
+              shift_date: string
+              shift_id: string
+              start_time: string
+              time_type: Database["public"]["Enums"]["shift_time_type"]
+              title: string
+              total_score: number
+              total_slots: number
+            }[]
+          }
+        | {
+            Args: { p_max_days?: number; p_volunteer_id: string }
+            Returns: {
+              booked_slots: number
+              department_id: string
+              department_name: string
+              end_time: string
+              fill_ratio: number
+              novelty_bonus: number
+              organizational_need: number
+              preference_match: number
+              requires_bg_check: boolean
+              score_breakdown: Json
+              shift_date: string
+              shift_id: string
+              start_time: string
+              time_type: Database["public"]["Enums"]["shift_time_type"]
+              title: string
+              total_score: number
+              total_slots: number
+            }[]
+          }
       send_self_confirmation_reminders: { Args: never; Returns: undefined }
       send_shift_reminders: { Args: never; Returns: undefined }
       transfer_admin_role: {

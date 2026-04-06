@@ -5,7 +5,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog } from "lucide-react";
+import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -20,11 +20,14 @@ export function AppSidebar() {
     { title: "Events", url: "/events", icon: CalendarDays },
     { title: "My History", url: "/history", icon: ClipboardList },
     { title: "My Notes", url: "/notes", icon: FileText },
+    { title: "Documents", url: "/documents", icon: FolderOpen },
+    { title: "Messages", url: "/messages", icon: MessageSquare },
   ] : [];
 
   const coordinatorItems = [
     { title: "Department Shifts", url: "/coordinator", icon: Building2 },
     { title: "Manage Shifts", url: "/coordinator/manage", icon: Settings },
+    { title: "Messages", url: "/messages", icon: MessageSquare },
   ];
 
   const adminItems = [
@@ -34,6 +37,8 @@ export function AppSidebar() {
     { title: "Events", url: "/admin/events", icon: CalendarDays },
     { title: "Reminders", url: "/admin/reminders", icon: Bell },
     { title: "Admin Settings", url: "/admin/settings", icon: Shield },
+    { title: "Doc Types", url: "/admin/documents", icon: FolderOpen },
+    { title: "Compliance", url: "/admin/compliance", icon: CheckSquare },
   ];
 
   const isActive = (path: string) => location.pathname === path;

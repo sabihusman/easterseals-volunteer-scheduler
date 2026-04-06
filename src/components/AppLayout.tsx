@@ -5,11 +5,15 @@ import { MobileNav } from "@/components/MobileNav";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { Leaf } from "lucide-react";
+import { Leaf, MessageSquare } from "lucide-react";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { useNavigate } from "react-router-dom";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
   const { profile } = useAuth();
+  const { unreadCount } = useUnreadCount();
+  const navigate = useNavigate();
 
   return (
     <SidebarProvider>
@@ -27,6 +31,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <h1 className="text-lg font-bold text-foreground hidden sm:block">Easterseals Iowa</h1>
               <h1 className="text-lg font-bold text-foreground sm:hidden">Easterseals</h1>
             </div>
+            <button
+              onClick={() => navigate("/messages")}
+              className="relative p-2 rounded-md hover:bg-muted transition-colors"
+              aria-label="Messages"
+            >
+              <MessageSquare className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 flex items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
             <NotificationBell />
           </header>
           <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto" role="main">

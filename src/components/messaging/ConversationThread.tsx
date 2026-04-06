@@ -1,0 +1,179 @@
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MessageBubble } from "./MessageBubble";
+import { Send, Loader2 } from "lucide-react";
+
+interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  sender_name?: string;
+}
+
+interface ConversationThreadProps {
+  conversationId: string;
+  participantNames: Record<string, string>;
+  onMessageSent?: () => void;
+}
+
+export function ConversationThread({ conversationId, participantNames, onMessageSent }: ConversationThreadProps) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const fetchMessages = async () => {
+    const { data } = await (supabase as any)
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+    if (data) setMessages(data as Message[]);
+    setLoading(false);
+  };
+
+  // Mark conversation as read
+  const markRead = async () => {
+    if (!user) return;
+    await (supabase as any)
+      .from("conversation_participants")
+      .update({ last_read_at: new Date().toISOString() })
+      .eq("conversation_id", conversationId)
+      .eq("user_id", user.id);
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    setMessages([]);
+    fetchMessages();
+    markRead();
+
+    // Real-time subscription
+    const channel = supabase
+      .channel(`messages:${conversationId}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      }, (payload) => {
+        const msg = payload.new as Message;
+        setMessages((prev) => [...prev, msg]);
+        // Mark read if we're viewing this conversation
+        markRead();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [conversationId]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !user) return;
+    setSending(true);
+
+    const { error } = await (supabase as any).from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: newMessage.trim(),
+    });
+
+    if (!error) {
+      // Update conversation updated_at
+      await (supabase as any)
+        .from("conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conversationId);
+
+      setNewMessage("");
+      onMessageSent?.();
+
+      // Insert notification for other participants
+      const otherParticipants = Object.keys(participantNames).filter((id) => id !== user.id);
+      if (otherParticipants.length > 0) {
+        const senderName = participantNames[user.id] || "Someone";
+        const notifs = otherParticipants.map((uid) => ({
+          user_id: uid,
+          title: `New message from ${senderName}`,
+          message: newMessage.trim().slice(0, 100),
+          type: "new_message",
+          link: `/messages`,
+          is_read: false,
+        }));
+        await supabase.from("notifications").insert(notifs);
+      }
+    }
+    setSending(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading messages...
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Messages */}
+      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+        {messages.length === 0 ? (
+          <p className="text-center text-muted-foreground text-sm py-8">
+            No messages yet. Start the conversation!
+          </p>
+        ) : (
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              content={msg.content}
+              senderName={participantNames[msg.sender_id] || "Unknown"}
+              createdAt={msg.created_at}
+              isOwn={msg.sender_id === user?.id}
+            />
+          ))
+        )}
+      </ScrollArea>
+
+      {/* Compose */}
+      <div className="border-t p-3 flex gap-2">
+        <Textarea
+          placeholder="Type a message..."
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+          className="resize-none min-h-[40px] max-h-[120px]"
+        />
+        <Button
+          size="icon"
+          onClick={handleSend}
+          disabled={!newMessage.trim() || sending}
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
