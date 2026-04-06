@@ -1,6 +1,6 @@
-# Easterseals Iowa Volunteer Scheduler — Technical Specification v5
+# Easterseals Iowa Volunteer Scheduler — Technical Specification v5.1
 
-**Version:** 5.0
+**Version:** 5.1
 **Date:** April 6, 2026
 **Repository:** github.com/sabihusman/easterseals-volunteer-scheduler
 **Live URL:** easterseals-volunteer-scheduler.vercel.app
@@ -158,13 +158,13 @@ easterseals-volunteer-scheduler/
 
 ### 2.1 Entity Relationship Overview
 
-The database contains **28 tables**, **1 view**, **16 functions**, **6 triggers**, and **4 pg_cron scheduled jobs**.
+The database contains **28 tables**, **1 view**, **16 functions**, **6 triggers**, and **4 pg_cron scheduled jobs**. Total of **15 SQL migration files**.
 
 #### Core Domain Tables
 
 | Table | Purpose | Key Fields |
 |-------|---------|------------|
-| `profiles` | User accounts | full_name, email, phone, role, bg_check_status, total_hours, consistency_score, volunteer_points, avatar_url, onboarding_complete, emergency_contact_name/phone, notif_email/in_app/sms, notif_shift_reminders/new_messages/milestone/document_expiry/booking_changes |
+| `profiles` | User accounts | full_name, email, phone, role, bg_check_status, total_hours, consistency_score, volunteer_points, avatar_url, calendar_token (UUID, never expires), onboarding_complete, emergency_contact_name/phone, notif_email/in_app/sms, notif_shift_reminders/new_messages/milestone/document_expiry/booking_changes |
 | `departments` | Volunteer departments | name, description, location_id, requires_bg_check, allows_groups, min_age, is_active |
 | `locations` | Physical locations | name, address, city, state, timezone |
 | `shifts` | Shift definitions | title, shift_date, start_time, end_time, department_id, total_slots, booked_slots, status, requires_bg_check, is_recurring, coordinator_note |
@@ -561,9 +561,10 @@ Recalculated automatically via trigger when `confirmation_status` changes to `co
 - Returns valid ICS file with one `VEVENT` per upcoming confirmed shift
 - Timezone: `America/Chicago`
 - Stable UIDs: `{shift_id}@easterseals-volunteer-scheduler`
-- Auth via JWT query parameter (calendar apps can't set headers)
+- **Auth via long-lived `calendar_token` (UUID)** — stored in `profiles.calendar_token`, never expires, revocable by regenerating. Calendar apps poll every 12-24h and cannot use short-lived JWTs.
 - `Cache-Control: no-store` for live updates
 - Deep-links for Google Calendar, Apple Calendar, Outlook
+- URL format: `https://{supabase-url}/functions/v1/calendar-feed?token={calendar_token}`
 
 ---
 
@@ -621,6 +622,15 @@ Recalculated automatically via trigger when `confirmation_status` changes to `co
 | Cross-tab timeout | localStorage sync via StorageEvent |
 | PWA stale data | NetworkOnly for booking endpoints |
 | Novelty bias | Log-scale with 0.3 floor |
+| Calendar auth | Long-lived UUID token (not JWT) — survives calendar app polling intervals |
+| BG cascade timing | Only cancels `shift_date > today`, warns coordinator about same-day |
+| Points double-count | Trigger checks state delta (`OLD != confirmed AND NEW = confirmed`) |
+| Leaderboard ties | Deterministic ordering: `points → consistency → created_at` |
+| WaitlistStatus queries | Fixed `status` → `booking_status` (was returning zero rows) |
+| CoverageAlert queries | Fixed `status` → `booking_status` + removed phantom `bg_check_cleared` column |
+| MFA timeout | `/mfa-verify` added to session timeout excluded paths |
+| Resend click tracking | Disabled via `data-resend-track="false"` on all email links |
+| Avatar upload | File input with 2MB validation, storage upload, URL persistence |
 
 ### 15.2 Credential Storage
 
@@ -673,10 +683,11 @@ npx supabase gen types typescript --project-id esycmohgumryeqteiwla > src/integr
 | Database functions | 16 |
 | Database triggers | 6 |
 | pg_cron jobs | 4 |
-| SQL migrations | 14 |
+| SQL migrations | 15 |
 | Edge Functions | 6 |
 | Storage buckets | 2 |
-| Git commits | 70+ |
+| Git commits | 75+ |
+| Bugs fixed (v5 audit) | 10 |
 
 ---
 
@@ -689,9 +700,9 @@ npx supabase gen types typescript --project-id esycmohgumryeqteiwla > src/integr
 | Twilio trial | Only verified numbers receive SMS until account upgraded |
 | Landing page | LocalWP only; needs domain + production hosting |
 | Bundle size | ~940KB main chunk; code-splitting recommended |
-| Email sandbox | Resend redirects to admin inbox until domain verified |
-| Avatar upload | Component exists; full upload flow in Settings to be wired |
+| Email sandbox | Resend `SANDBOX_MODE = true` — all emails go to admin inbox until domain verified |
 | Act-on-behalf UI | Edge Function deployed; AdminUsers dialog to be completed |
+| MFA recovery codes | Supabase generates them during enrollment but frontend doesn't force user to save them yet |
 
 ### 18.2 Sprint 4 (Planned)
 
@@ -712,4 +723,4 @@ npx supabase gen types typescript --project-id esycmohgumryeqteiwla > src/integr
 
 ---
 
-*Generated April 6, 2026 — Easterseals Iowa Volunteer Scheduler v5.0*
+*Generated April 6, 2026 — Easterseals Iowa Volunteer Scheduler v5.1 (post-audit)*
