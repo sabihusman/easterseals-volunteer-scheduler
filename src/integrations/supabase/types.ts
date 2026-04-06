@@ -1,3 +1,4 @@
+npm warn exec The following package was not found and will be installed: supabase@2.85.0
 export type Json =
   | string
   | number
@@ -1453,51 +1454,28 @@ export type Database = {
         Args: { p_booking_id: string }
         Returns: undefined
       }
-      score_shifts_for_volunteer:
-        | {
-            Args: { p_volunteer_id: string }
-            Returns: {
-              booked_slots: number
-              department_id: string
-              department_name: string
-              end_time: string
-              fill_ratio: number
-              novelty_bonus: number
-              organizational_need: number
-              preference_match: number
-              requires_bg_check: boolean
-              score_breakdown: Json
-              shift_date: string
-              shift_id: string
-              start_time: string
-              time_type: Database["public"]["Enums"]["shift_time_type"]
-              title: string
-              total_score: number
-              total_slots: number
-            }[]
-          }
-        | {
-            Args: { p_max_days?: number; p_volunteer_id: string }
-            Returns: {
-              booked_slots: number
-              department_id: string
-              department_name: string
-              end_time: string
-              fill_ratio: number
-              novelty_bonus: number
-              organizational_need: number
-              preference_match: number
-              requires_bg_check: boolean
-              score_breakdown: Json
-              shift_date: string
-              shift_id: string
-              start_time: string
-              time_type: Database["public"]["Enums"]["shift_time_type"]
-              title: string
-              total_score: number
-              total_slots: number
-            }[]
-          }
+      score_shifts_for_volunteer: {
+        Args: { p_max_days?: number; p_volunteer_id: string }
+        Returns: {
+          booked_slots: number
+          department_id: string
+          department_name: string
+          end_time: string
+          fill_ratio: number
+          novelty_bonus: number
+          organizational_need: number
+          preference_match: number
+          requires_bg_check: boolean
+          score_breakdown: Json
+          shift_date: string
+          shift_id: string
+          start_time: string
+          time_type: string
+          title: string
+          total_score: number
+          total_slots: number
+        }[]
+      }
       send_self_confirmation_reminders: { Args: never; Returns: undefined }
       send_shift_reminders: { Args: never; Returns: undefined }
       transfer_admin_role: {
