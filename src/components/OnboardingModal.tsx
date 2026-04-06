@@ -101,9 +101,12 @@ export default function OnboardingModal() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("onboarding_complete, full_name, phone, emergency_contact_name, emergency_contact_phone")
+      .select("onboarding_complete, full_name, phone, emergency_contact_name, emergency_contact_phone, role")
       .eq("id", user.id)
       .single();
+
+    // Skip onboarding for admins and coordinators
+    if (profile && (profile.role === "admin" || profile.role === "coordinator")) return;
 
     if (profile && !profile.onboarding_complete) {
       setForm({
@@ -377,11 +380,9 @@ export default function OnboardingModal() {
   if (!open) return null;
 
   return (
-    <Dialog open={open} onOpenChange={() => { /* prevent ESC close */ }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) setOpen(false); }}>
       <DialogContent
-        className="max-w-md gap-0 p-0 [&>button]:hidden"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        className="max-w-md gap-0 p-0"
       >
         {/* Step content */}
         <div className="px-6 pt-6 pb-2">{renderStep()}</div>
