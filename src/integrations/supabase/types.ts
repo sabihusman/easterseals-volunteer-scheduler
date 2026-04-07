@@ -1564,6 +1564,44 @@ export type Database = {
     }
     Functions: {
       export_critical_data: { Args: never; Returns: Json }
+      get_department_report: {
+        Args: { date_from: string; date_to: string; dept_uuids: string[] }
+        Returns: {
+          attendance_rate: number
+          avg_fill_rate: number
+          avg_rating: number
+          department_id: string
+          department_name: string
+          rated_shift_count: number
+          total_cancellations: number
+          total_confirmed: number
+          total_no_shows: number
+          total_shifts: number
+          total_waitlisted: number
+        }[]
+      }
+      get_shift_consistency: {
+        Args: { shift_uuids: string[] }
+        Returns: {
+          attendance_rate: number
+          attended: number
+          cancelled: number
+          no_shows: number
+          shift_id: string
+          total_bookings: number
+        }[]
+      }
+      get_shift_popularity: {
+        Args: { shift_uuids: string[] }
+        Returns: {
+          confirmed_count: number
+          fill_ratio: number
+          popularity_score: number
+          shift_id: string
+          view_count: number
+          waitlist_count: number
+        }[]
+      }
       get_shift_rating_aggregates: {
         Args: { shift_uuids: string[] }
         Returns: {

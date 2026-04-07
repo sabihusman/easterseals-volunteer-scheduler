@@ -5,7 +5,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare } from "lucide-react";
+import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -27,6 +27,7 @@ export function AppSidebar() {
   const coordinatorItems = [
     { title: "Department Shifts", url: "/coordinator", icon: Building2 },
     { title: "Manage Shifts", url: "/coordinator/manage", icon: Settings },
+    { title: "Reports", url: "/reports", icon: BarChart3 },
     { title: "Messages", url: "/messages", icon: MessageSquare },
   ];
 
