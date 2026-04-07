@@ -25,8 +25,10 @@ interface RecommendedShift {
 
 interface RecommendedShiftsProps {
   onBookShift: (shiftId: string, shiftData?: RecommendedShift) => void;
+  /** Bump to force a refresh after a successful booking */
+  refreshKey?: number;
 }
-export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
+export function RecommendedShifts({ onBookShift, refreshKey = 0 }: RecommendedShiftsProps) {
   const [shifts, setShifts] = useState<RecommendedShift[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasHistory, setHasHistory] = useState(false);
@@ -130,7 +132,7 @@ export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
     }
 
     loadRecommendations();
-  }, []);
+  }, [refreshKey]);
 
   const formatTime = (time: string | null) => {
     if (!time) return '';
