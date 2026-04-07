@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -11,6 +12,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.4"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -600,6 +626,7 @@ export type Database = {
           tos_accepted_at: string | null
           total_hours: number
           updated_at: string
+          username: string | null
           volunteer_points: number | null
         }
         Insert: {
@@ -635,6 +662,7 @@ export type Database = {
           tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
+          username?: string | null
           volunteer_points?: number | null
         }
         Update: {
@@ -670,6 +698,7 @@ export type Database = {
           tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
+          username?: string | null
           volunteer_points?: number | null
         }
         Relationships: [
@@ -1580,6 +1609,7 @@ export type Database = {
           total_waitlisted: number
         }[]
       }
+      get_email_by_username: { Args: { p_username: string }; Returns: string }
       get_shift_consistency: {
         Args: { shift_uuids: string[] }
         Returns: {
@@ -1661,6 +1691,7 @@ export type Database = {
         Args: { p_volunteer_id: string }
         Returns: undefined
       }
+      username_available: { Args: { p_username: string }; Returns: boolean }
     }
     Enums: {
       bg_check_status: "pending" | "cleared" | "failed" | "expired"
@@ -1803,6 +1834,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       bg_check_status: ["pending", "cleared", "failed", "expired"],

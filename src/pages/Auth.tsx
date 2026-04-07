@@ -18,6 +18,10 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || "1x0000000
 const registerSchema = z.object({
   name: z.string().trim().min(1, "Full name is required").max(100, "Name must be under 100 characters"),
   email: z.string().trim().email("Invalid email address").max(255, "Email must be under 255 characters"),
+  username: z.string().trim()
+    .min(3, "Username must be at least 3 characters")
+    .max(30, "Username must be under 30 characters")
+    .regex(/^[A-Za-z0-9_]+$/, "Only letters, numbers, and underscores allowed"),
   password: z.string()
     .min(8, "Password must be at least 8 characters")
     .regex(/[a-zA-Z]/, "Password must contain at least one letter")
@@ -33,10 +37,11 @@ export default function Auth() {
   const location = useLocation();
   const locationState = location.state as { inactivitySignout?: boolean; accountDeleted?: boolean } | null;
 
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginIdentifier, setLoginIdentifier] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
   const [regEmail, setRegEmail] = useState("");
+  const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
@@ -53,8 +58,22 @@ export default function Auth() {
       return;
     }
     setLoading(true);
+
+    // Resolve identifier: if it contains @, use as email; otherwise look up email by username
+    let emailToUse = loginIdentifier.trim();
+    if (!emailToUse.includes("@")) {
+      const { data: resolvedEmail, error: lookupError } = await supabase
+        .rpc("get_email_by_username", { p_username: emailToUse });
+      if (lookupError || !resolvedEmail) {
+        setLoading(false);
+        toast({ title: "Login failed", description: "No account found with that username.", variant: "destructive" });
+        return;
+      }
+      emailToUse = resolvedEmail as string;
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
+      email: emailToUse,
       password: loginPassword,
       options: { captchaToken: turnstileToken },
     });
@@ -77,7 +96,7 @@ export default function Auth() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = registerSchema.safeParse({ name: regName, email: regEmail, password: regPassword });
+    const result = registerSchema.safeParse({ name: regName, email: regEmail, username: regUsername, password: regPassword });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
       result.error.errors.forEach((err) => { fieldErrors[err.path[0] as string] = err.message; });
@@ -85,6 +104,13 @@ export default function Auth() {
       return;
     }
     setRegErrors({});
+
+    // Check username availability
+    const { data: available } = await supabase.rpc("username_available", { p_username: result.data.username });
+    if (!available) {
+      setRegErrors({ username: "Username is already taken" });
+      return;
+    }
     if (!tosAccepted) {
       toast({ title: "Terms required", description: "Please accept the Terms of Service and Code of Conduct.", variant: "destructive" });
       return;
@@ -109,6 +135,7 @@ export default function Auth() {
       await supabase.from("profiles").insert({
         id: data.user.id,
         email: result.data.email,
+        username: result.data.username,
         full_name: result.data.name,
         phone: regPhone || null,
         role: "volunteer",
@@ -228,10 +255,18 @@ export default function Auth() {
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4 mt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-identifier">Email or Username</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input id="login-email" type="email" className="pl-10" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="login-identifier"
+                        type="text"
+                        autoComplete="username"
+                        className="pl-10"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        required
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -277,6 +312,23 @@ export default function Auth() {
                       <Input id="reg-email" type="email" className="pl-10" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} required maxLength={255} />
                     </div>
                     {regErrors.email && <p className="text-xs text-destructive">{regErrors.email}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-username">Username</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="reg-username"
+                        className="pl-10"
+                        value={regUsername}
+                        onChange={(e) => setRegUsername(e.target.value)}
+                        required
+                        maxLength={30}
+                        placeholder="e.g. jane_doe"
+                      />
+                    </div>
+                    {regErrors.username && <p className="text-xs text-destructive">{regErrors.username}</p>}
+                    <p className="text-xs text-muted-foreground">3-30 characters, letters, numbers, and underscores only</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-phone">Phone (optional)</Label>
