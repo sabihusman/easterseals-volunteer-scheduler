@@ -3,8 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, MessageSquare } from "lucide-react";
+import { Search, MessageSquare, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ConversationItem {
   id: string;
@@ -26,9 +31,11 @@ interface ConversationListProps {
 
 export function ConversationList({ selectedId, onSelect, refreshTrigger }: ConversationListProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<ConversationItem | null>(null);
 
   const fetchConversations = async () => {
     if (!user) return;
@@ -36,7 +43,7 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
     // Get user's participations
     const { data: myParts } = await (supabase as any)
       .from("conversation_participants")
-      .select("conversation_id, last_read_at, is_archived")
+      .select("conversation_id, last_read_at, is_archived, cleared_at")
       .eq("user_id", user.id)
       .eq("is_archived", false);
 
@@ -93,14 +100,22 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
     const items: ConversationItem[] = [];
 
     for (const convo of convos) {
-      const { data: lastMsg } = await (supabase as any)
+      const myPart = myParts.find((p) => p.conversation_id === convo.id);
+      const clearedAt = myPart?.cleared_at as string | null | undefined;
+
+      // Only fetch messages that are newer than the user's local cleared_at cutoff
+      let lastMsgQuery = (supabase as any)
         .from("messages")
         .select("content, created_at, sender_id")
         .eq("conversation_id", convo.id)
         .order("created_at", { ascending: false })
         .limit(1);
+      if (clearedAt) lastMsgQuery = lastMsgQuery.gt("created_at", clearedAt);
+      const { data: lastMsg } = await lastMsgQuery;
 
-      const myPart = myParts.find((p) => p.conversation_id === convo.id);
+      // If the user cleared the chat and no new messages exist, hide it
+      if (clearedAt && (!lastMsg || lastMsg.length === 0)) continue;
+
       const otherId = convoToOthers[convo.id] || "";
       const otherName = otherId ? (profileMap[otherId] || "Unknown") : "Unknown";
 
@@ -133,6 +148,26 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
     !search || c.other_participant_name.toLowerCase().includes(search.toLowerCase())
       || c.subject?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleDelete = async () => {
+    if (!deleteTarget || !user) return;
+    const { error } = await (supabase as any)
+      .from("conversation_participants")
+      .update({ cleared_at: new Date().toISOString() })
+      .eq("conversation_id", deleteTarget.id)
+      .eq("user_id", user.id);
+    setDeleteTarget(null);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    // Clear selection if the deleted conversation was open
+    if (selectedId === deleteTarget.id) {
+      onSelect("", {});
+    }
+    toast({ title: "Conversation deleted", description: "Only visible to you." });
+    fetchConversations();
+  };
 
   const handleSelect = (convo: ConversationItem) => {
     // Build participant names map
@@ -174,40 +209,71 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
           </div>
         ) : (
           filtered.map((convo) => (
-            <button
+            <div
               key={convo.id}
-              onClick={() => handleSelect(convo)}
-              className={`w-full text-left px-4 py-3 border-b transition-colors hover:bg-muted/50 ${
+              className={`group relative border-b transition-colors hover:bg-muted/50 ${
                 selectedId === convo.id ? "bg-muted" : ""
               }`}
             >
-              <div className="flex items-center justify-between">
-                <p className={`text-sm truncate ${convo.has_unread ? "font-bold" : "font-medium"}`}>
-                  {convo.other_participant_name}
-                </p>
-                <div className="flex items-center gap-1.5">
-                  {convo.has_unread && (
-                    <span className="h-2 w-2 rounded-full bg-primary" />
-                  )}
-                  {convo.last_message_at && (
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                      {formatDistanceToNow(new Date(convo.last_message_at), { addSuffix: false })}
-                    </span>
-                  )}
+              <button
+                onClick={() => handleSelect(convo)}
+                className="w-full text-left px-4 py-3 pr-10"
+              >
+                <div className="flex items-center justify-between">
+                  <p className={`text-sm truncate ${convo.has_unread ? "font-bold" : "font-medium"}`}>
+                    {convo.other_participant_name}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    {convo.has_unread && (
+                      <span className="h-2 w-2 rounded-full bg-primary" />
+                    )}
+                    {convo.last_message_at && (
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {formatDistanceToNow(new Date(convo.last_message_at), { addSuffix: false })}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              {convo.subject && (
-                <p className="text-xs text-muted-foreground truncate">{convo.subject}</p>
-              )}
-              {convo.last_message && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {convo.last_message}
-                </p>
-              )}
-            </button>
+                {convo.subject && (
+                  <p className="text-xs text-muted-foreground truncate">{convo.subject}</p>
+                )}
+                {convo.last_message && (
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">
+                    {convo.last_message}
+                  </p>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Delete conversation"
+                onClick={(e) => { e.stopPropagation(); setDeleteTarget(convo); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-opacity"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
           ))
         )}
       </ScrollArea>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the conversation from your inbox only.
+              Other participants will still see it. If someone sends a new message later,
+              it will reappear with just the new messages.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 text-white hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
