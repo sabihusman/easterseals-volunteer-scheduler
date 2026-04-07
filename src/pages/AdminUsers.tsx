@@ -85,6 +85,16 @@ export default function AdminUsers() {
     toast({ title: `Booking privileges ${!current ? "granted" : "revoked"}` });
   };
 
+  const handleToggleMessaging = async (id: string, current: boolean) => {
+    const { error } = await (supabase as any)
+      .from("profiles")
+      .update({ messaging_blocked: !current })
+      .eq("id", id);
+    if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
+    setProfiles((prev) => prev.map((p) => p.id === id ? { ...p, messaging_blocked: !current } as any : p));
+    toast({ title: `Messaging ${!current ? "blocked" : "unblocked"}` });
+  };
+
   const handleBgCheck = async (id: string, status: "cleared" | "pending" | "failed" | "expired") => {
     const { error } = await supabase.from("profiles").update({
       bg_check_status: status,
@@ -284,6 +294,7 @@ export default function AdminUsers() {
                   <div className="flex gap-2 flex-wrap">
                     {bgBadge(p.bg_check_status)}
                     {!p.booking_privileges && <Badge variant="outline" className="text-xs">No Booking</Badge>}
+                    {(p as any).messaging_blocked && <Badge variant="destructive" className="text-xs">Messaging Blocked</Badge>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -309,6 +320,15 @@ export default function AdminUsers() {
                   <Button size="sm" variant="outline" onClick={() => handleToggleBooking(p.id, p.booking_privileges)}>
                     {p.booking_privileges ? "Revoke Booking" : "Grant Booking"}
                   </Button>
+                  {p.role !== "admin" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleToggleMessaging(p.id, (p as any).messaging_blocked === true)}
+                    >
+                      {(p as any).messaging_blocked ? "Unblock Messaging" : "Block Messaging"}
+                    </Button>
+                  )}
                   <Select onValueChange={(v) => handleBgCheck(p.id, v as "cleared" | "pending" | "failed" | "expired")}>
                     <SelectTrigger className="h-8 w-[120px] text-xs"><SelectValue placeholder="BG Check" /></SelectTrigger>
                     <SelectContent>

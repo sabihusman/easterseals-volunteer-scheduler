@@ -24,6 +24,7 @@ interface ConversationThreadProps {
 
 export function ConversationThread({ conversationId, participantNames: externalNames, onMessageSent }: ConversationThreadProps) {
   const { user, profile } = useAuth();
+  const messagingBlocked = (profile as any)?.messaging_blocked === true;
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -59,11 +60,23 @@ export function ConversationThread({ conversationId, participantNames: externalN
   const participantNames = Object.keys(externalNames).length > 1 ? externalNames : resolvedNames;
 
   const fetchMessages = async () => {
-    const { data } = await (supabase as any)
+    if (!user) return;
+    // Respect this user's local deletion cutoff — only show messages newer than cleared_at
+    const { data: myPart } = await (supabase as any)
+      .from("conversation_participants")
+      .select("cleared_at")
+      .eq("conversation_id", conversationId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    let query = (supabase as any)
       .from("messages")
       .select("*")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true });
+    if (myPart?.cleared_at) query = query.gt("created_at", myPart.cleared_at);
+
+    const { data } = await query;
     if (data) setMessages(data as Message[]);
     setLoading(false);
   };
@@ -188,17 +201,18 @@ export function ConversationThread({ conversationId, participantNames: externalN
       {/* Compose */}
       <div className="border-t p-3 flex gap-2">
         <Textarea
-          placeholder="Type a message..."
+          placeholder={messagingBlocked ? "Messaging has been disabled by an admin." : "Type a message..."}
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
+          disabled={messagingBlocked}
           className="resize-none min-h-[40px] max-h-[120px]"
         />
         <Button
           size="icon"
           onClick={handleSend}
-          disabled={!newMessage.trim() || sending}
+          disabled={!newMessage.trim() || sending || messagingBlocked}
         >
           {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>

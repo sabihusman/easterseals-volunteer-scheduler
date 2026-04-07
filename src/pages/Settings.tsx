@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Lock, Trash2, Shield, Upload, X } from "lucide-react";
+import { Lock, Trash2, Shield, Upload, X, AtSign, Check } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { format } from "date-fns";
 
@@ -49,6 +49,12 @@ export default function Settings() {
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // Username
+  const [currentUsername, setCurrentUsername] = useState<string | null>(null);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid" | "unchanged">("idle");
+  const [usernameSaving, setUsernameSaving] = useState(false);
 
   // Password
   const [newPassword, setNewPassword] = useState("");
@@ -95,8 +101,53 @@ export default function Settings() {
       setNotifMilestone((profile as any).notif_milestone ?? true);
       setNotifDocumentExpiry((profile as any).notif_document_expiry ?? true);
       setNotifBookingChanges((profile as any).notif_booking_changes ?? true);
+      const un = (profile as any).username ?? null;
+      setCurrentUsername(un);
+      setUsernameInput(un ?? "");
+      setUsernameStatus(un ? "unchanged" : "idle");
     }
   }, [profile]);
+
+  // Debounced username availability check
+  useEffect(() => {
+    const trimmed = usernameInput.trim();
+    if (!trimmed) { setUsernameStatus("idle"); return; }
+    if (trimmed === (currentUsername ?? "")) { setUsernameStatus("unchanged"); return; }
+    if (!/^[A-Za-z0-9_]{3,30}$/.test(trimmed)) { setUsernameStatus("invalid"); return; }
+
+    setUsernameStatus("checking");
+    const timer = setTimeout(async () => {
+      const { data: available } = await (supabase as any).rpc("username_available", { p_username: trimmed });
+      setUsernameStatus(available ? "available" : "taken");
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [usernameInput, currentUsername]);
+
+  const handleSaveUsername = async () => {
+    if (!user) return;
+    const trimmed = usernameInput.trim();
+    if (!trimmed || usernameStatus !== "available") return;
+    setUsernameSaving(true);
+    const { error } = await (supabase as any)
+      .from("profiles")
+      .update({ username: trimmed, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+    setUsernameSaving(false);
+    if (error) {
+      // Unique violation is possible if someone grabbed it between check and save
+      if ((error as any).code === "23505") {
+        setUsernameStatus("taken");
+        toast({ title: "Username taken", description: "Please choose a different username.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: (error as any).message, variant: "destructive" });
+      }
+      return;
+    }
+    setCurrentUsername(trimmed);
+    setUsernameStatus("unchanged");
+    toast({ title: "Username updated", description: `You can now sign in with @${trimmed}.` });
+    refreshProfile();
+  };
 
   // ── MFA Status ──
   useEffect(() => {
@@ -399,6 +450,60 @@ export default function Settings() {
           </div>
           <Button onClick={handleSaveProfile} disabled={profileLoading}>
             {profileLoading ? "Saving..." : "Save Changes"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Username ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><AtSign className="h-4 w-4" /> Username</CardTitle>
+          <CardDescription>
+            Pick a unique username you can use to sign in instead of your email. 3-30 characters, letters, numbers, and underscores only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {currentUsername && (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              Current username: <strong>@{currentUsername}</strong>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>Username</Label>
+            <div className="relative">
+              <AtSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="pl-10"
+                placeholder="e.g. jane_doe"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                maxLength={30}
+                autoComplete="off"
+              />
+            </div>
+            {usernameStatus === "checking" && (
+              <p className="text-xs text-muted-foreground">Checking availability...</p>
+            )}
+            {usernameStatus === "available" && (
+              <p className="text-xs text-primary flex items-center gap-1">
+                <Check className="h-3 w-3" /> Available
+              </p>
+            )}
+            {usernameStatus === "taken" && (
+              <p className="text-xs text-destructive">That username is already taken.</p>
+            )}
+            {usernameStatus === "invalid" && (
+              <p className="text-xs text-destructive">Use 3-30 letters, numbers, or underscores.</p>
+            )}
+            {usernameStatus === "unchanged" && currentUsername && (
+              <p className="text-xs text-muted-foreground">This is your current username.</p>
+            )}
+          </div>
+          <Button
+            onClick={handleSaveUsername}
+            disabled={usernameSaving || usernameStatus !== "available"}
+          >
+            {usernameSaving ? "Saving..." : currentUsername ? "Update Username" : "Set Username"}
           </Button>
         </CardContent>
       </Card>

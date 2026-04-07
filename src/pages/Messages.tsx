@@ -5,10 +5,12 @@ import { ConversationList } from "@/components/messaging/ConversationList";
 import { ConversationThread } from "@/components/messaging/ConversationThread";
 import { ComposeMessage } from "@/components/messaging/ComposeMessage";
 import { BulkComposeMessage } from "@/components/messaging/BulkComposeMessage";
-import { MessageSquarePlus, Megaphone, MessageSquare } from "lucide-react";
+import { MessageSquarePlus, Megaphone, MessageSquare, Ban } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Messages() {
-  const { role } = useAuth();
+  const { role, profile } = useAuth();
+  const messagingBlocked = (profile as any)?.messaging_blocked === true;
   const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
   const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
   const [composeOpen, setComposeOpen] = useState(false);
@@ -33,16 +35,27 @@ export default function Messages() {
       <div className="flex items-center justify-between pb-4">
         <h1 className="text-2xl font-bold">Messages</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setComposeOpen(true)}>
+          <Button variant="outline" onClick={() => setComposeOpen(true)} disabled={messagingBlocked}>
             <MessageSquarePlus className="h-4 w-4 mr-2" /> New Message
           </Button>
           {(role === "coordinator" || role === "admin") && (
-            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+            <Button variant="outline" onClick={() => setBulkOpen(true)} disabled={messagingBlocked}>
               <Megaphone className="h-4 w-4 mr-2" /> Bulk Message
             </Button>
           )}
         </div>
       </div>
+
+      {messagingBlocked && (
+        <Alert variant="destructive" className="mb-4">
+          <Ban className="h-4 w-4" />
+          <AlertTitle>Messaging Disabled</AlertTitle>
+          <AlertDescription>
+            An administrator has blocked you from sending messages. You can still read existing conversations.
+            Please contact your coordinator or admin if you believe this is a mistake.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Split layout */}
       <div className="flex flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
