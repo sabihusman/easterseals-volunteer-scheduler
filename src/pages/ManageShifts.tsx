@@ -200,6 +200,18 @@ export default function ManageShifts() {
       return;
     }
 
+    // Sanity check: shifts over 12 hours are almost always AM/PM mistakes.
+    // Require an explicit confirmation before saving.
+    const [sh, sm] = form.start_time.split(":").map(Number);
+    const [eh, em] = form.end_time.split(":").map(Number);
+    const durationMin = (eh * 60 + em) - (sh * 60 + sm);
+    if (durationMin > 12 * 60) {
+      const ok = window.confirm(
+        `This shift is ${Math.floor(durationMin / 60)}h ${durationMin % 60}m long. That's unusually long — did you mean to use PM for one of the times?\n\nClick OK to save anyway, or Cancel to fix the times.`
+      );
+      if (!ok) return;
+    }
+
     setSaving(true);
 
     const payload = {
@@ -256,6 +268,24 @@ export default function ManageShifts() {
     if (!editingId) return true; // new shift
     return canEditNote(form.shift_date, form.start_time);
   }, [editingId, form.shift_date, form.start_time]);
+
+  /* ---------- Live duration calc (catches AM/PM mistakes at the form) ---------- */
+  const durationInfo = useMemo(() => {
+    if (!form.start_time || !form.end_time) return null;
+    const [sh, sm] = form.start_time.split(":").map(Number);
+    const [eh, em] = form.end_time.split(":").map(Number);
+    if (Number.isNaN(sh) || Number.isNaN(eh)) return null;
+    const startMin = sh * 60 + sm;
+    const endMin = eh * 60 + em;
+    const diffMin = endMin - startMin;
+    if (diffMin <= 0) return { text: "End must be after start", minutes: diffMin, warn: true };
+    const hours = Math.floor(diffMin / 60);
+    const mins = diffMin % 60;
+    const parts: string[] = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (mins > 0) parts.push(`${mins}m`);
+    return { text: parts.join(" ") || "0m", minutes: diffMin, warn: diffMin > 8 * 60 };
+  }, [form.start_time, form.end_time]);
 
   /* ---------- Render ---------- */
 
@@ -411,6 +441,24 @@ export default function ManageShifts() {
                 />
               </div>
             </div>
+
+            {/* Live duration — catches AM/PM mistakes before saving */}
+            {durationInfo && (
+              <div
+                className={`rounded-md border px-3 py-2 text-sm flex items-center justify-between ${
+                  durationInfo.minutes <= 0
+                    ? "border-destructive bg-destructive/10 text-destructive"
+                    : durationInfo.warn
+                    ? "border-amber-500/50 bg-amber-500/10 text-amber-800"
+                    : "border-muted bg-muted/30"
+                }`}
+              >
+                <span className="font-medium">Duration: {durationInfo.text}</span>
+                {durationInfo.warn && durationInfo.minutes > 0 && (
+                  <span className="text-xs">Double-check AM/PM on your times.</span>
+                )}
+              </div>
+            )}
 
             {/* Max volunteers */}
             <div className="space-y-1.5">
