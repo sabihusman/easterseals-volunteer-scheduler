@@ -4,6 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/DatePicker";
+import { TimePicker } from "@/components/TimePicker";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -316,34 +318,30 @@ export default function AdminEvents() {
 
             <div className="space-y-1.5">
               <Label>Date *</Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={form.event_date}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, event_date: e.target.value }))
-                }
+                onChange={(v) => setForm((f) => ({ ...f, event_date: v }))}
+                placeholder="Select a date"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Start Time *</Label>
-                <Input
-                  type="time"
+                <TimePicker
                   value={form.start_time}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, start_time: e.target.value }))
-                  }
+                  onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
+                  defaultHour={9}
+                  defaultMinute={0}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>End Time *</Label>
-                <Input
-                  type="time"
+                <TimePicker
                   value={form.end_time}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, end_time: e.target.value }))
-                  }
+                  onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
+                  defaultHour={17}
+                  defaultMinute={0}
                 />
               </div>
             </div>

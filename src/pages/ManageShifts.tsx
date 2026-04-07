@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { DatePicker } from "@/components/DatePicker";
+import { TimePicker } from "@/components/TimePicker";
 import {
   Dialog,
   DialogContent,
@@ -372,12 +374,10 @@ export default function ManageShifts() {
             {/* Date */}
             <div className="space-y-1.5">
               <Label>Date *</Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={form.shift_date}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, shift_date: e.target.value }))
-                }
+                onChange={(v) => setForm((f) => ({ ...f, shift_date: v }))}
+                placeholder="Select a date"
               />
             </div>
 
@@ -385,28 +385,23 @@ export default function ManageShifts() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Start Time *</Label>
-                <Input
-                  type="time"
+                <TimePicker
                   value={form.start_time}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, start_time: e.target.value }))
-                  }
+                  onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
+                  defaultHour={9}
+                  defaultMinute={0}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>End Time *</Label>
-                <Input
-                  type="time"
+                <TimePicker
                   value={form.end_time}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, end_time: e.target.value }))
-                  }
+                  onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
+                  defaultHour={17}
+                  defaultMinute={0}
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground -mt-2">
-              Tip: Click the time field, type the hours and minutes, then click the AM/PM area and press up/down arrows to switch.
-            </p>
 
             {/* Max volunteers */}
             <div className="space-y-1.5">
