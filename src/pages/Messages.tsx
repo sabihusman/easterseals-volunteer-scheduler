@@ -19,7 +19,7 @@ export default function Messages() {
 
   const refresh = () => setRefreshTrigger((t) => t + 1);
 
-  const handleSelect = (id: string, names: Record<string, string>) => {
+  const handleSelect = (id: string | null, names: Record<string, string>) => {
     setSelectedConvoId(id);
     setParticipantNames(names);
   };

@@ -120,14 +120,16 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
         description: "This shift is no longer available to book.",
         variant: "destructive",
       });
-      setSubmitting(false);
       onOpenChange(false);
       return;
     }
 
-    // Check booking window
+    // Check booking window — compare calendar days, not ms deltas, so a
+    // shift exactly N days from today isn't rejected due to hours-of-day.
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const shiftDate = new Date(shift.shift_date + "T00:00:00");
-    const daysAhead = Math.ceil((shiftDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const daysAhead = Math.round((shiftDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     const maxDays = profile.extended_booking ? 21 : 14;
     if (daysAhead > maxDays) {
       toast({ title: "Booking window exceeded", description: `You can book up to ${maxDays} days in advance.`, variant: "destructive" });

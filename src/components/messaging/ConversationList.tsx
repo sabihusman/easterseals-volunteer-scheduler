@@ -25,7 +25,7 @@ interface ConversationItem {
 
 interface ConversationListProps {
   selectedId: string | null;
-  onSelect: (id: string, participantNames: Record<string, string>) => void;
+  onSelect: (id: string | null, participantNames: Record<string, string>) => void;
   refreshTrigger: number;
 }
 
@@ -163,7 +163,7 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
     }
     // Clear selection if the deleted conversation was open
     if (selectedId === deleteTarget.id) {
-      onSelect("", {});
+      onSelect(null, {});
     }
     toast({ title: "Conversation deleted", description: "Only visible to you." });
     fetchConversations();

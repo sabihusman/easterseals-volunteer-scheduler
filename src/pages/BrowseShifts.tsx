@@ -92,6 +92,7 @@ export default function BrowseShifts() {
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
   const [slotDialogShift, setSlotDialogShift] = useState<ShiftRow | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Booking window based on consistency score
   const extendedBooking = profile?.extended_booking === true;
@@ -184,6 +185,7 @@ export default function BrowseShifts() {
 
   const handleBooked = () => {
     fetchData();
+    setRefreshKey((k) => k + 1);
   };
 
   // Apply department + time range filters
@@ -324,6 +326,7 @@ export default function BrowseShifts() {
         <>
           {!privilegesSuspended && (
             <RecommendedShifts
+              refreshKey={refreshKey}
               onBookShift={(shiftId, shiftData) => {
                 if (shiftData) {
                   setSlotDialogShift({

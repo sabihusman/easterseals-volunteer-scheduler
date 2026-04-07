@@ -67,8 +67,9 @@ export default function ShiftHistory() {
   }, [user]);
 
   // Show shifts that are today or earlier (so same-day completed shifts appear)
-  // OR any cancelled/no_show booking (history of all past activity)
-  const today = new Date().toISOString().split("T")[0];
+  // OR any cancelled/no_show booking (history of all past activity).
+  // Use LOCAL date — UTC rollover would briefly drop same-day shifts otherwise.
+  const today = format(new Date(), "yyyy-MM-dd");
   const pastBookings = bookings.filter(b => {
     if (!b.shifts) return false;
     const isPastOrToday = b.shifts.shift_date <= today;
