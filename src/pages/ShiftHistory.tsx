@@ -66,7 +66,15 @@ export default function ShiftHistory() {
     fetchData();
   }, [user]);
 
-  const pastBookings = bookings.filter(b => b.shifts && b.shifts.shift_date < new Date().toISOString().split("T")[0]);
+  // Show shifts that are today or earlier (so same-day completed shifts appear)
+  // OR any cancelled/no_show booking (history of all past activity)
+  const today = new Date().toISOString().split("T")[0];
+  const pastBookings = bookings.filter(b => {
+    if (!b.shifts) return false;
+    const isPastOrToday = b.shifts.shift_date <= today;
+    const isCancelledOrNoShow = b.booking_status === "cancelled" || b.confirmation_status === "no_show";
+    return isPastOrToday || isCancelledOrNoShow;
+  });
 
   // Hours summary by month
   const hoursByMonth = useMemo(() => {
@@ -133,15 +141,28 @@ export default function ShiftHistory() {
   };
 
   const handleExportCSV = () => {
+    if (pastBookings.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "You don't have any completed or past shifts to export yet.",
+        variant: "destructive",
+      });
+      return;
+    }
     const data = pastBookings.map((b) => ({
       Date: b.shifts.shift_date,
       Shift: b.shifts.title,
       Department: b.shifts.departments?.name || "",
       Time: timeLabel(b.shifts),
+      "Hours Worked": b.final_hours ?? b._slotHours ?? "",
+      "Hours Source": b.hours_source ?? "",
+      "Volunteer Reported": b.volunteer_reported_hours ?? "",
+      "Coordinator Reported": b.coordinator_reported_hours ?? "",
       Status: b.confirmation_status,
       "Booking Status": b.booking_status,
     }));
     downloadCSV(data, `shift_history_${format(new Date(), "yyyy-MM-dd")}.csv`);
+    toast({ title: "Export complete", description: `Downloaded ${data.length} shift records.` });
   };
 
   const statusBadge = (booking: any) => {

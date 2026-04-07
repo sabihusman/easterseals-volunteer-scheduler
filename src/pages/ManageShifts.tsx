@@ -217,7 +217,18 @@ export default function ManageShifts() {
   /* ---------- Delete ---------- */
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this shift? This cannot be undone.")) return;
+    // Check for active bookings first to warn the user
+    const { count: bookingCount } = await supabase
+      .from("shift_bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("shift_id", id)
+      .eq("booking_status", "confirmed");
+
+    const warning = bookingCount && bookingCount > 0
+      ? `Delete this shift?\n\nThis will permanently remove the shift and CANCEL ${bookingCount} confirmed booking${bookingCount !== 1 ? "s" : ""}. This cannot be undone.`
+      : "Delete this shift? This cannot be undone.";
+
+    if (!confirm(warning)) return;
 
     const { error } = await supabase.from("shifts").delete().eq("id", id);
     if (error) {
