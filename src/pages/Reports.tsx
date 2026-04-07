@@ -217,16 +217,28 @@ export default function Reports() {
     ].filter((d) => d.value > 0);
   }, [filteredShifts, consistency, popularity]);
 
+  // Department rollup filtered by selected department
+  const visibleDepartmentReport = useMemo(() => {
+    if (selectedDept === "all") return departmentReport;
+    return departmentReport.filter((d) => d.department_id === selectedDept);
+  }, [departmentReport, selectedDept]);
+
   // Summary stats
   const summary = useMemo(() => {
     const totalShifts = filteredShifts.length;
-    let totalConfirmed = 0, totalNoShows = 0, totalSlots = 0;
+    let totalConfirmedBookings = 0;          // pre-event bookings (for fill %)
+    let totalAttended = 0, totalNoShows = 0; // post-event (for attendance %)
+    let totalSlots = 0;
     let ratedCount = 0, ratingSum = 0;
     for (const s of filteredShifts) {
       const c = consistency[s.id];
+      const p = popularity[s.id];
       if (c) {
-        totalConfirmed += c.attended;
+        totalAttended += c.attended;
         totalNoShows += c.no_shows;
+      }
+      if (p) {
+        totalConfirmedBookings += p.confirmed_count;
       }
       totalSlots += s.total_slots;
       const r = ratings[s.id];
@@ -235,11 +247,11 @@ export default function Reports() {
         ratingSum += r.avg_rating;
       }
     }
-    const fillRate = totalSlots > 0 ? Math.round((totalConfirmed / totalSlots) * 100) : 0;
-    const attendRate = totalConfirmed + totalNoShows > 0 ? Math.round((totalConfirmed / (totalConfirmed + totalNoShows)) * 100) : 0;
+    const fillRate = totalSlots > 0 ? Math.round((totalConfirmedBookings / totalSlots) * 100) : 0;
+    const attendRate = totalAttended + totalNoShows > 0 ? Math.round((totalAttended / (totalAttended + totalNoShows)) * 100) : 0;
     const avgRating = ratedCount > 0 ? +(ratingSum / ratedCount).toFixed(1) : 0;
     return { totalShifts, fillRate, attendRate, avgRating, ratedCount };
-  }, [filteredShifts, consistency, ratings]);
+  }, [filteredShifts, consistency, popularity, ratings]);
 
   const handleExport = () => {
     if (filteredShifts.length === 0) {
@@ -258,7 +270,7 @@ export default function Reports() {
         Confirmed: p?.confirmed_count ?? 0,
         Waitlisted: p?.waitlist_count ?? 0,
         Views: p?.view_count ?? 0,
-        "Fill %": c ? Math.round((c.attended / s.total_slots) * 100) : 0,
+        "Fill %": p && s.total_slots > 0 ? Math.round((p.confirmed_count / s.total_slots) * 100) : 0,
         Attended: c?.attended ?? 0,
         "No Shows": c?.no_shows ?? 0,
         Cancelled: c?.cancelled ?? 0,
@@ -366,10 +378,10 @@ export default function Reports() {
                   <CardDescription>Aggregated metrics per department</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 max-h-[280px] overflow-y-auto">
-                  {departmentReport.length === 0 ? (
+                  {visibleDepartmentReport.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">No data.</p>
                   ) : (
-                    departmentReport.map((d) => (
+                    visibleDepartmentReport.map((d) => (
                       <div key={d.department_id} className="flex items-center justify-between text-sm border-b pb-2">
                         <div>
                           <p className="font-medium">{d.department_name}</p>
@@ -400,7 +412,7 @@ export default function Reports() {
                   <Flame className="h-4 w-4 text-orange-500" /> Top 10 Most Popular Shifts
                 </CardTitle>
                 <CardDescription>
-                  Score factors: fill rate (50%) + waitlist demand (30%) + view count (20%)
+                  Score = fill rate × 1.0 + waitlist count × 0.1 + min(views÷20, 1.0) × 0.2
                 </CardDescription>
               </CardHeader>
               <CardContent>

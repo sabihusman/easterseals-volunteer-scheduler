@@ -43,7 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          fetchProfile(session.user.id);
+          // Await profile fetch so role is populated before ProtectedRoute decisions
+          await fetchProfile(session.user.id);
         } else {
           setProfile(null);
         }

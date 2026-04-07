@@ -62,35 +62,37 @@ export default function Auth() {
     // Resolve identifier: if it contains @, use as email; otherwise look up email by username
     let emailToUse = loginIdentifier.trim();
     if (!emailToUse.includes("@")) {
-      const { data: resolvedEmail, error: lookupError } = await supabase
+      const { data: resolvedEmail } = await supabase
         .rpc("get_email_by_username", { p_username: emailToUse });
-      if (lookupError || !resolvedEmail) {
+      if (!resolvedEmail) {
+        // Generic error to avoid username enumeration / email oracle
         setLoading(false);
-        toast({ title: "Login failed", description: "No account found with that username.", variant: "destructive" });
+        setTurnstileToken(null);
+        toast({ title: "Login failed", description: "Invalid credentials.", variant: "destructive" });
         return;
       }
       emailToUse = resolvedEmail as string;
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: emailToUse,
       password: loginPassword,
       options: { captchaToken: turnstileToken },
     });
-    setLoading(false);
     setTurnstileToken(null);
     if (error) {
-      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+      setLoading(false);
+      toast({ title: "Login failed", description: "Invalid credentials.", variant: "destructive" });
+      return;
+    }
+
+    // Use the official MFA AAL check — the previous session.user.factors approach was wrong
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    setLoading(false);
+    if (aal?.nextLevel === "aal2" && aal.nextLevel !== aal.currentLevel) {
+      navigate("/mfa-verify");
     } else {
-      // Check if MFA verification is needed
-      const currentLevel = data.session?.user?.factors?.length
-        ? data.session.user.factors.some((f: any) => f.status === "verified") ? "aal2_needed" : null
-        : null;
-      if (currentLevel === "aal2_needed") {
-        navigate("/mfa-verify");
-      } else {
-        navigate("/");
-      }
+      navigate("/");
     }
   };
 

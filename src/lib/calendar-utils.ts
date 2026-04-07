@@ -1,5 +1,6 @@
 // iCal export utility
 export function generateICS(shift: {
+  id?: string;
   title: string;
   shift_date: string;
   start_time?: string | null;
@@ -19,16 +20,30 @@ export function generateICS(shift: {
     dtEnd = `${date}T${shift.end_time.replace(/:/g, "").slice(0, 6)}`;
   }
 
+  // Stable UID — uses the shift ID if available, otherwise falls back to a
+  // deterministic hash of date+title so re-imports overwrite instead of
+  // duplicating. DTSTAMP is required by RFC 5545.
+  const uidBase = shift.id || `${shift.shift_date}-${shift.title}`.replace(/[^a-zA-Z0-9-]/g, "_");
+  const uid = `${uidBase}@easterseals-iowa-volunteer`;
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "").replace(/Z$/, "Z");
+
+  // Escape commas/semicolons/newlines per RFC 5545
+  const esc = (s: string) => s.replace(/[\\;,]/g, (m) => `\\${m}`).replace(/\n/g, "\\n");
+
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//Easterseals//Volunteer Scheduler//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `DTSTART:${dtStart}`,
-    `DTEND:${dtEnd}`,
-    `SUMMARY:${shift.title}`,
-    `DESCRIPTION:Department: ${shift.departments?.name || "N/A"}`,
-    `LOCATION:${shift.departments?.name || ""}`,
+    `UID:${uid}`,
+    `DTSTAMP:${dtstamp}`,
+    `DTSTART;TZID=America/Chicago:${dtStart}`,
+    `DTEND;TZID=America/Chicago:${dtEnd}`,
+    `SUMMARY:${esc(shift.title)}`,
+    `DESCRIPTION:${esc("Department: " + (shift.departments?.name || "N/A"))}`,
+    `LOCATION:${esc(shift.departments?.name || "")}`,
     "END:VEVENT",
     "END:VCALENDAR",
   ].join("\r\n");

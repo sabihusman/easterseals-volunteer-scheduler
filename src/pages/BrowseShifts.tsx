@@ -83,6 +83,7 @@ export default function BrowseShifts() {
   const { toast } = useToast();
   const { trackViewed, trackSignedUp, trackCancelled } = useInteractionTracking();
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
+  const [hiddenBgCount, setHiddenBgCount] = useState(0);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<"1w" | "2w" | "3w" | "1m">("2w");
@@ -126,10 +127,17 @@ export default function BrowseShifts() {
     ]);
     const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: { department_id: string }) => r.department_id));
 
-    // Filter out restricted depts and BG-check-required shifts if volunteer not cleared
+    // Count BG-gated shifts that would be hidden BEFORE filtering, so the
+    // banner shows even when every relevant shift was filtered out.
     const bgStatus = profile?.bg_check_status;
-    const filteredShifts = ((shiftData || []) as ShiftRow[]).filter((s) => {
-      if (restrictedDeptIds.has(s.department_id)) return false;
+    const rawShifts = ((shiftData || []) as ShiftRow[]).filter((s) => !restrictedDeptIds.has(s.department_id));
+    const bgHidden = rawShifts.filter((s) =>
+      (s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared"
+    ).length;
+    setHiddenBgCount(bgHidden);
+
+    // Filter out restricted depts and BG-check-required shifts if volunteer not cleared
+    const filteredShifts = rawShifts.filter((s) => {
       if ((s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared") return false;
       return true;
     });
@@ -177,8 +185,8 @@ export default function BrowseShifts() {
   const privilegesSuspended = profile?.booking_privileges === false;
   const bgNotCleared = profile?.bg_check_status !== "cleared";
   const bgFailed = profile?.bg_check_status === "failed" || profile?.bg_check_status === "expired";
-  // Some BG-gated shifts were hidden by the query already, but show banner if relevant
-  const hasBgGatedShiftsHidden = bgNotCleared && shifts.length > 0;
+  // Show banner whenever any BG-gated shifts were hidden, regardless of remaining list
+  const hasBgGatedShiftsHidden = bgNotCleared && hiddenBgCount > 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -353,7 +361,11 @@ export default function BrowseShifts() {
                             isBooked ? "bg-primary text-primary-foreground" : "bg-accent text-accent-foreground"
                           }`}
                           title={`${s.title} - ${timeLabel(s)}`}
-                          onClick={() => !isBooked && setSlotDialogShift(s)}
+                          onClick={() => {
+                            if (isBooked) return;
+                            trackViewed(s.id);
+                            setSlotDialogShift(s);
+                          }}
                         >
                           {s.title}
                         </div>

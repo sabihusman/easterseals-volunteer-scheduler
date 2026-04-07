@@ -81,8 +81,9 @@ export default function ShiftHistory() {
     const map: Record<string, number> = {};
     pastBookings.filter(b => b.confirmation_status === "confirmed").forEach((b) => {
       const month = format(new Date(b.shifts.shift_date), "yyyy-MM");
-      // Use slot-based hours if available, fall back to estimate
-      const hours = b._slotHours > 0 ? b._slotHours : (b.shifts.time_type === "all_day" ? 8 : 4);
+      // Prefer the official final_hours (matches dashboard, hours letter, points logic).
+      // Fall back to slot-based hours, then to a coarse estimate by time_type.
+      const hours = b.final_hours ?? (b._slotHours > 0 ? b._slotHours : (b.shifts.time_type === "all_day" ? 8 : 4));
       map[month] = (map[month] || 0) + hours;
     });
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
