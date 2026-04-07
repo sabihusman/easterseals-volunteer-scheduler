@@ -38,13 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // IMPORTANT: Do NOT await any supabase calls inside onAuthStateChange —
+    // the callback runs while holding the GoTrue auth lock, and awaiting
+    // a supabase query inside it will deadlock the lock and hang the app.
+    // Defer the profile fetch with setTimeout(..., 0) as recommended by
+    // Supabase docs.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          // Await profile fetch so role is populated before ProtectedRoute decisions
-          await fetchProfile(session.user.id);
+          setTimeout(() => { fetchProfile(session.user.id); }, 0);
         } else {
           setProfile(null);
         }
