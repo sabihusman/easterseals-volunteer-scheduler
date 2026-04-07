@@ -31,15 +31,15 @@ export default function VolunteerDashboard() {
     if (!user) return;
     const fetchBookings = async () => {
       const [{ data }, { data: pendingData }] = await Promise.all([
-        // Use !inner so the PostgREST filter on shifts.shift_date actually
-        // excludes the booking rows, not just nulls the embed. Otherwise
-        // past bookings come through with shifts=null and the count is off.
+        // Fetch all confirmed bookings (no date filter in SQL — PostgREST
+        // embed filters with joined columns have been a source of bugs).
+        // We filter to upcoming shifts client-side using the volunteer's
+        // local date so today's shifts always show up.
         supabase
           .from("shift_bookings")
-          .select("id, booking_status, confirmation_status, checked_in_at, shifts!inner(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+          .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
           .eq("volunteer_id", user.id)
           .eq("booking_status", "confirmed")
-          .gte("shifts.shift_date", today)
           .order("created_at", { ascending: false }),
         supabase
           .from("volunteer_shift_reports")
@@ -48,12 +48,16 @@ export default function VolunteerDashboard() {
           .eq("self_confirm_status", "pending")
           .is("submitted_at", null),
       ]);
-      setUpcomingBookings((data as any) || []);
+      // Keep only bookings whose shift is today or in the future (local date)
+      const upcoming = ((data as any[]) || []).filter(
+        (b) => b.shifts && b.shifts.shift_date >= today
+      );
+      setUpcomingBookings(upcoming);
       setPendingConfirmations((pendingData as any) || []);
       setLoading(false);
     };
     fetchBookings();
-  }, [user]);
+  }, [user, today]);
 
   const handleCancel = async (bookingId: string, shift: any) => {
     const shiftDate = shift.shift_date;
