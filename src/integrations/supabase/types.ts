@@ -1504,9 +1504,74 @@ export type Database = {
           },
         ]
       }
+      volunteer_shift_reports_safe: {
+        Row: {
+          booking_id: string | null
+          created_at: string | null
+          id: string | null
+          reminder_sent_at: string | null
+          self_confirm_status:
+            | Database["public"]["Enums"]["self_confirm_status"]
+            | null
+          self_reported_hours: number | null
+          submitted_at: string | null
+          updated_at: string | null
+          volunteer_id: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          reminder_sent_at?: string | null
+          self_confirm_status?:
+            | Database["public"]["Enums"]["self_confirm_status"]
+            | null
+          self_reported_hours?: number | null
+          submitted_at?: string | null
+          updated_at?: string | null
+          volunteer_id?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          reminder_sent_at?: string | null
+          self_confirm_status?:
+            | Database["public"]["Enums"]["self_confirm_status"]
+            | null
+          self_reported_hours?: number | null
+          submitted_at?: string | null
+          updated_at?: string | null
+          volunteer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_shift_reports_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "shift_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_shift_reports_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       export_critical_data: { Args: never; Returns: Json }
+      get_shift_rating_aggregates: {
+        Args: { shift_uuids: string[] }
+        Returns: {
+          avg_rating: number
+          rating_count: number
+          shift_id: string
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
       is_coordinator_or_admin: { Args: never; Returns: boolean }
       my_role: {
