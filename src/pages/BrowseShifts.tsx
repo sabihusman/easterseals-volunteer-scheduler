@@ -105,17 +105,19 @@ export default function BrowseShifts() {
     maxDate.setDate(maxDate.getDate() + maxDays);
     const maxDateStr = format(maxDate, "yyyy-MM-dd");
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    const twoHoursFromNow = new Date(Date.now() + 2 * 60 * 60 * 1000)
-      .toTimeString().slice(0, 8);
 
+    // Fetch all candidate shifts within the booking window (from today onward).
+    // The definitive "not yet ended" filter is applied client-side below so we
+    // can handle time_type defaults (morning/afternoon/all_day) and local TZ
+    // correctly.
     const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
       supabase.from("departments").select("id, name").eq("is_active", true).order("name"),
       supabase
         .from("shifts")
         .select("*, departments(name, requires_bg_check)")
+        .gte("shift_date", todayStr)
         .lte("shift_date", maxDateStr)
         .in("status", ["open", "full"])
-        .or(`shift_date.gt.${todayStr},and(shift_date.eq.${todayStr},start_time.gt.${twoHoursFromNow}),and(shift_date.gte.${todayStr},start_time.is.null)`)
         .order("shift_date", { ascending: true })
         .order("start_time", { ascending: true, nullsFirst: false }),
       user
@@ -127,10 +129,33 @@ export default function BrowseShifts() {
     ]);
     const restrictedDeptIds = new Set((restrictionResult.data || []).map((r: { department_id: string }) => r.department_id));
 
+    // Compute each shift's end datetime in local time, honoring time_type
+    // defaults when end_time is null. A shift is bookable only until its
+    // end time has passed.
+    const shiftEndAt = (s: ShiftRow): Date => {
+      const endStr =
+        s.end_time ||
+        (s.time_type === "morning"
+          ? "12:00:00"
+          : s.time_type === "afternoon"
+          ? "16:00:00"
+          : "17:00:00");
+      return new Date(`${s.shift_date}T${endStr}`);
+    };
+    const now = new Date();
+
+    // Build a set of shift IDs the user has already booked (confirmed or waitlisted)
+    const alreadyBookedIds = new Set((myBookings || []).map((b: { shift_id: string }) => b.shift_id));
+
     // Count BG-gated shifts that would be hidden BEFORE filtering, so the
     // banner shows even when every relevant shift was filtered out.
     const bgStatus = profile?.bg_check_status;
-    const rawShifts = ((shiftData || []) as ShiftRow[]).filter((s) => !restrictedDeptIds.has(s.department_id));
+    const rawShifts = ((shiftData || []) as ShiftRow[])
+      .filter((s) => !restrictedDeptIds.has(s.department_id))
+      // Drop shifts whose end time has already passed
+      .filter((s) => shiftEndAt(s) > now)
+      // Hide shifts the user has already booked so they don't see them twice
+      .filter((s) => !alreadyBookedIds.has(s.id));
     const bgHidden = rawShifts.filter((s) =>
       (s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared"
     ).length;
@@ -144,7 +169,7 @@ export default function BrowseShifts() {
 
     setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
-    setBookingIds(new Set((myBookings || []).map((b: { shift_id: string }) => b.shift_id)));
+    setBookingIds(alreadyBookedIds);
     setLoading(false);
   }, [user, profile?.extended_booking, profile?.bg_check_status]);
 

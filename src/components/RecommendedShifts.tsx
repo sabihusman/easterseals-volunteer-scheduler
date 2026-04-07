@@ -48,6 +48,29 @@ export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
 
         const maxDays = profileData?.extended_booking ? 21 : 14;
 
+        // Pre-fetch the user's active bookings so we can filter them out
+        const { data: myBookings } = await supabase
+          .from('shift_bookings')
+          .select('shift_id')
+          .eq('volunteer_id', user.id)
+          .in('booking_status', ['confirmed', 'waitlisted']);
+        const bookedIds = new Set((myBookings || []).map((b) => b.shift_id));
+
+        // Helper: compute a shift's end datetime using time_type defaults
+        const shiftEndAt = (s: Pick<RecommendedShift, 'shift_date' | 'time_type' | 'end_time'>): Date => {
+          const endStr =
+            s.end_time ||
+            (s.time_type === 'morning'
+              ? '12:00:00'
+              : s.time_type === 'afternoon'
+              ? '16:00:00'
+              : '17:00:00');
+          return new Date(`${s.shift_date}T${endStr}`);
+        };
+        const now = new Date();
+        const filterRelevant = (list: RecommendedShift[]) =>
+          list.filter((s) => !bookedIds.has(s.shift_id) && shiftEndAt(s) > now);
+
         const { data, error } = await (supabase as any).rpc(
           'score_shifts_for_volunteer',
           { p_volunteer_id: user.id, p_max_days: maxDays }
@@ -56,40 +79,47 @@ export function RecommendedShifts({ onBookShift }: RecommendedShiftsProps) {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          setShifts(data as RecommendedShift[]);
+          const filtered = filterRelevant(data as RecommendedShift[]);
+          setShifts(filtered);
           const breakdown = data[0]?.score_breakdown as any;
           setHasHistory(breakdown?.has_history ?? false);
         } else {
-          // Fallback: upcoming unfilled shifts sorted by date
+          // Fallback: upcoming unfilled shifts sorted by date (local timezone)
+          const localToday = (() => {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          })();
           const { data: fallback } = await supabase
             .from('shifts')
             .select('*, departments(name)')
             .neq('status', 'cancelled')
             .neq('status', 'full')
-            .gt('shift_date', new Date().toISOString().split('T')[0])
+            .gte('shift_date', localToday)
             .order('shift_date', { ascending: true })
-            .limit(6);
+            .limit(20);
 
           if (fallback) {
-            setShifts(
-              fallback.map((s: any) => ({
-                shift_id: s.id,
-                title: s.title,
-                shift_date: s.shift_date,
-                time_type: s.time_type,
-                start_time: s.start_time,
-                end_time: s.end_time,
-                department_name: s.departments?.name ?? '',
-                total_slots: s.total_slots,
-                booked_slots: s.booked_slots,
-                fill_ratio:
-                  s.total_slots > 0 ? s.booked_slots / s.total_slots : 0,
-                total_score: 0,
-                organizational_need: 0,
-                requires_bg_check: s.requires_bg_check,
-                score_breakdown: null,
-              }))
-            );
+            const mapped: RecommendedShift[] = fallback.map((s: any) => ({
+              shift_id: s.id,
+              title: s.title,
+              shift_date: s.shift_date,
+              time_type: s.time_type,
+              start_time: s.start_time,
+              end_time: s.end_time,
+              department_name: s.departments?.name ?? '',
+              total_slots: s.total_slots,
+              booked_slots: s.booked_slots,
+              fill_ratio:
+                s.total_slots > 0 ? s.booked_slots / s.total_slots : 0,
+              total_score: 0,
+              organizational_need: 0,
+              requires_bg_check: s.requires_bg_check,
+              score_breakdown: null,
+            }));
+            setShifts(filterRelevant(mapped).slice(0, 6));
           }
         }
       } catch (err) {

@@ -70,6 +70,8 @@ Deno.serve(async (req) => {
       shift_invitation: true,
       booking_changed: true,
       self_no_show: true,
+      unactioned_shift_reminder: true,
+      unactioned_shift_coord_reminder: true,
     };
 
     if (!typeMap[record.type]) {
@@ -94,6 +96,8 @@ Deno.serve(async (req) => {
       self_no_show: "notif_booking_changes",
       late_cancellation: "notif_booking_changes",
       waitlist_notification: "notif_booking_changes",
+      unactioned_shift_reminder: "notif_shift_reminders",
+      unactioned_shift_coord_reminder: "notif_shift_reminders",
     };
     const prefCol = typePrefs[record.type];
     if (prefCol && (profile as any)[prefCol] === false) {
@@ -103,8 +107,11 @@ Deno.serve(async (req) => {
     }
 
     // Parse shift details from message
-    emailPayload.shiftTitle = record.title || "";
+    emailPayload.shiftTitle = record.data?.shift_title || record.title || "";
     emailPayload.subject = record.title;
+    if (record.data?.shift_date) emailPayload.shiftDate = record.data.shift_date;
+    if (record.data?.booking_id) emailPayload.bookingId = record.data.booking_id;
+    if (record.data?.volunteer_name) emailPayload.volunteerName = record.data.volunteer_name;
 
     // ── Send Email ──
     if (profile.notif_email) {

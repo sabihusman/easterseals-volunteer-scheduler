@@ -22,19 +22,25 @@ export default function VolunteerDashboard() {
   const [loading, setLoading] = useState(true);
   const [pendingConfirmations, setPendingConfirmations] = useState<any[]>([]);
 
-  const today = new Date().toISOString().split("T")[0];
+  // Use LOCAL date, not UTC — otherwise in the evening Central time the UTC
+  // rollover drops today's shifts from the filter and they disappear from the
+  // dashboard until the next calendar day.
+  const today = format(new Date(), "yyyy-MM-dd");
 
   useEffect(() => {
     if (!user) return;
     const fetchBookings = async () => {
       const [{ data }, { data: pendingData }] = await Promise.all([
+        // Use !inner so the PostgREST filter on shifts.shift_date actually
+        // excludes the booking rows, not just nulls the embed. Otherwise
+        // past bookings come through with shifts=null and the count is off.
         supabase
           .from("shift_bookings")
-          .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+          .select("id, booking_status, confirmation_status, checked_in_at, shifts!inner(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
           .eq("volunteer_id", user.id)
           .eq("booking_status", "confirmed")
           .gte("shifts.shift_date", today)
-          .order("created_at", { ascending: true }),
+          .order("created_at", { ascending: false }),
         supabase
           .from("volunteer_shift_reports")
           .select("id, booking_id, self_confirm_status, shift_bookings(id, shifts(title, shift_date, departments(name)))")
@@ -102,7 +108,12 @@ export default function VolunteerDashboard() {
     });
   };
 
-  const handleCheckIn = async (bookingId: string) => {
+  const handleCheckIn = async (bookingId: string, shift: any) => {
+    // Only allow check-in on the shift's own date, once within the shift window
+    if (shift?.shift_date !== today) {
+      toast({ title: "Not today", description: "You can only check in on the day of your shift.", variant: "destructive" });
+      return;
+    }
     const { error } = await supabase
       .from("shift_bookings")
       .update({ checked_in_at: new Date().toISOString() })
@@ -253,7 +264,7 @@ export default function VolunteerDashboard() {
                       </div>
                       <div className="flex flex-col gap-2 sm:items-end">
                         {isToday && !alreadyCheckedIn && (
-                          <Button size="sm" onClick={() => handleCheckIn(booking.id)}>Check In</Button>
+                          <Button size="sm" onClick={() => handleCheckIn(booking.id, s)}>Check In</Button>
                         )}
                         {alreadyCheckedIn && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
                         <div className="flex gap-1 flex-wrap">

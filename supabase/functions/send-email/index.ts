@@ -126,6 +126,31 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
         ),
       };
 
+    case "unactioned_shift_reminder":
+      return {
+        subject: `Action needed: confirm your shift — ${shiftTitle}`,
+        html: brandedHtml(
+          h2("Please Check In and Confirm Your Shift") +
+          p(`Your shift <strong>${shiftTitle}</strong> on ${shiftDate} has ended, but we don't yet have a check-in or confirmation from you.`) +
+          p("Volunteer hours are only counted once you check in and submit your shift confirmation. If no action is taken within a week of the shift, it will be removed from your history and may affect your consistency score.") +
+          button("Confirm Shift Now", `${APP_URL}/my-shifts/confirm/${bookingId}`)
+        ),
+      };
+
+    case "unactioned_shift_coord_reminder":
+      return {
+        subject: `Volunteer not confirmed — ${shiftTitle}`,
+        html: brandedHtml(
+          h2("Volunteer Has Not Confirmed Shift") +
+          p(`${volunteerName || "A volunteer"} has not checked in or confirmed their shift:`) +
+          detail("Shift", shiftTitle || "") +
+          detail("Date", shiftDate || "") +
+          detail("Volunteer", volunteerName || "") +
+          p("More than 48 hours have passed since the shift ended. Please follow up with them or mark the shift as complete from the unactioned shifts list.") +
+          button("Review Unactioned Shifts", `${APP_URL}/admin/unactioned-shifts`)
+        ),
+      };
+
     case "coordinator_confirmation_reminder":
       return {
         subject: `Action Required: Confirm attendance for ${shiftTitle}`,
