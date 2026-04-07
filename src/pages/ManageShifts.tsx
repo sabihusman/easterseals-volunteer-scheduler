@@ -161,11 +161,28 @@ export default function ManageShifts() {
   /* ---------- Save ---------- */
 
   async function handleSave() {
-    if (!form.title || !form.department_id || !form.shift_date || !form.start_time || !form.end_time) {
+    const missing: string[] = [];
+    if (!form.title) missing.push("Shift Title");
+    if (!form.department_id) missing.push("Department");
+    if (!form.shift_date) missing.push("Date");
+    if (!form.start_time) missing.push("Start Time (make sure AM/PM is set)");
+    if (!form.end_time) missing.push("End Time (make sure AM/PM is set)");
+
+    if (missing.length > 0) {
       toast({
         variant: "destructive",
-        title: "Missing fields",
-        description: "Please complete all required fields.",
+        title: "Missing or invalid fields",
+        description: `Please complete: ${missing.join(", ")}`,
+      });
+      return;
+    }
+
+    // Validate end time is after start time
+    if (form.start_time >= form.end_time) {
+      toast({
+        variant: "destructive",
+        title: "Invalid time range",
+        description: "End time must be after start time.",
       });
       return;
     }
@@ -376,6 +393,9 @@ export default function ManageShifts() {
                 />
               </div>
             </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Tip: Click the time field, type the hours and minutes, then click the AM/PM area and press up/down arrows to switch.
+            </p>
 
             {/* Max volunteers */}
             <div className="space-y-1.5">
