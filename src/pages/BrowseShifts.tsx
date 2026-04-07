@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays, AlertTriangle } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Shield, Users, List, CalendarDays, AlertTriangle, Sparkles, Filter } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -85,11 +85,17 @@ export default function BrowseShifts() {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>("all");
+  const [timeRange, setTimeRange] = useState<"1w" | "2w" | "3w" | "1m">("2w");
   const [loading, setLoading] = useState(true);
   const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
   const [slotDialogShift, setSlotDialogShift] = useState<ShiftRow | null>(null);
+
+  // Booking window based on consistency score
+  const extendedBooking = profile?.extended_booking === true;
+  const maxBookingDays = extendedBooking ? 21 : 14;
+  const consistencyScore = profile?.consistency_score ?? 0;
 
   const fetchData = useCallback(async () => {
     // Calculate max booking date based on profile
@@ -102,14 +108,15 @@ export default function BrowseShifts() {
       .toTimeString().slice(0, 8);
 
     const [{ data: depts }, { data: shiftData }, { data: myBookings }, restrictionResult] = await Promise.all([
-      supabase.from("departments").select("id, name").eq("is_active", true),
+      supabase.from("departments").select("id, name").eq("is_active", true).order("name"),
       supabase
         .from("shifts")
         .select("*, departments(name, requires_bg_check)")
         .lte("shift_date", maxDateStr)
         .in("status", ["open", "full"])
         .or(`shift_date.gt.${todayStr},and(shift_date.eq.${todayStr},start_time.gt.${twoHoursFromNow}),and(shift_date.gte.${todayStr},start_time.is.null)`)
-        .order("shift_date", { ascending: true }),
+        .order("shift_date", { ascending: true })
+        .order("start_time", { ascending: true, nullsFirst: false }),
       user
         ? supabase.from("shift_bookings").select("shift_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
         : Promise.resolve({ data: [] }),
@@ -135,11 +142,28 @@ export default function BrowseShifts() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // If extended booking is not available, clamp time range to "2w"
+  useEffect(() => {
+    if (!extendedBooking && (timeRange === "3w" || timeRange === "1m")) {
+      setTimeRange("2w");
+    }
+  }, [extendedBooking, timeRange]);
+
   const handleBooked = () => {
     fetchData();
   };
 
-  const filtered = selectedDept === "all" ? shifts : shifts.filter((s) => s.department_id === selectedDept);
+  // Apply department + time range filters
+  const timeRangeDays: Record<typeof timeRange, number> = { "1w": 7, "2w": 14, "3w": 21, "1m": 30 };
+  const rangeLimit = new Date();
+  rangeLimit.setDate(rangeLimit.getDate() + timeRangeDays[timeRange]);
+  const rangeLimitStr = format(rangeLimit, "yyyy-MM-dd");
+
+  const filtered = shifts.filter((s) => {
+    if (selectedDept !== "all" && s.department_id !== selectedDept) return false;
+    if (s.shift_date > rangeLimitStr) return false;
+    return true;
+  });
 
   const monthStart = startOfMonth(calMonth);
   const monthEnd = endOfMonth(calMonth);
@@ -182,14 +206,49 @@ export default function BrowseShifts() {
         </Alert>
       )}
 
+      {/* Eligibility banner — shows consistency score and booking window */}
+      {!privilegesSuspended && profile && (
+        <div className={`rounded-lg border p-3 flex items-start gap-3 ${
+          extendedBooking
+            ? "border-primary/30 bg-primary/5"
+            : "border-muted bg-muted/30"
+        }`}>
+          <Sparkles className={`h-5 w-5 mt-0.5 shrink-0 ${extendedBooking ? "text-primary" : "text-muted-foreground"}`} />
+          <div className="flex-1 text-sm">
+            {extendedBooking ? (
+              <>
+                <p className="font-medium text-foreground">
+                  Extended booking unlocked — book up to <strong>3 weeks</strong> in advance
+                </p>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  Your consistency score is {consistencyScore}% over your last 5 shifts. Keep it above 90% to retain this perk.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-foreground">
+                  Standard booking window — 2 weeks in advance
+                </p>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  {consistencyScore > 0
+                    ? `Your consistency score is ${consistencyScore}%. Reach 90% over your last 5 shifts to unlock a 3-week booking window.`
+                    : "Complete 5 shifts with a 90% attendance rate to unlock a 3-week booking window."}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold">Available Shifts</h2>
           <p className="text-muted-foreground">Browse and book volunteer shifts</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Select value={selectedDept} onValueChange={setSelectedDept}>
             <SelectTrigger className="w-[180px]">
+              <Filter className="h-4 w-4 mr-1" />
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
             <SelectContent>
@@ -197,6 +256,22 @@ export default function BrowseShifts() {
               {departments.map((d) => (
                 <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={timeRange} onValueChange={(v) => setTimeRange(v as "1w" | "2w" | "3w" | "1m")}>
+            <SelectTrigger className="w-[160px]">
+              <CalendarIcon className="h-4 w-4 mr-1" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1w">Within 1 week</SelectItem>
+              <SelectItem value="2w">Within 2 weeks</SelectItem>
+              <SelectItem value="3w" disabled={!extendedBooking}>
+                Within 3 weeks{!extendedBooking && " 🔒"}
+              </SelectItem>
+              <SelectItem value="1m" disabled={!extendedBooking}>
+                Within 1 month{!extendedBooking && " 🔒"}
+              </SelectItem>
             </SelectContent>
           </Select>
           <Tabs value={view} onValueChange={(v) => setView(v as "list" | "calendar")}>
