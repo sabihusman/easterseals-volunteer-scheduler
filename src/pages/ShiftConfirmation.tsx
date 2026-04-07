@@ -75,21 +75,31 @@ export default function ShiftConfirmation() {
     setSubmitting(true);
 
     if (attended === false) {
-      // Self-reported no-show
-      await supabase
+      // Self-reported no-show — upsert so it works whether or not a row exists
+      const { error: reportErr } = await supabase
         .from("volunteer_shift_reports")
-        .update({
+        .upsert({
+          booking_id: bookingId!,
           self_confirm_status: "no_show" as any,
           submitted_at: new Date().toISOString(),
-        })
-        .eq("booking_id", bookingId!);
+        }, { onConflict: "booking_id" });
+      if (reportErr) {
+        toast({ title: "Error", description: reportErr.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
 
-      await supabase
+      const { error: bookingErr } = await supabase
         .from("shift_bookings")
         .update({ confirmation_status: "no_show" as any })
         .eq("id", bookingId!);
+      if (bookingErr) {
+        toast({ title: "Error", description: bookingErr.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
 
-      // Notify coordinators
+      // Notify coordinators (using booking_changed type so the webhook routes it)
       const { data: coords } = await supabase
         .from("department_coordinators")
         .select("coordinator_id")
@@ -101,7 +111,7 @@ export default function ShiftConfirmation() {
       for (const c of coords || []) {
         await supabase.from("notifications").insert({
           user_id: c.coordinator_id,
-          type: "self_no_show",
+          type: "booking_changed",
           title: "Volunteer Self-Reported No-Show",
           message: `${volName} has self-reported as a no-show for ${booking.shifts.title} on ${format(new Date(booking.shifts.shift_date), "MMM d, yyyy")}`,
         });
@@ -126,28 +136,38 @@ export default function ShiftConfirmation() {
       return;
     }
 
-    // Save to volunteer_shift_reports — the DB trigger automatically syncs
-    // self_reported_hours to shift_bookings.volunteer_reported_hours and
-    // runs resolve_hours_discrepancy() via the sync_volunteer_reported_hours trigger.
-    await supabase
+    // Save to volunteer_shift_reports — upsert so it works whether or not a row exists.
+    // The DB trigger automatically syncs self_reported_hours to
+    // shift_bookings.volunteer_reported_hours and runs resolve_hours_discrepancy().
+    const { error: reportErr } = await supabase
       .from("volunteer_shift_reports")
-      .update({
+      .upsert({
+        booking_id: bookingId!,
         self_confirm_status: "attended" as any,
         self_reported_hours: hoursNum,
         star_rating: rating,
         shift_feedback: feedback.trim() || null,
         submitted_at: new Date().toISOString(),
-      })
-      .eq("booking_id", bookingId!);
+      }, { onConflict: "booking_id" });
+    if (reportErr) {
+      toast({ title: "Error", description: reportErr.message, variant: "destructive" });
+      setSubmitting(false);
+      return;
+    }
 
     // Private note
     if (privateNote.trim()) {
-      await supabase.from("volunteer_private_notes").insert({
+      const { error: noteErr } = await supabase.from("volunteer_private_notes").insert({
         volunteer_id: user.id,
         shift_id: booking.shift_id,
         department_id: booking.shifts.department_id,
         content: privateNote.trim(),
       });
+      if (noteErr) {
+        toast({ title: "Saved confirmation, but note failed", description: noteErr.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      }
     }
 
     toast({ title: "Confirmation submitted!" });

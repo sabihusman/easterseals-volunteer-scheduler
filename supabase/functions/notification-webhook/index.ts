@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     // Get the user's email, phone, and notification preferences
     const { data: profile } = await supabase
       .from("profiles")
-      .select("email, full_name, phone, notif_email, notif_sms, notif_shift_reminders, notif_new_messages, notif_milestone, notif_document_expiry, notif_booking_changes")
+      .select("email, full_name, phone, emergency_contact_phone, notif_email, notif_sms, notif_shift_reminders, notif_new_messages, notif_milestone, notif_document_expiry, notif_booking_changes")
       .eq("id", record.user_id)
       .single();
 
@@ -68,6 +68,8 @@ Deno.serve(async (req) => {
       booking_confirmed: true,
       booking_cancelled: true,
       shift_invitation: true,
+      booking_changed: true,
+      self_no_show: true,
     };
 
     if (!typeMap[record.type]) {
@@ -88,6 +90,8 @@ Deno.serve(async (req) => {
       document_expiry_warning: "notif_document_expiry",
       booking_confirmed: "notif_booking_changes",
       booking_cancelled: "notif_booking_changes",
+      booking_changed: "notif_booking_changes",
+      self_no_show: "notif_booking_changes",
       late_cancellation: "notif_booking_changes",
       waitlist_notification: "notif_booking_changes",
     };
@@ -113,7 +117,9 @@ Deno.serve(async (req) => {
     }
 
     // ── Send SMS ──
-    if (profile.notif_sms && profile.phone) {
+    // Fall back to emergency_contact_phone if no primary phone — matches Settings UI
+    const smsTarget = profile.phone || (profile as any).emergency_contact_phone;
+    if (profile.notif_sms && smsTarget) {
       // Build a concise SMS message from notification
       let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
 
@@ -123,7 +129,7 @@ Deno.serve(async (req) => {
       }
 
       const { error: smsError } = await supabase.functions.invoke("send-sms", {
-        body: { to: profile.phone, body: smsBody },
+        body: { to: smsTarget, body: smsBody },
       });
       if (smsError) {
         console.error("Failed to send SMS via webhook:", smsError);

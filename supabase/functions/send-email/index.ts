@@ -179,7 +179,7 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
           detail("Time", shiftTime || "") +
           detail("Department", department || "") +
           p("This spot may fill quickly — book now to secure it.") +
-          button("Book Now", `${APP_URL}/browse-shifts`)
+          button("Book Now", `${APP_URL}/shifts`)
         ),
       };
 
@@ -190,7 +190,7 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
           h2("Congratulations! 🎉") +
           bigNumber(String(totalHours || 0), "Total Volunteer Hours") +
           p("Your dedication makes a real difference in our community. Thank you for your incredible service!") +
-          button("View Shift History", `${APP_URL}/shift-history`)
+          button("View Shift History", `${APP_URL}/history`)
         ),
       };
 
@@ -206,7 +206,7 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
             <tr><td style="padding:8px 0;font-size:14px;color:#374151;"><strong>2.</strong> Browse and book available shifts</td></tr>
             <tr><td style="padding:8px 0;font-size:14px;color:#374151;"><strong>3.</strong> Show up, check in, and make a difference!</td></tr>
           </table>` +
-          button("Browse Shifts", `${APP_URL}/browse-shifts`)
+          button("Browse Shifts", `${APP_URL}/shifts`)
         ),
       };
 

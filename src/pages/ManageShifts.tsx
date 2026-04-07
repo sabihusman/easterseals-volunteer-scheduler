@@ -16,6 +16,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -110,6 +120,7 @@ export default function ManageShifts() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ShiftForm>(EMPTY_FORM);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; bookingCount: number } | null>(null);
 
   /* ---------- Fetch ---------- */
 
@@ -218,21 +229,19 @@ export default function ManageShifts() {
 
   /* ---------- Delete ---------- */
 
-  async function handleDelete(id: string) {
-    // Check for active bookings first to warn the user
+  async function requestDelete(id: string) {
     const { count: bookingCount } = await supabase
       .from("shift_bookings")
       .select("*", { count: "exact", head: true })
       .eq("shift_id", id)
       .eq("booking_status", "confirmed");
+    setDeleteTarget({ id, bookingCount: bookingCount ?? 0 });
+  }
 
-    const warning = bookingCount && bookingCount > 0
-      ? `Delete this shift?\n\nThis will permanently remove the shift and CANCEL ${bookingCount} confirmed booking${bookingCount !== 1 ? "s" : ""}. This cannot be undone.`
-      : "Delete this shift? This cannot be undone.";
-
-    if (!confirm(warning)) return;
-
-    const { error } = await supabase.from("shifts").delete().eq("id", id);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from("shifts").delete().eq("id", deleteTarget.id);
+    setDeleteTarget(null);
     if (error) {
       toast({ variant: "destructive", title: "Error", description: error.message });
     } else {
@@ -314,7 +323,7 @@ export default function ManageShifts() {
                       variant="ghost"
                       size="icon"
                       className="text-red-600 hover:text-red-700"
-                      onClick={() => handleDelete(s.id)}
+                      onClick={() => requestDelete(s.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -468,6 +477,29 @@ export default function ManageShifts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ---- Delete confirmation ---- */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this shift?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && deleteTarget.bookingCount > 0
+                ? `This will permanently remove the shift and CANCEL ${deleteTarget.bookingCount} confirmed booking${deleteTarget.bookingCount !== 1 ? "s" : ""}. This cannot be undone.`
+                : "This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
