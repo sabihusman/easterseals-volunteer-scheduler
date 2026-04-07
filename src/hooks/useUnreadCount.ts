@@ -10,9 +10,10 @@ export function useUnreadCount() {
     if (!user) { setCount(0); return; }
 
     // Get all conversations the user is part of, with their last_read_at
+    // and cleared_at (local-delete cutoff).
     const { data: participations } = await (supabase as any)
       .from("conversation_participants")
-      .select("conversation_id, last_read_at")
+      .select("conversation_id, last_read_at, cleared_at")
       .eq("user_id", user.id)
       .eq("is_archived", false);
 
@@ -20,11 +21,18 @@ export function useUnreadCount() {
 
     let unread = 0;
     for (const p of participations) {
+      // Cutoff: the later of last_read_at and cleared_at. If the user
+      // locally deleted the conversation, we shouldn't count anything
+      // before the deletion moment.
+      const readAt = p.last_read_at ? new Date(p.last_read_at).getTime() : 0;
+      const clearedAt = p.cleared_at ? new Date(p.cleared_at).getTime() : 0;
+      const cutoff = new Date(Math.max(readAt, clearedAt)).toISOString();
+
       const { count: msgCount } = await (supabase as any)
         .from("messages")
         .select("*", { count: "exact", head: true })
         .eq("conversation_id", p.conversation_id)
-        .gt("created_at", p.last_read_at)
+        .gt("created_at", cutoff)
         .neq("sender_id", user.id);
 
       if (msgCount && msgCount > 0) unread++;

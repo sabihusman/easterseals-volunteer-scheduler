@@ -104,9 +104,29 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
     if (!user || !profile) return;
     if (hasSlots && selected.size === 0) return;
 
+    // Reject booking if shift has already ended
+    const shiftEndStr =
+      shift.end_time ||
+      (shift.time_type === "morning"
+        ? "12:00:00"
+        : shift.time_type === "afternoon"
+        ? "16:00:00"
+        : "17:00:00");
+    const shiftEnd = new Date(`${shift.shift_date}T${shiftEndStr}`);
+    const now = new Date();
+    if (shiftEnd <= now) {
+      toast({
+        title: "Shift has ended",
+        description: "This shift is no longer available to book.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      onOpenChange(false);
+      return;
+    }
+
     // Check booking window
     const shiftDate = new Date(shift.shift_date + "T00:00:00");
-    const now = new Date();
     const daysAhead = Math.ceil((shiftDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const maxDays = profile.extended_booking ? 21 : 14;
     if (daysAhead > maxDays) {
