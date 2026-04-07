@@ -45,47 +45,24 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
       const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && (role === "admin" || departmentIds.includes(b.shifts.department_id)));
       setBookings(filtered);
 
-      // Fetch aggregate ratings for shifts in these departments.
-      // Privacy rule: only show an aggregate when 2 or more volunteers
-      // have rated a shift, so individual ratings cannot be inferred.
+      // Fetch aggregate ratings via the SECURITY DEFINER function.
+      // The function only returns aggregates for shifts with 2+ ratings;
+      // individual star_rating and shift_feedback values are NOT readable
+      // by coordinators or admins (RLS blocks direct table access).
       const shiftIds = [...new Set(filtered.map((b) => b.shift_id))];
       if (shiftIds.length > 0) {
-        // Get all booking IDs across all shifts so we can map ratings back
-        const { data: allBookings } = await supabase
-          .from("shift_bookings")
-          .select("id, shift_id")
-          .in("shift_id", shiftIds);
-
-        const bookingToShift = new Map((allBookings || []).map((b) => [b.id, b.shift_id]));
-        const allBookingIds = (allBookings || []).map((b) => b.id);
-
-        if (allBookingIds.length > 0) {
-          const { data: reports } = await supabase
-            .from("volunteer_shift_reports")
-            .select("booking_id, star_rating")
-            .not("star_rating", "is", null)
-            .in("booking_id", allBookingIds);
-
-          const ratingsByShift: Record<string, number[]> = {};
-          for (const r of reports || []) {
-            const sid = bookingToShift.get(r.booking_id);
-            if (sid) {
-              if (!ratingsByShift[sid]) ratingsByShift[sid] = [];
-              ratingsByShift[sid].push(r.star_rating!);
-            }
-          }
-          const avgMap: Record<string, { avg: number; count: number }> = {};
-          for (const [sid, ratings] of Object.entries(ratingsByShift)) {
-            // Enforce 2+ volunteer minimum to protect individual privacy
-            if (ratings.length >= 2) {
-              avgMap[sid] = {
-                avg: +(ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
-                count: ratings.length,
-              };
-            }
-          }
-          setShiftRatings(avgMap);
+        const { data: aggregates } = await (supabase as any).rpc(
+          "get_shift_rating_aggregates",
+          { shift_uuids: shiftIds }
+        );
+        const avgMap: Record<string, { avg: number; count: number }> = {};
+        for (const row of aggregates || []) {
+          avgMap[row.shift_id] = {
+            avg: Number(row.avg_rating),
+            count: row.rating_count,
+          };
         }
+        setShiftRatings(avgMap);
       }
 
       setLoading(false);
