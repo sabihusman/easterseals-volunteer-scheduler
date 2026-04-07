@@ -45,29 +45,47 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
       const filtered = ((data || []) as BookingEntry[]).filter((b) => b.shifts && (role === "admin" || departmentIds.includes(b.shifts.department_id)));
       setBookings(filtered);
 
-      // Fetch aggregate ratings for shifts in these departments
+      // Fetch aggregate ratings for shifts in these departments.
+      // Privacy rule: only show an aggregate when 2 or more volunteers
+      // have rated a shift, so individual ratings cannot be inferred.
       const shiftIds = [...new Set(filtered.map((b) => b.shift_id))];
       if (shiftIds.length > 0) {
-        const { data: reports } = await supabase
-          .from("volunteer_shift_reports")
-          .select("booking_id, star_rating")
-          .not("star_rating", "is", null);
-        
-        // Map booking_id to shift_id
-        const bookingToShift = new Map(filtered.map((b) => [b.id, b.shift_id]));
-        const ratingsByShift: Record<string, number[]> = {};
-        for (const r of reports || []) {
-          const sid = bookingToShift.get(r.booking_id);
-          if (sid) {
-            if (!ratingsByShift[sid]) ratingsByShift[sid] = [];
-            ratingsByShift[sid].push(r.star_rating!);
+        // Get all booking IDs across all shifts so we can map ratings back
+        const { data: allBookings } = await supabase
+          .from("shift_bookings")
+          .select("id, shift_id")
+          .in("shift_id", shiftIds);
+
+        const bookingToShift = new Map((allBookings || []).map((b) => [b.id, b.shift_id]));
+        const allBookingIds = (allBookings || []).map((b) => b.id);
+
+        if (allBookingIds.length > 0) {
+          const { data: reports } = await supabase
+            .from("volunteer_shift_reports")
+            .select("booking_id, star_rating")
+            .not("star_rating", "is", null)
+            .in("booking_id", allBookingIds);
+
+          const ratingsByShift: Record<string, number[]> = {};
+          for (const r of reports || []) {
+            const sid = bookingToShift.get(r.booking_id);
+            if (sid) {
+              if (!ratingsByShift[sid]) ratingsByShift[sid] = [];
+              ratingsByShift[sid].push(r.star_rating!);
+            }
           }
+          const avgMap: Record<string, { avg: number; count: number }> = {};
+          for (const [sid, ratings] of Object.entries(ratingsByShift)) {
+            // Enforce 2+ volunteer minimum to protect individual privacy
+            if (ratings.length >= 2) {
+              avgMap[sid] = {
+                avg: +(ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
+                count: ratings.length,
+              };
+            }
+          }
+          setShiftRatings(avgMap);
         }
-        const avgMap: Record<string, { avg: number; count: number }> = {};
-        for (const [sid, ratings] of Object.entries(ratingsByShift)) {
-          avgMap[sid] = { avg: +(ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1), count: ratings.length };
-        }
-        setShiftRatings(avgMap);
       }
 
       setLoading(false);
@@ -103,7 +121,10 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
               <span>{b.shifts?.title}</span>
               <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{b.shifts?.shift_date ? format(new Date(b.shifts.shift_date), "MMM d, yyyy") : ""}</span>
               {rating && (
-                <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-warning text-warning" />★ {rating.avg} avg ({rating.count} rating{rating.count !== 1 ? "s" : ""})</span>
+                <span className="flex items-center gap-1" title="Aggregate rating shown only when 2+ volunteers have rated to protect individual privacy">
+                  <Star className="h-3 w-3 fill-warning text-warning" />
+                  ★ {rating.avg} avg ({rating.count} rating{rating.count !== 1 ? "s" : ""})
+                </span>
               )}
             </div>
           </div>
