@@ -154,18 +154,39 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       return;
     }
 
+    // Fresh capacity check: the cached shift.booked_slots is stale if
+    // another volunteer booked between fetch and click. Confirm with the
+    // DB directly. If full, ask the user if they want to join the waitlist.
+    const { count: freshConfirmed } = await supabase
+      .from("shift_bookings")
+      .select("*", { count: "exact", head: true })
+      .eq("shift_id", shift.id)
+      .eq("booking_status", "confirmed");
+    const currentlyFull = (freshConfirmed ?? 0) >= shift.total_slots;
+
+    if (currentlyFull) {
+      const ok = window.confirm(
+        "This shift is now full. Would you like to join the waitlist? You'll be notified if a spot opens up."
+      );
+      if (!ok) {
+        setSubmitting(false);
+        return;
+      }
+    }
+
     let bookingId: string;
-    const isFull = shift.booked_slots >= shift.total_slots;
+    const requestedStatus: "confirmed" | "waitlisted" = currentlyFull ? "waitlisted" : "confirmed";
 
     if (existing && existing.booking_status === "cancelled") {
       // Delete old slot selections first
       await supabase.from("shift_booking_slots").delete().eq("booking_id", existing.id);
 
-      // Re-activate cancelled booking
+      // Re-activate cancelled booking. DB trigger will demote to waitlist
+      // if the shift fills between our check and the write.
       const { error } = await supabase
         .from("shift_bookings")
         .update({
-          booking_status: isFull ? "waitlisted" : "confirmed",
+          booking_status: requestedStatus,
           confirmation_status: "pending_confirmation" as const,
           cancelled_at: null,
         })
@@ -178,13 +199,13 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       }
       bookingId = existing.id;
     } else {
-      // Insert new booking
+      // Insert new booking. DB trigger enforces capacity atomically.
       const { data: booking, error } = await supabase
         .from("shift_bookings")
         .insert({
           shift_id: shift.id,
           volunteer_id: user.id,
-          booking_status: isFull ? "waitlisted" : "confirmed",
+          booking_status: requestedStatus,
         })
         .select("id")
         .single();
@@ -196,6 +217,16 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       }
       bookingId = booking.id;
     }
+
+    // Read back the actual stored status — the BEFORE INSERT trigger may
+    // have demoted us to waitlisted if the shift filled during the race.
+    const { data: finalBooking } = await supabase
+      .from("shift_bookings")
+      .select("booking_status")
+      .eq("id", bookingId)
+      .maybeSingle();
+    const actualStatus = finalBooking?.booking_status ?? requestedStatus;
+    const endedUpWaitlisted = actualStatus === "waitlisted";
 
     // Insert slot selections if slots exist
     if (hasSlots && selected.size > 0) {
@@ -212,7 +243,12 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       }
     }
 
-    toast({ title: isFull ? "Added to waitlist" : "Shift booked!", description: hasSlots ? `${totalHours} hours selected` : "Booking confirmed" });
+    toast({
+      title: endedUpWaitlisted ? "Added to waitlist" : "Shift booked!",
+      description: endedUpWaitlisted
+        ? "The shift was full. You'll be notified if a spot opens up."
+        : (hasSlots ? `${totalHours} hours selected` : "Booking confirmed"),
+    });
 
     // Fire and forget booking confirmation email
     if (profile?.email) {
