@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Calendar, Users, Download, Trash2, XCircle, Search } from "lucide-react";
 import { format } from "date-fns";
-import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
+import { downloadCSV, timeLabel, parseShiftDate } from "@/lib/calendar-utils";
 import { DepartmentCoordinatorManager } from "@/components/DepartmentCoordinatorManager";
 import { VolunteerLeaderboard } from "@/components/VolunteerLeaderboard";
 import { useToast } from "@/hooks/use-toast";
@@ -57,21 +57,25 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [{ data: depts }, { data: shiftData }, { count: volCount }] = await Promise.all([
+      // Use a light id-only SELECT rather than a HEAD count — the HEAD
+      // count path through PostgREST is disproportionately expensive when
+      // the table has multi-policy RLS (especially profiles) and has been
+      // returning 503s from the pooler in production.
+      const [{ data: depts }, { data: shiftData }, { data: vols }] = await Promise.all([
         supabase.from("departments").select("id, name").eq("is_active", true),
         supabase
           .from("shifts")
           .select("*, departments(name), profiles!shifts_created_by_fkey(full_name)")
           .order("shift_date", { ascending: true })
           .limit(1000),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "volunteer"),
+        supabase.from("profiles").select("id").eq("role", "volunteer"),
       ]);
       setDepartments(depts || []);
       setShifts(shiftData || []);
       setStats({
         totalShifts: (shiftData || []).length,
         totalBookings: (shiftData || []).reduce((sum: number, s: any) => sum + s.booked_slots, 0),
-        totalVolunteers: volCount || 0,
+        totalVolunteers: (vols || []).length,
       });
       setLoading(false);
     };
@@ -128,7 +132,7 @@ export default function AdminDashboard() {
         user_id: b.volunteer_id,
         type: "shift_cancelled",
         title: `Shift Cancelled — ${shift.title}`,
-        message: `Your shift "${shift.title}" on ${format(new Date(shift.shift_date), "MMM d, yyyy")} at ${timeLabel(shift)} has been cancelled by the administrator.`,
+        message: `Your shift "${shift.title}" on ${format(parseShiftDate(shift.shift_date), "MMM d, yyyy")} at ${timeLabel(shift)} has been cancelled by the administrator.`,
         link: "/dashboard",
       }));
       await supabase.from("notifications").insert(notifications);
@@ -264,7 +268,7 @@ export default function AdminDashboard() {
                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {format(new Date(s.shift_date), "MMM d, yyyy")}
+                        {format(parseShiftDate(s.shift_date), "MMM d, yyyy")}
                       </span>
                       <span>{timeLabel(s)}</span>
                       <span className="flex items-center gap-1">
@@ -320,7 +324,7 @@ export default function AdminDashboard() {
             <AlertDialogTitle>Cancel this shift?</AlertDialogTitle>
             <AlertDialogDescription>
               Cancelling <strong>{cancelPrompt?.title}</strong> on{" "}
-              {cancelPrompt && format(new Date(cancelPrompt.shift_date), "MMM d, yyyy")} will notify all{" "}
+              {cancelPrompt && format(parseShiftDate(cancelPrompt.shift_date), "MMM d, yyyy")} will notify all{" "}
               {cancelPrompt?.booked_slots || 0} booked volunteer{cancelPrompt?.booked_slots !== 1 ? "s" : ""} that the shift has been cancelled. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

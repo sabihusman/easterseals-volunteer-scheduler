@@ -68,7 +68,7 @@ export default function AdminReminders() {
                         Sent to: {r.profiles?.full_name} • {format(new Date(r.sent_at), "MMM d, yyyy h:mm a")}
                       </div>
                       {r.shift_bookings?.shifts?.shift_date && (
-                        <div className="text-xs text-muted-foreground">Shift date: {format(new Date(r.shift_bookings.shifts.shift_date), "MMM d, yyyy")}</div>
+                        <div className="text-xs text-muted-foreground">Shift date: {format(new Date(r.shift_bookings.shifts.shift_date + "T00:00:00"), "MMM d, yyyy")}</div>
                       )}
                     </div>
                     <div className="flex items-center gap-2">

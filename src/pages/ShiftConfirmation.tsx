@@ -128,7 +128,7 @@ export default function ShiftConfirmation() {
           user_id: c.coordinator_id,
           type: "booking_changed",
           title: "Volunteer Self-Reported No-Show",
-          message: `${volName} has self-reported as a no-show for ${booking.shifts.title} on ${format(new Date(booking.shifts.shift_date), "MMM d, yyyy")}`,
+          message: `${volName} has self-reported as a no-show for ${booking.shifts.title} on ${format(new Date(booking.shifts.shift_date + "T00:00:00"), "MMM d, yyyy")}`,
         });
       }
 
@@ -219,7 +219,7 @@ export default function ShiftConfirmation() {
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{shift?.shift_date ? format(new Date(shift.shift_date), "MMMM d, yyyy") : ""}</span>
+            <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{shift?.shift_date ? format(new Date(shift.shift_date + "T00:00:00"), "MMMM d, yyyy") : ""}</span>
             <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{shift ? timeLabel(shift) : ""}</span>
             <span className="flex items-center gap-1"><Building2 className="h-4 w-4" />{shift?.departments?.name}</span>
           </div>
