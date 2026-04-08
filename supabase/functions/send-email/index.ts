@@ -28,7 +28,7 @@ ${bodyContent}
 <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
 <p style="margin:0;font-size:12px;color:#6b7280;text-align:center;">
 ${APP_NAME} · Easterseals Iowa<br>
-<a href="${APP_URL}" data-resend-track="false" style="color:${BRAND_COLOR};">Open App</a>
+<a href="${APP_URL}" style="color:${BRAND_COLOR};">Open App</a>
 </p>
 </td></tr>
 </table>
@@ -38,13 +38,10 @@ ${APP_NAME} · Easterseals Iowa<br>
 }
 
 function button(text: string, href: string): string {
-  // Include the raw URL as plain text fallback BELOW the button. If Resend's
-  // click-tracking wrapper (us-east-1.resend-clicks.com) is unreachable
-  // (we've seen ERR_QUIC_PROTOCOL_ERROR), users can copy the raw URL and
-  // paste it into their browser to bypass the wrapper entirely.
-  // Free-tier Resend accounts cannot disable click tracking.
+  // Include the raw URL as plain text fallback below the button so users
+  // can always copy/paste if their email client mangles the link.
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td>
-<a href="${href}" data-resend-track="false" style="display:inline-block;padding:12px 28px;background:${BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">${text}</a>
+<a href="${href}" style="display:inline-block;padding:12px 28px;background:${BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">${text}</a>
 </td></tr></table>
 <p style="margin:-8px 0 24px;font-size:12px;line-height:1.5;color:#6b7280;">If the button above doesn't open, copy and paste this link into your browser:<br><span style="word-break:break-all;color:#374151;font-family:monospace;">${href}</span></p>`;
 }
@@ -286,9 +283,25 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ============================================================
+    // Provider selection (feature flag)
+    //   EMAIL_PROVIDER=mailersend (default) -> MailerSend (no click wrapping)
+    //   EMAIL_PROVIDER=resend                -> Resend (legacy, has click wrapping)
+    // ============================================================
+    const EMAIL_PROVIDER = (Deno.env.get("EMAIL_PROVIDER") || "mailersend").toLowerCase();
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    if (!RESEND_API_KEY) {
+    const MAILERSEND_API_KEY = Deno.env.get("MAILERSEND_API_KEY");
+    const MAILERSEND_FROM_EMAIL =
+      Deno.env.get("MAILERSEND_FROM_EMAIL") || "noreply@test-pzkmgq70q2vl059v.mlsender.net";
+
+    if (EMAIL_PROVIDER === "resend" && !RESEND_API_KEY) {
       return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (EMAIL_PROVIDER === "mailersend" && !MAILERSEND_API_KEY) {
+      return new Response(JSON.stringify({ error: "MAILERSEND_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -323,41 +336,85 @@ Deno.serve(async (req) => {
       console.log(`Sandbox mode: redirecting email for ${to} to ${SANDBOX_EMAIL}`);
     }
 
-    // NOTE: Resend wraps every email link with us-east-1.resend-clicks.com
-    // for click tracking. That wrapper occasionally fails with
-    // ERR_QUIC_PROTOCOL_ERROR and the volunteer sees a "This site can't be
-    // reached" page. Add data-resend-track="false" on anchors to opt out at
-    // the link level, and request the account-level tracking be disabled in
-    // the Resend dashboard (Settings \u2192 Tracking).
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: `${APP_NAME} <onboarding@resend.dev>`,
-        to: [actualTo],
-        subject: actualSubject,
-        html,
-        // Best-effort: newer Resend API versions accept these; older ones ignore
-        tags: [{ name: "click_tracking", value: "off" }],
-      }),
-    });
+    let providerResponseId: string | undefined;
+    let providerError: unknown = null;
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      // Log error but return 200 so callers never break
-      console.error("Resend API error:", data);
-      return new Response(JSON.stringify({ success: false, warning: "Email sending failed silently" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (EMAIL_PROVIDER === "mailersend") {
+      // MailerSend API: https://developers.mailersend.com/api/v1/email.html
+      // Free tier does NOT wrap links with a tracking proxy.
+      const msRes = await fetch("https://api.mailersend.com/v1/email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          Authorization: `Bearer ${MAILERSEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: { email: MAILERSEND_FROM_EMAIL, name: APP_NAME },
+          to: [{ email: actualTo }],
+          subject: actualSubject,
+          html,
+          // Disable both tracking modes explicitly so they can never bite us
+          // even if MailerSend defaults change.
+          settings: {
+            track_clicks: false,
+            track_opens: false,
+            track_content: false,
+          },
+        }),
       });
+      // MailerSend returns 202 Accepted with empty body on success.
+      // Message ID is in the X-Message-Id response header.
+      if (!msRes.ok) {
+        let errBody: unknown = null;
+        try { errBody = await msRes.json(); } catch { errBody = await msRes.text(); }
+        providerError = { status: msRes.status, body: errBody };
+        console.error("MailerSend API error:", providerError);
+      } else {
+        providerResponseId = msRes.headers.get("X-Message-Id") || undefined;
+      }
+    } else {
+      // ===== Resend (legacy path) =====
+      // NOTE: Resend wraps every email link with us-east-1.resend-clicks.com
+      // for click tracking. Free-tier accounts cannot disable it.
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: `${APP_NAME} <onboarding@resend.dev>`,
+          to: [actualTo],
+          subject: actualSubject,
+          html,
+          tags: [{ name: "click_tracking", value: "off" }],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        providerError = data;
+        console.error("Resend API error:", data);
+      } else {
+        providerResponseId = data?.id;
+      }
     }
 
-    return new Response(JSON.stringify({ success: true, id: data.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    if (providerError) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          warning: "Email sending failed silently",
+          provider: EMAIL_PROVIDER,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, id: providerResponseId, provider: EMAIL_PROVIDER }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   } catch (e) {
     // Log error but return 200 so callers never break
     console.error("send-email error:", e);
