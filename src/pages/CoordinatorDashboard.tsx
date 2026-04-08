@@ -224,7 +224,7 @@ export default function CoordinatorDashboard() {
                 <div className="space-y-1">
                   {lowCoverage.slice(0, 5).map((s) => (
                     <div key={s.id} className="text-sm text-muted-foreground">
-                      {s.title} on {format(new Date(s.shift_date), "MMM d")} — {s.booked_slots}/{s.total_slots} filled
+                      {s.title} on {format(new Date(s.shift_date + "T00:00:00"), "MMM d")} — {s.booked_slots}/{s.total_slots} filled
                     </div>
                   ))}
                 </div>
@@ -282,7 +282,7 @@ export default function CoordinatorDashboard() {
                         <Badge variant={s.status === "open" ? "default" : "secondary"}>{s.status}</Badge>
                       </div>
                       <div className="flex gap-3 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date), "MMM d, yyyy")}</span>
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
                         <span className="flex items-center gap-1"><Users className="h-3 w-3" />{s.booked_slots}/{s.total_slots}</span>
                       </div>

@@ -96,7 +96,7 @@ export function VolunteerActivityTab({ departmentIds }: Props) {
             <div className="text-sm font-medium">{b.profiles?.full_name}</div>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span>{b.shifts?.title}</span>
-              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{b.shifts?.shift_date ? format(new Date(b.shifts.shift_date), "MMM d, yyyy") : ""}</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{b.shifts?.shift_date ? format(new Date(b.shifts.shift_date + "T00:00:00"), "MMM d, yyyy") : ""}</span>
               {rating && (
                 <span className="flex items-center gap-1" title="Aggregate rating shown only when 2+ volunteers have rated to protect individual privacy">
                   <Star className="h-3 w-3 fill-warning text-warning" />

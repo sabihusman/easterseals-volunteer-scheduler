@@ -83,6 +83,17 @@ export function googleCalendarUrl(shift: Parameters<typeof generateICS>[0]): str
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+/**
+ * Parse a YYYY-MM-DD string as LOCAL midnight instead of UTC.
+ * Using `new Date("2026-04-08")` parses as UTC midnight and then
+ * displays in local time — which in any timezone west of UTC shows
+ * the PREVIOUS calendar day. Appending T00:00:00 anchors to local.
+ */
+export function parseShiftDate(dateStr: string | null | undefined): Date {
+  if (!dateStr) return new Date(NaN);
+  return new Date(dateStr + "T00:00:00");
+}
+
 // CSV export utility
 export function downloadCSV(data: Record<string, unknown>[], filename: string) {
   if (data.length === 0) return;

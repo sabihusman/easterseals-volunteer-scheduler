@@ -175,7 +175,7 @@ export default function MyNotes() {
     ${filtered.map((n) => `
       <div class="note">
         <div class="note-header">${n.title || n.shifts?.title || "General Note"}</div>
-        <div class="note-info">${n.shifts?.shift_date ? format(new Date(n.shifts.shift_date), "MMM d, yyyy") : ""} — ${n.departments?.name || ""}</div>
+        <div class="note-info">${n.shifts?.shift_date ? format(new Date(n.shifts.shift_date + "T00:00:00"), "MMM d, yyyy") : ""} — ${n.departments?.name || ""}</div>
         <div class="note-content">${n.content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
       </div>
     `).join("")}
@@ -208,7 +208,7 @@ export default function MyNotes() {
                   <span className="flex items-center gap-1">📋 {n.shifts.title}</span>
                 )}
                 {n.shifts?.shift_date && (
-                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(n.shifts.shift_date), "MMM d, yyyy")}</span>
+                  <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(n.shifts.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
                 )}
                 <span>{format(new Date(n.created_at), "MMM d, yyyy")}</span>
               </div>
@@ -335,7 +335,7 @@ export default function MyNotes() {
                   <SelectContent>
                     {myBookings.map((b: any) => (
                       <SelectItem key={b.shifts.id} value={b.shifts.id}>
-                        {b.shifts.title} — {format(new Date(b.shifts.shift_date), "MMM d, yyyy")}
+                        {b.shifts.title} — {format(new Date(b.shifts.shift_date + "T00:00:00"), "MMM d, yyyy")}
                       </SelectItem>
                     ))}
                   </SelectContent>

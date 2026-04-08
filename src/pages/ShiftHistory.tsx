@@ -81,7 +81,7 @@ export default function ShiftHistory() {
   const hoursByMonth = useMemo(() => {
     const map: Record<string, number> = {};
     pastBookings.filter(b => b.confirmation_status === "confirmed").forEach((b) => {
-      const month = format(new Date(b.shifts.shift_date), "yyyy-MM");
+      const month = format(new Date(b.shifts.shift_date + "T00:00:00"), "yyyy-MM");
       // Prefer the official final_hours (matches dashboard, hours letter, points logic).
       // Fall back to slot-based hours, then to a coarse estimate by time_type.
       const hours = b.final_hours ?? (b._slotHours > 0 ? b._slotHours : (b.shifts.time_type === "all_day" ? 8 : 4));
@@ -247,7 +247,7 @@ export default function ShiftHistory() {
                     <div className="space-y-1">
                       <div className="font-medium">{s.title}</div>
                       <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date), "MMM d, yyyy")}</span>
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
                       </div>
                       <div className="flex gap-2">
@@ -327,7 +327,7 @@ export default function ShiftHistory() {
                     <div className="space-y-0.5">
                       <div className="font-medium text-sm">{inv.invite_name} ({inv.invite_email})</div>
                       <div className="text-xs text-muted-foreground">
-                        {inv.shifts?.title} — {inv.shifts?.shift_date ? format(new Date(inv.shifts.shift_date), "MMM d, yyyy") : ""}
+                        {inv.shifts?.title} — {inv.shifts?.shift_date ? format(new Date(inv.shifts.shift_date + "T00:00:00"), "MMM d, yyyy") : ""}
                       </div>
                     </div>
                     <Badge

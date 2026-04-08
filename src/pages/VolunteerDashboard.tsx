@@ -474,7 +474,7 @@ export default function VolunteerDashboard() {
                       <div className="space-y-1">
                         <div className="font-medium">{s.title}</div>
                         <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date), "MMM d, yyyy")}</span>
+                          <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
                           <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{s.departments?.name}</span>
                         </div>
