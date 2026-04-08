@@ -38,9 +38,15 @@ ${APP_NAME} · Easterseals Iowa<br>
 }
 
 function button(text: string, href: string): string {
+  // Include the raw URL as plain text fallback BELOW the button. If Resend's
+  // click-tracking wrapper (us-east-1.resend-clicks.com) is unreachable
+  // (we've seen ERR_QUIC_PROTOCOL_ERROR), users can copy the raw URL and
+  // paste it into their browser to bypass the wrapper entirely.
+  // Free-tier Resend accounts cannot disable click tracking.
   return `<table cellpadding="0" cellspacing="0" style="margin:24px 0;"><tr><td>
 <a href="${href}" data-resend-track="false" style="display:inline-block;padding:12px 28px;background:${BRAND_COLOR};color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">${text}</a>
-</td></tr></table>`;
+</td></tr></table>
+<p style="margin:-8px 0 24px;font-size:12px;line-height:1.5;color:#6b7280;">If the button above doesn't open, copy and paste this link into your browser:<br><span style="word-break:break-all;color:#374151;font-family:monospace;">${href}</span></p>`;
 }
 
 function p(text: string): string {
