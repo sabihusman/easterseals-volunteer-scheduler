@@ -22,6 +22,7 @@ export default function VolunteerDashboard() {
   const [loading, setLoading] = useState(true);
   const [pendingConfirmations, setPendingConfirmations] = useState<any[]>([]);
   const [waitlistOffers, setWaitlistOffers] = useState<any[]>([]);
+  const [waitlistPassive, setWaitlistPassive] = useState<any[]>([]);
 
   // Use LOCAL date, not UTC — otherwise in the evening Central time the UTC
   // rollover drops today's shifts from the filter and they disappear from the
@@ -30,7 +31,8 @@ export default function VolunteerDashboard() {
 
   const fetchBookings = useCallback(async () => {
     if (!user) return;
-    const [{ data }, { data: pendingData }, { data: offers }] = await Promise.all([
+    const nowIso = new Date().toISOString();
+    const [{ data }, { data: pendingData }, { data: offers }, { data: passive }] = await Promise.all([
       // Fetch all confirmed bookings (no date filter in SQL — PostgREST
       // embed filters with joined columns have been a source of bugs).
       // We filter to upcoming shifts client-side using the volunteer's
@@ -54,7 +56,14 @@ export default function VolunteerDashboard() {
         .eq("volunteer_id", user.id)
         .eq("booking_status", "waitlisted")
         .not("waitlist_offer_expires_at", "is", null)
-        .gt("waitlist_offer_expires_at", new Date().toISOString()),
+        .gt("waitlist_offer_expires_at", nowIso),
+      // Passive waitlist: on the list but no active offer yet
+      (supabase as any)
+        .from("shift_bookings")
+        .select("id, created_at, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name), total_slots, booked_slots)")
+        .eq("volunteer_id", user.id)
+        .eq("booking_status", "waitlisted")
+        .or(`waitlist_offer_expires_at.is.null,waitlist_offer_expires_at.lt.${nowIso}`),
     ]);
     // Keep only bookings whose shift is today/future AND not cancelled by admin
     const upcoming = ((data as any[]) || []).filter(
@@ -63,6 +72,11 @@ export default function VolunteerDashboard() {
     setUpcomingBookings(upcoming);
     setPendingConfirmations((pendingData as any) || []);
     setWaitlistOffers((offers as any[]) || []);
+    // Only show passive waitlist entries for shifts that are today or in the future
+    const passiveFuture = ((passive as any[]) || []).filter(
+      (b) => b.shifts && b.shifts.shift_date >= today
+    );
+    setWaitlistPassive(passiveFuture);
     setLoading(false);
   }, [user, today]);
 
@@ -88,6 +102,21 @@ export default function VolunteerDashboard() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       toast({ title: "Offer declined" });
+    }
+    fetchBookings();
+  };
+
+  const handleLeaveWaitlist = async (bookingId: string) => {
+    const ok = window.confirm("Leave the waitlist for this shift? You can rejoin later if spots are still open.");
+    if (!ok) return;
+    const { error } = await supabase
+      .from("shift_bookings")
+      .delete()
+      .eq("id", bookingId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Left the waitlist" });
     }
     fetchBookings();
   };
@@ -331,6 +360,39 @@ export default function VolunteerDashboard() {
           </Card>
         );
       })}
+
+      {waitlistPassive.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" /> Your Waitlist
+            </CardTitle>
+            <CardDescription className="text-xs">
+              You'll be notified if a spot opens up on any of these shifts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {waitlistPassive.map((w) => {
+              const s = w.shifts;
+              return (
+                <div key={w.id} className="flex items-center justify-between gap-3 py-2 px-3 rounded-md bg-muted/50">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{s?.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {s && format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}
+                      {s?.departments?.name ? ` · ${s.departments.name}` : ""}
+                      {s && ` · ${s.booked_slots}/${s.total_slots} filled`}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => handleLeaveWaitlist(w.id)}>
+                    Leave Waitlist
+                  </Button>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
