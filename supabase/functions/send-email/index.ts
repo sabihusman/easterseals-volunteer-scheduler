@@ -28,7 +28,7 @@ ${bodyContent}
 <tr><td style="padding:16px 32px;background:#f9fafb;border-top:1px solid #e5e7eb;">
 <p style="margin:0;font-size:12px;color:#6b7280;text-align:center;">
 ${APP_NAME} · Easterseals Iowa<br>
-<a href="${APP_URL}" style="color:${BRAND_COLOR};">Open App</a>
+<a href="${APP_URL}" data-resend-track="false" style="color:${BRAND_COLOR};">Open App</a>
 </p>
 </td></tr>
 </table>
@@ -317,6 +317,12 @@ Deno.serve(async (req) => {
       console.log(`Sandbox mode: redirecting email for ${to} to ${SANDBOX_EMAIL}`);
     }
 
+    // NOTE: Resend wraps every email link with us-east-1.resend-clicks.com
+    // for click tracking. That wrapper occasionally fails with
+    // ERR_QUIC_PROTOCOL_ERROR and the volunteer sees a "This site can't be
+    // reached" page. Add data-resend-track="false" on anchors to opt out at
+    // the link level, and request the account-level tracking be disabled in
+    // the Resend dashboard (Settings \u2192 Tracking).
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -328,6 +334,8 @@ Deno.serve(async (req) => {
         to: [actualTo],
         subject: actualSubject,
         html,
+        // Best-effort: newer Resend API versions accept these; older ones ignore
+        tags: [{ name: "click_tracking", value: "off" }],
       }),
     });
 
