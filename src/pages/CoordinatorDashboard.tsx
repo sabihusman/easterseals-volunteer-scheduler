@@ -62,7 +62,13 @@ export default function CoordinatorDashboard() {
         .neq("status", "cancelled")
         .order("shift_date", { ascending: true });
 
-      if (selectedDept !== "all") {
+      if (selectedDept === "all") {
+        // For coordinators, "all" means all of their assigned departments
+        // (not every department in the org). Admins see everything.
+        if (role !== "admin" && departments.length > 0) {
+          query = query.in("department_id", departments.map((d: any) => d.id));
+        }
+      } else {
         query = query.eq("department_id", selectedDept);
       }
 
@@ -82,7 +88,7 @@ export default function CoordinatorDashboard() {
       }
     };
     fetchShiftsAndBookings();
-  }, [selectedDept]);
+  }, [selectedDept, role, departments]);
 
   const handleConfirm = async (bookingId: string, status: "confirmed" | "no_show") => {
     const { error } = await supabase
@@ -141,8 +147,12 @@ export default function CoordinatorDashboard() {
           )}
           {role !== "admin" && departments.length > 0 && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
               <SelectContent>
+                {/* Offer an All option when coordinator manages more than one department */}
+                {departments.length > 1 && (
+                  <SelectItem value="all">All My Departments</SelectItem>
+                )}
                 {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
               </SelectContent>
             </Select>
