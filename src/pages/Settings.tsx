@@ -81,6 +81,11 @@ export default function Settings() {
   const [mfaCode, setMfaCode] = useState("");
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaDialogOpen, setMfaDialogOpen] = useState(false);
+  // Backup codes — shown ONCE after successful enrollment
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [backupCodesDialogOpen, setBackupCodesDialogOpen] = useState(false);
+  const [backupCodesAcknowledged, setBackupCodesAcknowledged] = useState(false);
+  const [unusedBackupCount, setUnusedBackupCount] = useState<number | null>(null);
 
   // Delete
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
@@ -164,6 +169,15 @@ export default function Settings() {
     checkMfa();
   }, []);
 
+  // When MFA is enrolled, fetch how many backup codes the user has left
+  useEffect(() => {
+    if (!mfaEnrolled) { setUnusedBackupCount(null); return; }
+    (async () => {
+      const { data, error } = await (supabase as any).rpc("mfa_unused_backup_code_count");
+      if (!error && typeof data === "number") setUnusedBackupCount(data);
+    })();
+  }, [mfaEnrolled]);
+
   const handleEnableMfa = async () => {
     setMfaLoading(true);
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
@@ -204,7 +218,55 @@ export default function Settings() {
     setMfaDialogOpen(false);
     setMfaQrCode(null);
     setMfaCode("");
+
+    // Generate backup recovery codes and show them ONCE.
+    // Without these, a user who loses their authenticator is locked out
+    // until an admin manually resets MFA.
+    const { data: codes, error: codesError } = await (supabase as any).rpc("mfa_generate_backup_codes");
+    if (codesError) {
+      toast({
+        title: "2FA enabled, but backup codes failed",
+        description: "Generate backup codes manually from this page or you may be locked out if you lose your device.",
+        variant: "destructive",
+      });
+    } else if (Array.isArray(codes)) {
+      setBackupCodes(codes);
+      setBackupCodesAcknowledged(false);
+      setBackupCodesDialogOpen(true);
+      setUnusedBackupCount(codes.length);
+    }
     toast({ title: "2FA enabled", description: "Two-factor authentication is now active on your account." });
+  };
+
+  const handleRegenerateBackupCodes = async () => {
+    setMfaLoading(true);
+    const { data: codes, error } = await (supabase as any).rpc("mfa_generate_backup_codes");
+    setMfaLoading(false);
+    if (error) {
+      toast({ title: "Could not generate codes", description: error.message, variant: "destructive" });
+      return;
+    }
+    if (Array.isArray(codes)) {
+      setBackupCodes(codes);
+      setBackupCodesAcknowledged(false);
+      setBackupCodesDialogOpen(true);
+      setUnusedBackupCount(codes.length);
+      toast({ title: "New backup codes generated", description: "Previous codes are now invalid." });
+    }
+  };
+
+  const handleCopyBackupCodes = async () => {
+    if (!backupCodes) return;
+    try {
+      await navigator.clipboard.writeText(backupCodes.join("\n"));
+      toast({ title: "Copied", description: "Backup codes copied to clipboard." });
+    } catch {
+      toast({
+        title: "Copy failed",
+        description: "Select the codes manually and copy them.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRemoveMfa = async () => {
@@ -547,14 +609,31 @@ export default function Settings() {
         </CardHeader>
         <CardContent className="space-y-4">
           {mfaEnrolled ? (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge className="bg-primary/10 text-primary hover:bg-primary/10">Active</Badge>
-                <p className="text-sm text-muted-foreground">2FA is enabled on your account</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary/10 text-primary hover:bg-primary/10">Active</Badge>
+                  <p className="text-sm text-muted-foreground">2FA is enabled on your account</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleRemoveMfa} disabled={mfaLoading}>
+                  {mfaLoading ? "Removing..." : "Remove 2FA"}
+                </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={handleRemoveMfa} disabled={mfaLoading}>
-                {mfaLoading ? "Removing..." : "Remove 2FA"}
-              </Button>
+              <div className="flex items-center justify-between rounded-md border border-dashed p-3">
+                <div>
+                  <p className="text-sm font-medium">Backup recovery codes</p>
+                  <p className="text-xs text-muted-foreground">
+                    {unusedBackupCount === null
+                      ? "Loading…"
+                      : unusedBackupCount === 0
+                        ? "No codes remaining. Generate new ones to avoid getting locked out."
+                        : `${unusedBackupCount} of 10 codes remaining`}
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleRegenerateBackupCodes} disabled={mfaLoading}>
+                  {mfaLoading ? "Generating…" : "Generate new codes"}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-between">
@@ -596,6 +675,66 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Backup codes display dialog \u2014 shown ONCE after enrollment or regeneration */}
+      <Dialog
+        open={backupCodesDialogOpen}
+        onOpenChange={(open) => {
+          // Block closing until the user confirms they've saved the codes
+          if (!open && !backupCodesAcknowledged) return;
+          setBackupCodesDialogOpen(open);
+          if (!open) setBackupCodes(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save Your Backup Recovery Codes</DialogTitle>
+            <DialogDescription>
+              Store these codes somewhere safe. Each code can be used once if you
+              lose access to your authenticator app. You will not see them again.
+            </DialogDescription>
+          </DialogHeader>
+          {backupCodes && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-4 font-mono text-sm">
+                {backupCodes.map((code) => (
+                  <div key={code} className="text-center select-all">{code}</div>
+                ))}
+              </div>
+              <div className="rounded-md border border-amber-500/40 bg-amber-50 p-3 text-xs text-amber-900">
+                <strong>Important:</strong> If you lose your authenticator <em>and</em> these codes,
+                you will need an admin to reset your 2FA. Save them now in a password manager,
+                print them, or store them in a secure location.
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="backup-ack"
+                  checked={backupCodesAcknowledged}
+                  onCheckedChange={(c) => setBackupCodesAcknowledged(c === true)}
+                />
+                <Label htmlFor="backup-ack" className="text-sm font-normal cursor-pointer">
+                  I have saved these codes in a safe place
+                </Label>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={handleCopyBackupCodes}>
+                  Copy to clipboard
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={!backupCodesAcknowledged}
+                  onClick={() => {
+                    setBackupCodesDialogOpen(false);
+                    setBackupCodes(null);
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── Notifications ── */}
       <Card>

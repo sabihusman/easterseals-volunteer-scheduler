@@ -11,8 +11,36 @@ export default function MfaVerify() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [factorId, setFactorId] = useState<string | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const handleRecoverWithBackupCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (recoveryCode.length < 8) return;
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("mfa-recovery", {
+      body: { code: recoveryCode },
+    });
+    setLoading(false);
+    if (error || !data?.success) {
+      toast({
+        title: "Invalid recovery code",
+        description: "Check the code and try again, or contact your admin.",
+        variant: "destructive",
+      });
+      setRecoveryCode("");
+      return;
+    }
+    toast({
+      title: "Recovery successful",
+      description: "Your authenticator has been removed. Sign in again and re-enroll 2FA.",
+    });
+    // Sign out so the user lands on /auth without an active MFA challenge
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
 
   useEffect(() => {
     const checkAssuranceLevel = async () => {
@@ -86,38 +114,65 @@ export default function MfaVerify() {
           <CardDescription>Enter the 6-digit code from your authenticator app</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleVerify} className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                placeholder="000000"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                className="text-center text-2xl tracking-widest"
-                autoFocus
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
-              {loading ? "Verifying..." : "Verify"}
-            </Button>
-            <div className="text-center">
-              <button
-                type="button"
-                className="text-sm text-primary hover:underline"
-                onClick={() =>
-                  toast({
-                    title: "Recovery codes",
-                    description: "Contact your admin to reset MFA.",
-                  })
-                }
-              >
-                Use recovery code
-              </button>
-            </div>
-          </form>
+          {recoveryMode ? (
+            <form onSubmit={handleRecoverWithBackupCode} className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  placeholder="XXXX-XXXX"
+                  value={recoveryCode}
+                  onChange={(e) => setRecoveryCode(e.target.value.toUpperCase().slice(0, 9))}
+                  className="text-center text-xl tracking-widest font-mono"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Enter one of the backup codes you saved when you enabled 2FA.
+                  Using a backup code will remove your current authenticator so
+                  you can sign in fresh.
+                </p>
+              </div>
+              <Button type="submit" className="w-full" disabled={loading || recoveryCode.length < 8}>
+                {loading ? "Verifying..." : "Use Recovery Code"}
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-primary hover:underline"
+                  onClick={() => { setRecoveryMode(false); setRecoveryCode(""); }}
+                >
+                  Back to authenticator code
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="text-center text-2xl tracking-widest"
+                  autoFocus
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading || code.length !== 6}>
+                {loading ? "Verifying..." : "Verify"}
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-primary hover:underline"
+                  onClick={() => setRecoveryMode(true)}
+                >
+                  Use a backup recovery code
+                </button>
+              </div>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
