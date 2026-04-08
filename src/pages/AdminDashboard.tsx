@@ -141,12 +141,36 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteShift = async (shift: any) => {
+    // Notify affected volunteers BEFORE the delete cascade wipes their bookings.
+    // notifications.user_id is not FK-linked to shift_bookings, so these survive.
+    const { data: affected } = await supabase
+      .from("shift_bookings")
+      .select("volunteer_id")
+      .eq("shift_id", shift.id)
+      .eq("booking_status", "confirmed");
+
+    if (affected && affected.length > 0) {
+      const shiftDateFormatted = format(new Date(shift.shift_date + "T00:00:00"), "MMM d, yyyy");
+      const notifRows = affected.map((b: any) => ({
+        user_id: b.volunteer_id,
+        type: "shift_cancelled",
+        title: `Shift Removed — ${shift.title}`,
+        message: `Your booking for "${shift.title}" on ${shiftDateFormatted} has been removed by an administrator.`,
+        link: "/dashboard",
+      }));
+      // Don't block delete on notification failure
+      await supabase.from("notifications").insert(notifRows);
+    }
+
     const { error } = await supabase.from("shifts").delete().eq("id", shift.id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setShifts((prev) => prev.filter((s) => s.id !== shift.id));
-      toast({ title: "Shift permanently deleted." });
+      const suffix = affected && affected.length > 0
+        ? ` ${affected.length} volunteer${affected.length !== 1 ? "s have" : " has"} been notified.`
+        : "";
+      toast({ title: `Shift permanently deleted.${suffix}` });
     }
     setDeletePrompt(null);
   };

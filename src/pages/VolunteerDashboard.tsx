@@ -48,9 +48,9 @@ export default function VolunteerDashboard() {
           .eq("self_confirm_status", "pending")
           .is("submitted_at", null),
       ]);
-      // Keep only bookings whose shift is today or in the future (local date)
+      // Keep only bookings whose shift is today/future AND not cancelled by admin
       const upcoming = ((data as any[]) || []).filter(
-        (b) => b.shifts && b.shifts.shift_date >= today
+        (b) => b.shifts && b.shifts.shift_date >= today && b.shifts.status !== "cancelled"
       );
       setUpcomingBookings(upcoming);
       setPendingConfirmations((pendingData as any) || []);
@@ -68,10 +68,39 @@ export default function VolunteerDashboard() {
     const isLateCancel = hoursUntilShift < 48;
     const isVeryLateCancel = hoursUntilShift <= 12;
 
+    // Verify the booking still exists before trying to cancel — if admin
+    // hard-deleted the shift, the booking was cascaded away and any update
+    // would silently match 0 rows.
+    const { data: existing, error: checkError } = await supabase
+      .from("shift_bookings")
+      .select("id, booking_status")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (checkError || !existing) {
+      toast({
+        title: "Shift no longer exists",
+        description: "This shift was removed by an administrator. Refreshing your list.",
+        variant: "destructive",
+      });
+      // Drop the stale row from state so the UI matches reality
+      setUpcomingBookings((prev) => prev.filter((b) => b.id !== bookingId));
+      return;
+    }
+
+    if (existing.booking_status !== "confirmed") {
+      toast({
+        title: "Already cancelled",
+        description: "This booking is no longer active.",
+      });
+      setUpcomingBookings((prev) => prev.filter((b) => b.id !== bookingId));
+      return;
+    }
+
     const { error } = await supabase
       .from("shift_bookings")
-      .update({ 
-        booking_status: "cancelled", 
+      .update({
+        booking_status: "cancelled",
         cancelled_at: new Date().toISOString(),
         ...(isVeryLateCancel ? { late_cancel_notified: true } : {}),
       })

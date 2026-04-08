@@ -109,10 +109,11 @@ export default function Reports() {
       const { data: depts } = await deptQuery;
       setDepartments(depts || []);
 
-      // Shifts in range
+      // Shifts in range — exclude admin-cancelled shifts from all reports
       let shiftQuery = supabase
         .from("shifts")
         .select("id, title, shift_date, department_id, total_slots, departments(name)")
+        .neq("status", "cancelled")
         .gte("shift_date", dateFrom)
         .lte("shift_date", dateTo)
         .order("shift_date", { ascending: false });

@@ -57,6 +57,9 @@ export default function CoordinatorDashboard() {
       let query = supabase
         .from("shifts")
         .select("*")
+        // Exclude admin-cancelled shifts — they are considered deleted
+        // from everyone's view except the admin panel itself.
+        .neq("status", "cancelled")
         .order("shift_date", { ascending: true });
 
       if (selectedDept !== "all") {
