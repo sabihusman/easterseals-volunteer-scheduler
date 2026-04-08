@@ -31,53 +31,67 @@ export default function VolunteerDashboard() {
 
   const fetchBookings = useCallback(async () => {
     if (!user) return;
-    const nowIso = new Date().toISOString();
-    const [{ data }, { data: pendingData }, { data: offers }, { data: passive }] = await Promise.all([
-      // Fetch all confirmed bookings (no date filter in SQL — PostgREST
-      // embed filters with joined columns have been a source of bugs).
-      // We filter to upcoming shifts client-side using the volunteer's
-      // local date so today's shifts always show up.
-      supabase
-        .from("shift_bookings")
-        .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
-        .eq("volunteer_id", user.id)
-        .eq("booking_status", "confirmed")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("volunteer_shift_reports")
-        .select("id, booking_id, self_confirm_status, shift_bookings(id, shifts(title, shift_date, departments(name)))")
-        .eq("volunteer_id", user.id)
-        .eq("self_confirm_status", "pending")
-        .is("submitted_at", null),
-      // Active waitlist offers for this volunteer
-      (supabase as any)
-        .from("shift_bookings")
-        .select("id, waitlist_offer_expires_at, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
-        .eq("volunteer_id", user.id)
-        .eq("booking_status", "waitlisted")
-        .not("waitlist_offer_expires_at", "is", null)
-        .gt("waitlist_offer_expires_at", nowIso),
-      // Passive waitlist: on the list but no active offer yet
-      (supabase as any)
-        .from("shift_bookings")
-        .select("id, created_at, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name), total_slots, booked_slots)")
-        .eq("volunteer_id", user.id)
-        .eq("booking_status", "waitlisted")
-        .or(`waitlist_offer_expires_at.is.null,waitlist_offer_expires_at.lt.${nowIso}`),
-    ]);
-    // Keep only bookings whose shift is today/future AND not cancelled by admin
-    const upcoming = ((data as any[]) || []).filter(
-      (b) => b.shifts && b.shifts.shift_date >= today && b.shifts.status !== "cancelled"
-    );
-    setUpcomingBookings(upcoming);
-    setPendingConfirmations((pendingData as any) || []);
-    setWaitlistOffers((offers as any[]) || []);
-    // Only show passive waitlist entries for shifts that are today or in the future
-    const passiveFuture = ((passive as any[]) || []).filter(
-      (b) => b.shifts && b.shifts.shift_date >= today
-    );
-    setWaitlistPassive(passiveFuture);
-    setLoading(false);
+    try {
+      // Fetch CONFIRMED and WAITLISTED bookings in a single query; we split
+      // them client-side. Avoiding PostgREST .or() with ISO timestamps
+      // because it silently fails on some special-character combinations.
+      const [{ data, error: bookingsErr }, { data: pendingData }] = await Promise.all([
+        supabase
+          .from("shift_bookings")
+          .select("id, booking_status, confirmation_status, checked_in_at, waitlist_offer_expires_at, created_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+          .eq("volunteer_id", user.id)
+          .in("booking_status", ["confirmed", "waitlisted"])
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("volunteer_shift_reports")
+          .select("id, booking_id, self_confirm_status, shift_bookings(id, shifts(title, shift_date, departments(name)))")
+          .eq("volunteer_id", user.id)
+          .eq("self_confirm_status", "pending")
+          .is("submitted_at", null),
+      ]);
+      if (bookingsErr) {
+        console.error("fetchBookings error:", bookingsErr);
+      }
+
+      const all = (data as any[]) || [];
+      const nowMs = Date.now();
+
+      // Upcoming (confirmed) shifts: today or future, not admin-cancelled
+      const upcoming = all.filter(
+        (b) =>
+          b.booking_status === "confirmed" &&
+          b.shifts &&
+          b.shifts.shift_date >= today &&
+          b.shifts.status !== "cancelled"
+      );
+
+      // Active waitlist offers
+      const offers = all.filter(
+        (b) =>
+          b.booking_status === "waitlisted" &&
+          b.waitlist_offer_expires_at &&
+          new Date(b.waitlist_offer_expires_at).getTime() > nowMs
+      );
+
+      // Passive waitlist (no active offer) for future shifts
+      const passive = all.filter(
+        (b) =>
+          b.booking_status === "waitlisted" &&
+          (!b.waitlist_offer_expires_at ||
+            new Date(b.waitlist_offer_expires_at).getTime() <= nowMs) &&
+          b.shifts &&
+          b.shifts.shift_date >= today
+      );
+
+      setUpcomingBookings(upcoming);
+      setWaitlistOffers(offers);
+      setWaitlistPassive(passive);
+      setPendingConfirmations((pendingData as any) || []);
+    } catch (e) {
+      console.error("fetchBookings fatal error:", e);
+    } finally {
+      setLoading(false);
+    }
   }, [user, today]);
 
   useEffect(() => {
