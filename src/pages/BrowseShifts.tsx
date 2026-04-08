@@ -410,8 +410,14 @@ export default function BrowseShifts() {
         </div>
       )}
 
+      {/*
+        Keyed by shift id so that clicking Book Shift on a different shift
+        forces a clean remount instead of reusing a stale internal state
+        that could have its open-transition in-flight.
+      */}
       {slotDialogShift && (
         <SlotSelectionDialog
+          key={slotDialogShift.id}
           open={!!slotDialogShift}
           onOpenChange={(open) => { if (!open) setSlotDialogShift(null); }}
           shift={slotDialogShift}

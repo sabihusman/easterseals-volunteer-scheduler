@@ -315,7 +315,14 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                   className={`flex items-center gap-3 p-3 rounded-md border mb-2 cursor-pointer transition-colors ${allSelected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
                   onClick={toggleAll}
                 >
-                  <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+                  {/*
+                    The Checkbox is visual-only. We intentionally do NOT pass
+                    onCheckedChange — the parent div already handles the toggle.
+                    Passing both caused a double-toggle that cancelled itself
+                    out (clicking the checkbox region registered zero state
+                    change from the user's perspective).
+                  */}
+                  <Checkbox checked={allSelected} tabIndex={-1} aria-hidden="true" />
                   <div className="flex-1">
                     <div className="text-sm font-medium">Full Shift</div>
                     <div className="text-xs text-muted-foreground">
@@ -334,12 +341,23 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                   return (
                     <div
                       key={slot.id}
+                      role="checkbox"
+                      aria-checked={isSelected}
+                      aria-disabled={isFull}
+                      tabIndex={isFull ? -1 : 0}
                       className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
                         isFull ? "opacity-50 cursor-not-allowed bg-muted" : isSelected ? "border-primary bg-primary/5 cursor-pointer" : "hover:bg-muted/50 cursor-pointer"
                       }`}
                       onClick={() => !isFull && toggleSlot(slot.id)}
+                      onKeyDown={(e) => {
+                        if ((e.key === " " || e.key === "Enter") && !isFull) {
+                          e.preventDefault();
+                          toggleSlot(slot.id);
+                        }
+                      }}
                     >
-                      <Checkbox checked={isSelected} disabled={isFull} onCheckedChange={() => !isFull && toggleSlot(slot.id)} />
+                      {/* Visual-only — parent div owns the toggle */}
+                      <Checkbox checked={isSelected} disabled={isFull} tabIndex={-1} aria-hidden="true" />
                       <div className="flex-1">
                         <div className="text-sm">{formatSlotRange(slot.slot_start, slot.slot_end)}</div>
                         <div className="text-xs text-muted-foreground">{slotHours(slot.slot_start, slot.slot_end)} hours</div>
