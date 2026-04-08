@@ -128,6 +128,8 @@ export default function ManageShifts() {
     const { data } = await supabase
       .from("shifts")
       .select("*, departments(name)")
+      // Don't show admin-cancelled shifts in coordinator's manage view
+      .neq("status", "cancelled")
       .order("shift_date", { ascending: true });
 
     if (data) setShifts(data as Shift[]);
