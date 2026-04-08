@@ -71,7 +71,14 @@ export function RecommendedShifts({ onBookShift, refreshKey = 0 }: RecommendedSh
         };
         const now = new Date();
         const filterRelevant = (list: RecommendedShift[]) =>
-          list.filter((s) => !bookedIds.has(s.shift_id) && shiftEndAt(s) > now);
+          list.filter((s) =>
+            !bookedIds.has(s.shift_id) &&
+            shiftEndAt(s) > now &&
+            // Don't recommend full shifts — they're still visible in
+            // Browse Shifts so users can choose to join the waitlist,
+            // but we shouldn't actively push them.
+            s.booked_slots < s.total_slots
+          );
 
         const { data, error } = await (supabase as any).rpc(
           'score_shifts_for_volunteer',
