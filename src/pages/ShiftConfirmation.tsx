@@ -61,13 +61,28 @@ export default function ShiftConfirmation() {
   const maxHours = (() => {
     if (!booking?.shifts) return 8;
     const s = booking.shifts;
+    let baseHours: number;
     if (s.time_type === "custom" && s.start_time && s.end_time) {
       const [sh, sm] = s.start_time.split(":").map(Number);
       const [eh, em] = s.end_time.split(":").map(Number);
-      return Math.max(0.5, (eh * 60 + em - sh * 60 - sm) / 60);
+      baseHours = Math.max(0.5, (eh * 60 + em - sh * 60 - sm) / 60);
+    } else if (s.time_type === "morning" || s.time_type === "afternoon") {
+      baseHours = 4;
+    } else {
+      baseHours = 8;
     }
-    if (s.time_type === "morning" || s.time_type === "afternoon") return 4;
-    return 8;
+    // If the volunteer checked in before shift start, the early window
+    // counts toward their hours (up to the 30-minute check-in grace period).
+    if (booking.checked_in_at && s.start_time && s.shift_date) {
+      const checkedInMs = new Date(booking.checked_in_at).getTime();
+      const shiftStartMs = new Date(`${s.shift_date}T${s.start_time}`).getTime();
+      if (checkedInMs < shiftStartMs) {
+        const earlyMinutes = Math.min(30, (shiftStartMs - checkedInMs) / 60000);
+        baseHours += earlyMinutes / 60;
+      }
+    }
+    // Round to nearest 0.25 for cleaner display
+    return Math.round(baseHours * 4) / 4;
   })();
 
   const handleSubmit = async () => {

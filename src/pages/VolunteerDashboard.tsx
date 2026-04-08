@@ -142,11 +142,48 @@ export default function VolunteerDashboard() {
   };
 
   const handleCheckIn = async (bookingId: string, shift: any) => {
-    // Only allow check-in on the shift's own date, once within the shift window
     if (shift?.shift_date !== today) {
       toast({ title: "Not today", description: "You can only check in on the day of your shift.", variant: "destructive" });
       return;
     }
+
+    // Only allow check-in within the 30-minute pre-shift window (or later).
+    // Use time_type defaults when start_time is null.
+    const startStr =
+      shift.start_time ||
+      (shift.time_type === "morning"
+        ? "09:00:00"
+        : shift.time_type === "afternoon"
+        ? "13:00:00"
+        : "09:00:00");
+    const shiftStart = new Date(`${shift.shift_date}T${startStr}`);
+    const endStr =
+      shift.end_time ||
+      (shift.time_type === "morning"
+        ? "12:00:00"
+        : shift.time_type === "afternoon"
+        ? "16:00:00"
+        : "17:00:00");
+    const shiftEnd = new Date(`${shift.shift_date}T${endStr}`);
+    const now = new Date();
+    const minutesToStart = (shiftStart.getTime() - now.getTime()) / 60000;
+    if (minutesToStart > 30) {
+      toast({
+        title: "Too early",
+        description: `Check-in opens 30 minutes before the shift starts (${Math.ceil(minutesToStart - 30)} minute${minutesToStart - 30 >= 2 ? "s" : ""} from now).`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (now > shiftEnd) {
+      toast({
+        title: "Shift ended",
+        description: "This shift has already ended. Use the shift confirmation flow instead.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from("shift_bookings")
       .update({ checked_in_at: new Date().toISOString() })
@@ -277,6 +314,14 @@ export default function VolunteerDashboard() {
               const s = booking.shifts!;
               const isToday = s.shift_date === today;
               const alreadyCheckedIn = !!booking.checked_in_at;
+              // Compute whether we're in the check-in window: from 30 min
+              // before start until shift end.
+              const startStr = s.start_time || (s.time_type === "morning" ? "09:00:00" : s.time_type === "afternoon" ? "13:00:00" : "09:00:00");
+              const endStr = s.end_time || (s.time_type === "morning" ? "12:00:00" : s.time_type === "afternoon" ? "16:00:00" : "17:00:00");
+              const shiftStartMs = new Date(`${s.shift_date}T${startStr}`).getTime();
+              const shiftEndMs = new Date(`${s.shift_date}T${endStr}`).getTime();
+              const nowMs = Date.now();
+              const checkInOpen = isToday && nowMs >= shiftStartMs - 30 * 60 * 1000 && nowMs <= shiftEndMs;
               return (
                 <Card key={booking.id}>
                   <CardContent className="pt-4 pb-4">
@@ -296,8 +341,11 @@ export default function VolunteerDashboard() {
                         <BookedSlotsDisplay bookingId={booking.id} />
                       </div>
                       <div className="flex flex-col gap-2 sm:items-end">
-                        {isToday && !alreadyCheckedIn && (
+                        {checkInOpen && !alreadyCheckedIn && (
                           <Button size="sm" onClick={() => handleCheckIn(booking.id, s)}>Check In</Button>
+                        )}
+                        {isToday && !alreadyCheckedIn && !checkInOpen && nowMs < shiftStartMs && (
+                          <Badge variant="outline" className="text-xs">Check-in opens 30 min before start</Badge>
                         )}
                         {alreadyCheckedIn && <Badge className="text-xs bg-success text-success-foreground">Checked In</Badge>}
                         <div className="flex gap-1 flex-wrap">

@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, Users, CheckCircle, XCircle, AlertTriangle, Download, List, CalendarDays } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Calendar, Clock, Users, CheckCircle, XCircle, AlertTriangle, Download, List, CalendarDays, Pencil } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
@@ -23,6 +26,9 @@ export default function CoordinatorDashboard() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
+  const [hoursEditTarget, setHoursEditTarget] = useState<{ booking: any; shift: any } | null>(null);
+  const [hoursEditValue, setHoursEditValue] = useState("");
+  const [hoursSaving, setHoursSaving] = useState(false);
   const [tab, setTab] = useState("shifts");
 
   useEffect(() => {
@@ -89,6 +95,44 @@ export default function CoordinatorDashboard() {
     };
     fetchShiftsAndBookings();
   }, [selectedDept, role, departments]);
+
+  const openHoursEditor = (booking: any, shift: any) => {
+    setHoursEditTarget({ booking, shift });
+    setHoursEditValue(
+      booking.final_hours != null
+        ? String(booking.final_hours)
+        : ""
+    );
+  };
+
+  const handleSaveHours = async () => {
+    if (!hoursEditTarget) return;
+    const parsed = parseFloat(hoursEditValue);
+    if (Number.isNaN(parsed) || parsed < 0) {
+      toast({ title: "Invalid hours", description: "Enter a non-negative number.", variant: "destructive" });
+      return;
+    }
+    setHoursSaving(true);
+    const { error } = await (supabase as any).rpc("admin_update_shift_hours", {
+      p_booking_id: hoursEditTarget.booking.id,
+      p_hours: parsed,
+    });
+    setHoursSaving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    // Optimistic local update
+    setBookings((prev) =>
+      prev.map((b) =>
+        b.id === hoursEditTarget.booking.id
+          ? { ...b, final_hours: parsed, hours_source: "coordinator" }
+          : b
+      )
+    );
+    setHoursEditTarget(null);
+    toast({ title: "Hours updated", description: `Set to ${parsed}h and volunteer total recalculated.` });
+  };
 
   const handleConfirm = async (bookingId: string, status: "confirmed" | "no_show") => {
     const { error } = await supabase
@@ -265,9 +309,30 @@ export default function CoordinatorDashboard() {
                                     </Button>
                                   </>
                                 ) : (
-                                  <Badge variant={b.confirmation_status === "confirmed" ? "default" : "destructive"} className="text-xs">
-                                    {b.confirmation_status.replace("_", " ")}
-                                  </Badge>
+                                  <>
+                                    <Badge variant={b.confirmation_status === "confirmed" ? "default" : "destructive"} className="text-xs">
+                                      {b.confirmation_status.replace("_", " ")}
+                                    </Badge>
+                                    {b.confirmation_status === "confirmed" && (
+                                      <>
+                                        {b.final_hours != null && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            {b.final_hours}h
+                                          </Badge>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-7 px-2"
+                                          onClick={() => openHoursEditor(b, s)}
+                                          title="Edit recorded hours"
+                                        >
+                                          <Pencil className="h-3 w-3 mr-1" />
+                                          Edit Hours
+                                        </Button>
+                                      </>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -290,6 +355,58 @@ export default function CoordinatorDashboard() {
           <DepartmentVolunteersTab departmentIds={activeDeptIds} departments={selectedDept === "all" ? departments : departments.filter(d => d.id === selectedDept)} />
         </TabsContent>
       </Tabs>
+
+      {/* Retroactive hour correction dialog */}
+      <Dialog
+        open={!!hoursEditTarget}
+        onOpenChange={(open) => { if (!open) setHoursEditTarget(null); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Volunteer Hours</DialogTitle>
+            <DialogDescription>
+              Retroactively correct the recorded hours for this shift. Use this
+              when a volunteer only completed part of the shift, or when the
+              self-reported hours need adjustment.
+            </DialogDescription>
+          </DialogHeader>
+          {hoursEditTarget && (
+            <div className="space-y-4 py-2">
+              <div className="text-sm space-y-1">
+                <p><strong>{hoursEditTarget.booking.profiles?.full_name}</strong></p>
+                <p className="text-muted-foreground">
+                  {hoursEditTarget.shift.title} · {format(new Date(hoursEditTarget.shift.shift_date + "T00:00:00"), "MMM d, yyyy")}
+                </p>
+                <p className="text-muted-foreground">
+                  {timeLabel(hoursEditTarget.shift)}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Hours Worked</Label>
+                <Input
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  value={hoursEditValue}
+                  onChange={(e) => setHoursEditValue(e.target.value)}
+                  placeholder="e.g. 1.5"
+                />
+                <p className="text-xs text-muted-foreground">
+                  This will update the volunteer's total hours and points.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHoursEditTarget(null)} disabled={hoursSaving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveHours} disabled={hoursSaving || !hoursEditValue}>
+              {hoursSaving ? "Saving..." : "Save Hours"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
