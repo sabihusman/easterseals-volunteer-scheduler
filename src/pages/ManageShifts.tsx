@@ -214,6 +214,20 @@ export default function ManageShifts() {
     const missing: string[] = [];
     if (!form.title) missing.push("Shift Title");
     if (!form.department_id) missing.push("Department");
+
+    // Coordinators must only save shifts in departments they're assigned to
+    if (
+      role === "coordinator" &&
+      form.department_id &&
+      !departments.some((d) => d.id === form.department_id)
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Not assigned",
+        description: "You are not assigned to this department. Contact an admin to be added.",
+      });
+      return;
+    }
     if (!form.shift_date) missing.push("Date");
     if (!form.start_time) missing.push("Start Time (make sure AM/PM is set)");
     if (!form.end_time) missing.push("End Time (make sure AM/PM is set)");
