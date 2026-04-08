@@ -110,7 +110,7 @@ function canEditNote(shiftDate: string, startTime: string): boolean {
 
 export default function ManageShifts() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -125,31 +125,66 @@ export default function ManageShifts() {
   /* ---------- Fetch ---------- */
 
   async function fetchShifts() {
-    const { data } = await supabase
+    // For coordinators, scope to their assigned departments only so they
+    // can't see (or act on) shifts in departments they don't manage.
+    let deptFilter: string[] | null = null;
+    if (role === "coordinator" && user) {
+      const { data: assignments } = await supabase
+        .from("department_coordinators")
+        .select("department_id")
+        .eq("coordinator_id", user.id);
+      deptFilter = (assignments || []).map((a: any) => a.department_id);
+      if (deptFilter.length === 0) {
+        setShifts([]);
+        return;
+      }
+    }
+
+    let query = supabase
       .from("shifts")
       .select("*, departments(name)")
       // Don't show admin-cancelled shifts in coordinator's manage view
       .neq("status", "cancelled")
       .order("shift_date", { ascending: true });
+    if (deptFilter) query = query.in("department_id", deptFilter);
 
+    const { data } = await query;
     if (data) setShifts(data as Shift[]);
   }
 
   async function fetchDepartments() {
+    // Coordinators only see the departments they're assigned to.
+    // Admins see everything active.
+    if (role === "coordinator" && user) {
+      const { data } = await supabase
+        .from("department_coordinators")
+        .select("departments(id, name, is_active)")
+        .eq("coordinator_id", user.id);
+      const depts = ((data || []) as any[])
+        .map((row) => row.departments)
+        .filter((d: any) => d && d.is_active)
+        .map((d: any) => ({ id: d.id, name: d.name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setDepartments(depts);
+      return;
+    }
+
     const { data } = await supabase
       .from("departments")
       .select("id, name")
       .eq("is_active", true)
       .order("name");
-
     if (data) setDepartments(data);
   }
 
   useEffect(() => {
+    // Wait until auth resolves so the role-based scoping can kick in
+    if (!user || !role) return;
     Promise.all([fetchShifts(), fetchDepartments()]).then(() =>
       setLoading(false)
     );
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, role]);
 
   /* ---------- Open dialog ---------- */
 
