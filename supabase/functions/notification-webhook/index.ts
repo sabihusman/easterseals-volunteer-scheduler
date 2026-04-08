@@ -72,6 +72,8 @@ Deno.serve(async (req) => {
       self_no_show: true,
       unactioned_shift_reminder: true,
       unactioned_shift_coord_reminder: true,
+      waitlist_offer: true,
+      waitlist_offer_expired: true,
     };
 
     if (!typeMap[record.type]) {
@@ -98,6 +100,8 @@ Deno.serve(async (req) => {
       waitlist_notification: "notif_booking_changes",
       unactioned_shift_reminder: "notif_shift_reminders",
       unactioned_shift_coord_reminder: "notif_shift_reminders",
+      waitlist_offer: "notif_booking_changes",
+      waitlist_offer_expired: "notif_booking_changes",
     };
     const prefCol = typePrefs[record.type];
     if (prefCol && (profile as any)[prefCol] === false) {

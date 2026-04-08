@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle, ChevronDown } from "lucide-react";
+import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle, ChevronDown, CheckCircle } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { format, differenceInHours } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -21,43 +21,76 @@ export default function VolunteerDashboard() {
   const [upcomingBookings, setUpcomingBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingConfirmations, setPendingConfirmations] = useState<any[]>([]);
+  const [waitlistOffers, setWaitlistOffers] = useState<any[]>([]);
 
   // Use LOCAL date, not UTC — otherwise in the evening Central time the UTC
   // rollover drops today's shifts from the filter and they disappear from the
   // dashboard until the next calendar day.
   const today = format(new Date(), "yyyy-MM-dd");
 
-  useEffect(() => {
+  const fetchBookings = useCallback(async () => {
     if (!user) return;
-    const fetchBookings = async () => {
-      const [{ data }, { data: pendingData }] = await Promise.all([
-        // Fetch all confirmed bookings (no date filter in SQL — PostgREST
-        // embed filters with joined columns have been a source of bugs).
-        // We filter to upcoming shifts client-side using the volunteer's
-        // local date so today's shifts always show up.
-        supabase
-          .from("shift_bookings")
-          .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
-          .eq("volunteer_id", user.id)
-          .eq("booking_status", "confirmed")
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("volunteer_shift_reports")
-          .select("id, booking_id, self_confirm_status, shift_bookings(id, shifts(title, shift_date, departments(name)))")
-          .eq("volunteer_id", user.id)
-          .eq("self_confirm_status", "pending")
-          .is("submitted_at", null),
-      ]);
-      // Keep only bookings whose shift is today/future AND not cancelled by admin
-      const upcoming = ((data as any[]) || []).filter(
-        (b) => b.shifts && b.shifts.shift_date >= today && b.shifts.status !== "cancelled"
-      );
-      setUpcomingBookings(upcoming);
-      setPendingConfirmations((pendingData as any) || []);
-      setLoading(false);
-    };
-    fetchBookings();
+    const [{ data }, { data: pendingData }, { data: offers }] = await Promise.all([
+      // Fetch all confirmed bookings (no date filter in SQL — PostgREST
+      // embed filters with joined columns have been a source of bugs).
+      // We filter to upcoming shifts client-side using the volunteer's
+      // local date so today's shifts always show up.
+      supabase
+        .from("shift_bookings")
+        .select("id, booking_status, confirmation_status, checked_in_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+        .eq("volunteer_id", user.id)
+        .eq("booking_status", "confirmed")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("volunteer_shift_reports")
+        .select("id, booking_id, self_confirm_status, shift_bookings(id, shifts(title, shift_date, departments(name)))")
+        .eq("volunteer_id", user.id)
+        .eq("self_confirm_status", "pending")
+        .is("submitted_at", null),
+      // Active waitlist offers for this volunteer
+      (supabase as any)
+        .from("shift_bookings")
+        .select("id, waitlist_offer_expires_at, shifts(id, title, shift_date, time_type, start_time, end_time, departments(name))")
+        .eq("volunteer_id", user.id)
+        .eq("booking_status", "waitlisted")
+        .not("waitlist_offer_expires_at", "is", null)
+        .gt("waitlist_offer_expires_at", new Date().toISOString()),
+    ]);
+    // Keep only bookings whose shift is today/future AND not cancelled by admin
+    const upcoming = ((data as any[]) || []).filter(
+      (b) => b.shifts && b.shifts.shift_date >= today && b.shifts.status !== "cancelled"
+    );
+    setUpcomingBookings(upcoming);
+    setPendingConfirmations((pendingData as any) || []);
+    setWaitlistOffers((offers as any[]) || []);
+    setLoading(false);
   }, [user, today]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [fetchBookings]);
+
+  const handleWaitlistAccept = async (bookingId: string) => {
+    const { error } = await (supabase as any).rpc("waitlist_accept", { p_booking_id: bookingId });
+    if (error) {
+      toast({ title: "Could not accept", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Shift confirmed!", description: "You're booked." });
+    }
+    fetchBookings();
+  };
+
+  const handleWaitlistDecline = async (bookingId: string) => {
+    const ok = window.confirm("Decline this waitlist offer? Your spot will move to the next volunteer.");
+    if (!ok) return;
+    const { error } = await (supabase as any).rpc("waitlist_decline", { p_booking_id: bookingId });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Offer declined" });
+    }
+    fetchBookings();
+  };
 
   const handleCancel = async (bookingId: string, shift: any) => {
     const shiftDate = shift.shift_date;
@@ -262,6 +295,42 @@ export default function VolunteerDashboard() {
           </CardContent>
         </Card>
       )}
+
+      {waitlistOffers.length > 0 && waitlistOffers.map((offer) => {
+        const s = offer.shifts;
+        const expiresAt = new Date(offer.waitlist_offer_expires_at);
+        const minutesLeft = Math.max(0, Math.round((expiresAt.getTime() - Date.now()) / 60000));
+        return (
+          <Card key={offer.id} className="border-amber-500/50 bg-amber-500/10">
+            <CardContent className="pt-4 pb-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-1">
+                  <p className="font-semibold">Waitlist spot opened: {s?.title}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {s && format(new Date(s.shift_date + "T00:00:00"), "MMMM d, yyyy")}
+                    {s?.departments?.name ? ` · ${s.departments.name}` : ""}
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    You have {minutesLeft >= 60
+                      ? `${Math.floor(minutesLeft / 60)}h ${minutesLeft % 60}m`
+                      : `${minutesLeft} minute${minutesLeft !== 1 ? "s" : ""}`} to respond.
+                    The offer forfeits at {format(expiresAt, "h:mm a")}.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => handleWaitlistDecline(offer.id)}>
+                  Decline
+                </Button>
+                <Button size="sm" onClick={() => handleWaitlistAccept(offer.id)}>
+                  <CheckCircle className="h-4 w-4 mr-2" /> Accept Shift
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

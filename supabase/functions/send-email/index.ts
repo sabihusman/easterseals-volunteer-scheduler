@@ -126,6 +126,28 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
         ),
       };
 
+    case "waitlist_offer":
+      return {
+        subject: `A spot just opened: ${shiftTitle}`,
+        html: brandedHtml(
+          h2("A Waitlist Spot Just Opened! 🎉") +
+          p(`A spot has opened for <strong>${shiftTitle}</strong> on ${shiftDate}. You're next on the waitlist.`) +
+          p("You have <strong>2 hours</strong> to accept or decline. After that the offer moves to the next volunteer on the waitlist.") +
+          button("Review & Respond", `${APP_URL}/dashboard`)
+        ),
+      };
+
+    case "waitlist_offer_expired":
+      return {
+        subject: `Waitlist offer expired — ${shiftTitle || "shift"}`,
+        html: brandedHtml(
+          h2("Waitlist Offer Expired") +
+          p("You didn't respond to the waitlist offer within 2 hours, so the spot has moved to the next volunteer in line.") +
+          p("You can still browse other shifts and book a new one.") +
+          button("Browse Shifts", `${APP_URL}/shifts`)
+        ),
+      };
+
     case "unactioned_shift_reminder":
       return {
         subject: `Action needed: confirm your shift — ${shiftTitle}`,
