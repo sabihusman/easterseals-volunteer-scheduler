@@ -35,6 +35,7 @@ import AdminDocumentTypes from "./pages/AdminDocumentTypes";
 import DocumentCompliance from "./pages/DocumentCompliance";
 import VolunteerDocuments from "./pages/VolunteerDocuments";
 import Messages from "./pages/Messages";
+import VolunteerUnactionedShifts from "./pages/VolunteerUnactionedShifts";
 
 const queryClient = new QueryClient();
 
@@ -82,6 +83,7 @@ const App = () => (
             <Route path="/my-shifts/confirm/:bookingId" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftConfirmation /></ProtectedRoute>} />
             <Route path="/notes" element={<ProtectedRoute requiredRole={["volunteer"]}><MyNotes /></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDocuments /></ProtectedRoute>} />
+            <Route path="/unactioned" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerUnactionedShifts /></ProtectedRoute>} />
 
             <Route path="/coordinator" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><CoordinatorDashboard /></ProtectedRoute>} />
             <Route path="/coordinator/manage" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><ManageShifts /></ProtectedRoute>} />
