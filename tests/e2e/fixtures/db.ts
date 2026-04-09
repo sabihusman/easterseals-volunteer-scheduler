@@ -273,6 +273,31 @@ export async function getTestDepartmentId(
   return rows[0].department_id;
 }
 
+/**
+ * Delete ALL shifts whose title starts with "E2E-". These are
+ * exclusively created by the Playwright test fixtures — real shifts
+ * never use this prefix. This is the primary defense against orphaned
+ * test data: each spec calls this in beforeAll so that any leftovers
+ * from a previous failed run (where afterAll never executed) are
+ * cleaned before the next run creates new ones.
+ *
+ * Safe against real data: the WHERE clause is `title LIKE 'E2E-%'`.
+ * A human-created shift would have to be intentionally named with
+ * that prefix to be affected.
+ */
+export async function cleanupStaleE2EShifts(
+  request: APIRequestContext,
+  accessToken: string
+): Promise<number> {
+  const res = await request.delete(
+    `${SUPABASE_URL}/rest/v1/shifts?title=like.E2E-%25`,
+    { headers: { ...headers(accessToken), Prefer: "return=representation" } }
+  );
+  if (!res.ok()) return 0;
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows.length : 0;
+}
+
 /** Nuke a shift and everything it owns — used for teardown safety. */
 export async function hardCleanupShift(
   request: APIRequestContext,
