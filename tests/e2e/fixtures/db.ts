@@ -41,11 +41,22 @@ export interface CreatedShift {
 /**
  * Create a fresh shift owned by the authenticated user (must be a
  * coordinator or admin for their department).
+ *
+ * NOTE: `shifts.created_by` is NOT NULL in the schema. The default
+ * value is auth.uid() *only* when the row is inserted via PostgREST
+ * with that column omitted AND the column has a `DEFAULT auth.uid()`.
+ * The current schema does not, so the caller must pass the
+ * coordinator's user id explicitly. Get it from the user object
+ * returned by signInAsRole().
  */
 export async function createShift(
   request: APIRequestContext,
   accessToken: string,
-  overrides: Partial<CreatedShift> & { department_id: string; total_slots?: number }
+  overrides: Partial<CreatedShift> & {
+    department_id: string;
+    created_by: string;
+    total_slots?: number;
+  }
 ): Promise<CreatedShift> {
   const tomorrow = new Date(Date.now() + 7 * 86400000)
     .toISOString()
@@ -60,6 +71,7 @@ export async function createShift(
     requires_bg_check: false,
     status: "open",
     department_id: overrides.department_id,
+    created_by: overrides.created_by,
   };
   const res = await request.post(`${SUPABASE_URL}/rest/v1/shifts`, {
     headers: headers(accessToken),
