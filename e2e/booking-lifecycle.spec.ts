@@ -32,7 +32,7 @@ const PASSWORD = "Demo1234$";
 
 const ADP_DEPT_ID = "56a6edcb-80da-4ff0-b8a0-59c3b676cf0b";
 
-let tokens: { [k: string]: string } = {};
+const tokens: { [k: string]: string } = {};
 let testShiftId: string | null = null;
 
 // ----- helpers -----
@@ -60,7 +60,12 @@ async function rest(api: any, role: string, method: string, path: string, body?:
   });
   const text = await res.text();
   let parsed: any = null;
-  try { parsed = JSON.parse(text); } catch {}
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    // Non-JSON responses (empty bodies, plain text errors) are expected
+    // from some endpoints; fall through with parsed = null.
+  }
   return { status: res.status(), data: parsed, raw: text };
 }
 
