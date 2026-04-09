@@ -30,7 +30,9 @@ import {
  * a real-life overlap with the test shift.
  */
 
-const SHIFT_DATE_OFFSET_DAYS = 32;
+// Must be within the 14-day default booking window — see enforce_booking_window
+// trigger. Distinct from other E2E specs so the overlap trigger stays quiet.
+const SHIFT_DATE_OFFSET_DAYS = 9;
 
 test.describe("Admin hard-deletes shift with bookings", () => {
   test("leaves no orphaned records", async ({

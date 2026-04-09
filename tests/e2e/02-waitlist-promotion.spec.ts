@@ -35,7 +35,9 @@ import {
  * promotion contract is enforced by triggers, so REST is sufficient.
  */
 
-const SHIFT_DATE_OFFSET_DAYS = 31;
+// Must be within the 14-day default booking window — see enforce_booking_window
+// trigger. Distinct from other E2E specs so the overlap trigger stays quiet.
+const SHIFT_DATE_OFFSET_DAYS = 8;
 
 test.describe("Waitlist promotion lifecycle", () => {
   let shiftId: string | null = null;
