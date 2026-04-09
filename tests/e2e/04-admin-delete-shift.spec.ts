@@ -6,81 +6,85 @@ import {
   listBookingsForShift,
   countBy,
   getTestDepartmentId,
+  uniqueShiftDate,
+  expectOk,
+  cancelVolunteerBookingsOnDate,
+  authHeaders,
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
 } from "./fixtures/db";
 
 /**
  * E2E 4 — Admin hard-deletes a shift with existing bookings.
  *
  * After deletion, NO rows should remain in any of:
- *   - shift_bookings     (FK on shift_id)
- *   - shift_booking_slots (FK on shift_id via booking)
- *   - volunteer_shift_reports (FK on shift_id)
+ *   - shift_bookings           (FK on shift_id)
+ *   - shift_booking_slots      (FK on shift_id via booking)
+ *   - volunteer_shift_reports  (FK on shift_id)
  *
- * The shift_delete_cascade migration (20260407_shift_delete_cascade.sql)
- * is supposed to clean these up. This test locks that behavior down —
- * any regression that leaves orphaned rows should fail CI.
+ * The shift_delete_cascade migration is supposed to clean these up.
+ * This test locks that behavior down — any regression that leaves
+ * orphaned rows fails CI.
  *
- * We use DELETE via REST as the admin (the same call the AdminDashboard
- * UI makes). We do NOT use the UI's cancel-then-delete-later flow;
- * this is specifically the hard-delete path.
+ * Uses a unique date in the booking window + 06:00-07:00 so the test
+ * volunteer's bookings don't collide with anything else. We only book
+ * ONE volunteer onto the shift — the cascade test only needs at
+ * least one child row in each FK'd table to validate, and only
+ * volunteer-role accounts can insert into shift_bookings (the
+ * enforce_volunteer_role trigger blocks coordinators/admins).
  */
 
-function authHeaders(token: string) {
-  return {
-    "Content-Type": "application/json",
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${token}`,
-    Prefer: "return=representation",
-  };
-}
+// Must be within the 14-day default booking window — see enforce_booking_window
+// trigger. Distinct from other E2E specs so the overlap trigger stays quiet.
+const SHIFT_DATE_OFFSET_DAYS = 9;
 
 test.describe("Admin hard-deletes shift with bookings", () => {
   test("leaves no orphaned records", async ({
-    playwright,
     page,
     context,
     request,
   }) => {
-    // --- 1. Coordinator creates a 2-slot shift ---
+    // --- 1. Coordinator creates a 2-slot shift on a unique date ---
     const coord = await signInAsRole(request, "coordinator");
     const departmentId = await getTestDepartmentId(
       request,
       coord.access_token
     );
+    const shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coord.access_token, {
       department_id: departmentId,
+      created_by: coord.user.id,
       total_slots: 2,
       title: `E2E-Delete-${Date.now()}`,
+      shift_date: shiftDate,
+      start_time: "06:00:00",
+      end_time: "07:00:00",
     });
     const shiftId = shift.id;
 
-    // --- 2. Two volunteers (vol + admin here playing the second vol
-    //    role, same as waitlist test) book it ---
+    // --- 2. Pre-cleanup: clear any leftover bookings on that date ---
     const volA = await signInAsRole(request, "volunteer");
-    await request.post(`${SUPABASE_URL}/rest/v1/shift_bookings`, {
-      headers: authHeaders(volA.access_token),
-      data: {
-        shift_id: shiftId,
-        volunteer_id: volA.user.id,
-        booking_status: "confirmed",
-      },
-    });
-
     const admin = await signInAsRole(request, "admin");
-    await request.post(`${SUPABASE_URL}/rest/v1/shift_bookings`, {
-      headers: authHeaders(admin.access_token),
-      data: {
-        shift_id: shiftId,
-        volunteer_id: admin.user.id,
-        booking_status: "confirmed",
-      },
-    });
+    await cancelVolunteerBookingsOnDate(
+      request,
+      volA.access_token,
+      volA.user.id,
+      shiftDate
+    );
 
-    // Sanity: we should have 2 booking rows, counter at 2 (or capped
-    // at total_slots — some of them may have demoted to waitlisted
-    // depending on trigger behavior, but at least 1 row exists).
+    // --- 3. Volunteer books the shift ---
+    const bookARes = await request.post(
+      `${SUPABASE_URL}/rest/v1/shift_bookings`,
+      {
+        headers: authHeaders(volA.access_token),
+        data: {
+          shift_id: shiftId,
+          volunteer_id: volA.user.id,
+          booking_status: "confirmed",
+        },
+      }
+    );
+    await expectOk(bookARes, "vol A book");
+
     const bookingsBefore = await listBookingsForShift(
       request,
       admin.access_token,
@@ -88,24 +92,20 @@ test.describe("Admin hard-deletes shift with bookings", () => {
     );
     expect(bookingsBefore.length).toBeGreaterThanOrEqual(1);
 
-    // --- 3. Admin signs in via UI (smoke) then issues the DELETE ---
+    // --- 4. Admin signs in via UI (smoke) then issues the DELETE ---
     await loginAndVisit(request, context, page, "admin", "/admin");
     await expect(page.locator("h1, h2").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // The DELETE is the same REST call the AdminDashboard UI makes.
     const deleteRes = await request.delete(
       `${SUPABASE_URL}/rest/v1/shifts?id=eq.${shiftId}`,
       { headers: authHeaders(admin.access_token) }
     );
-    expect(
-      deleteRes.ok(),
-      `admin delete shift: ${await deleteRes.text()}`
-    ).toBeTruthy();
+    await expectOk(deleteRes, "admin delete shift");
     await new Promise((r) => setTimeout(r, 500));
 
-    // --- 4. Verify no orphans remain ---
+    // --- 5. Verify no orphans remain ---
     const shiftAfter = await getShift(request, admin.access_token, shiftId);
     expect(shiftAfter, "shift row should be gone").toBeNull();
 

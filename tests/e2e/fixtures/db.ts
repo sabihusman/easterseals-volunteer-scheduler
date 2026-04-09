@@ -1,6 +1,15 @@
 import type { APIRequestContext } from "@playwright/test";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./session";
 
+// Re-export so spec files can import these constants from a single
+// fixtures entry point. The original split between session.ts and
+// db.ts was an internal artifact — every spec that calls a db helper
+// also needs the URL/key to make ad-hoc REST calls under the user's
+// own session, and forcing them to import from two paths just to
+// satisfy module boundaries was a footgun. Several specs already
+// import these from "./fixtures/db" expecting them to be exported.
+export { SUPABASE_URL, SUPABASE_ANON_KEY };
+
 /**
  * Supabase REST helpers for E2E setup / teardown / verification.
  *
@@ -15,6 +24,96 @@ function headers(accessToken: string) {
     Authorization: `Bearer ${accessToken}`,
     Prefer: "return=representation",
   };
+}
+
+/**
+ * Public version of `headers` for spec files that issue ad-hoc REST
+ * calls under their own session token.
+ */
+export function authHeaders(accessToken: string) {
+  return headers(accessToken);
+}
+
+/**
+ * Generate a unique YYYY-MM-DD date in the future, offset N days from
+ * today. Each spec uses a distinct offset so no two test shifts share
+ * a date — this avoids the prevent_overlapping_bookings trigger ever
+ * firing across tests, since the trigger keys on (volunteer_id,
+ * shift_date, time-overlap).
+ *
+ * Far-future dates also stay clear of any real production shifts the
+ * test users might already be booked on.
+ */
+export function uniqueShiftDate(offsetDays: number): string {
+  return new Date(Date.now() + offsetDays * 86400000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+export function uniquePastShiftDate(offsetDays: number): string {
+  return new Date(Date.now() - Math.abs(offsetDays) * 86400000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/**
+ * Wrap a Playwright APIResponse so a non-OK status throws with the
+ * full response body included in the error message — instead of the
+ * useless "expect(false).toBeTruthy()" we were getting before.
+ */
+export async function expectOk(
+  res: { ok: () => boolean; status: () => number; text: () => Promise<string> },
+  label: string
+): Promise<void> {
+  if (!res.ok()) {
+    const body = await res.text();
+    throw new Error(`${label} failed: HTTP ${res.status()} ${body}`);
+  }
+}
+
+/**
+ * Cancel any active (confirmed/waitlisted) bookings the given
+ * volunteer has on the given shift_date. Used as belt-and-suspenders
+ * pre-test cleanup so a volunteer's leftover state from a real-life
+ * booking or a previous failed test run can't poison the overlap
+ * trigger.
+ *
+ * Runs as the postgres role via the supabase admin REST endpoint
+ * (we use the coordinator's token here, which has SELECT visibility
+ * via the dept-coordinator policy; the actual cancel is performed by
+ * the volunteer themselves below since UPDATE on shift_bookings is
+ * locked to the row's owner).
+ */
+export async function cancelVolunteerBookingsOnDate(
+  request: APIRequestContext,
+  volunteerAccessToken: string,
+  volunteerId: string,
+  shiftDate: string
+): Promise<number> {
+  // First find all active bookings the volunteer has via shifts JOIN.
+  // PostgREST embedded resource syntax: shifts!inner so the join
+  // applies as a filter on the parent.
+  const findRes = await request.get(
+    `${SUPABASE_URL}/rest/v1/shift_bookings?select=id,shifts!inner(shift_date)&volunteer_id=eq.${volunteerId}&booking_status=in.(confirmed,waitlisted)&shifts.shift_date=eq.${shiftDate}`,
+    { headers: headers(volunteerAccessToken) }
+  );
+  if (!findRes.ok()) return 0;
+  const rows = (await findRes.json()) as Array<{ id: string }>;
+  if (!rows || rows.length === 0) return 0;
+  // Cancel each one (UPDATE booking_status=cancelled).
+  for (const row of rows) {
+    await request.patch(
+      `${SUPABASE_URL}/rest/v1/shift_bookings?id=eq.${row.id}`,
+      {
+        headers: headers(volunteerAccessToken),
+        data: {
+          booking_status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+        },
+      }
+    );
+  }
+  return rows.length;
 }
 
 export interface CreatedShift {
@@ -32,11 +131,22 @@ export interface CreatedShift {
 /**
  * Create a fresh shift owned by the authenticated user (must be a
  * coordinator or admin for their department).
+ *
+ * NOTE: `shifts.created_by` is NOT NULL in the schema. The default
+ * value is auth.uid() *only* when the row is inserted via PostgREST
+ * with that column omitted AND the column has a `DEFAULT auth.uid()`.
+ * The current schema does not, so the caller must pass the
+ * coordinator's user id explicitly. Get it from the user object
+ * returned by signInAsRole().
  */
 export async function createShift(
   request: APIRequestContext,
   accessToken: string,
-  overrides: Partial<CreatedShift> & { department_id: string; total_slots?: number }
+  overrides: Partial<CreatedShift> & {
+    department_id: string;
+    created_by: string;
+    total_slots?: number;
+  }
 ): Promise<CreatedShift> {
   const tomorrow = new Date(Date.now() + 7 * 86400000)
     .toISOString()
@@ -51,6 +161,7 @@ export async function createShift(
     requires_bg_check: false,
     status: "open",
     department_id: overrides.department_id,
+    created_by: overrides.created_by,
   };
   const res = await request.post(`${SUPABASE_URL}/rest/v1/shifts`, {
     headers: headers(accessToken),
