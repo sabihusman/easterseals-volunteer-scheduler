@@ -4,6 +4,7 @@ import {
   createShift,
   listBookingsForShift,
   hardCleanupShift,
+  cleanupStaleE2EShifts,
   getTestDepartmentId,
   uniquePastShiftDate,
   expectOk,
@@ -55,6 +56,7 @@ test.describe("Coordinator confirms attendance", () => {
     // --- 1. Coordinator creates a far-past shift ---
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
+    await cleanupStaleE2EShifts(request, coordAccess);
     const departmentId = await getTestDepartmentId(request, coordAccess);
     const pastDate = uniquePastShiftDate(PAST_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {
