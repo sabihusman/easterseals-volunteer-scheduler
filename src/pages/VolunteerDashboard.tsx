@@ -430,9 +430,15 @@ export default function VolunteerDashboard() {
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{profile?.consistency_score ?? 0}%</div>
+            <div className="text-2xl font-bold">
+              {profile?.consistency_score != null ? `${profile.consistency_score}%` : "—"}
+            </div>
             <p className="text-sm text-muted-foreground">Consistency Score</p>
-            <p className="text-xs text-muted-foreground mt-1">Based on last 5 shifts</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {profile?.consistency_score != null
+                ? "Based on last 5 shifts"
+                : "Complete 5 shifts to see your score"}
+            </p>
           </CardContent>
         </Card>
         <Card>
