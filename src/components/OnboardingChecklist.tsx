@@ -12,7 +12,17 @@ export function OnboardingChecklist() {
   if (!profile || profile.role !== "volunteer" || profile.onboarding_complete || dismissed) return null;
 
   const items = [
-    { label: "Complete your profile", done: !!(profile.phone && profile.emergency_contact) },
+    {
+      label: "Complete your profile",
+      // profiles has emergency_contact_name and emergency_contact_phone
+      // — the old `emergency_contact` field never existed, so this item
+      // was permanently stuck incomplete.
+      done: !!(
+        profile.phone &&
+        (profile as any).emergency_contact_name &&
+        (profile as any).emergency_contact_phone
+      ),
+    },
     { label: "Review Code of Conduct", done: !!profile.tos_accepted_at },
     { label: "Upload required documents", done: false },
     { label: "Background check submission", done: profile.bg_check_status !== "pending" },
@@ -21,7 +31,15 @@ export function OnboardingChecklist() {
   const allDone = items.every((i) => i.done);
 
   const handleDismiss = async () => {
-    if (allDone && user) {
+    if (!allDone) {
+      // Hide the card for this session only — it will come back on
+      // reload until every item is actually done. Previously dismiss
+      // was permanent even if nothing was completed, letting users
+      // skip onboarding entirely.
+      setDismissed(true);
+      return;
+    }
+    if (user) {
       await supabase.from("profiles").update({ onboarding_complete: true }).eq("id", user.id);
       refreshProfile();
     }

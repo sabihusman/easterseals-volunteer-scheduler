@@ -8,8 +8,13 @@ const BRAND_COLOR = "#006B3E";
 const APP_NAME = "Easterseals Iowa Volunteer Scheduler";
 const APP_URL = "https://easterseals-volunteer-scheduler.vercel.app";
 
-const SANDBOX_MODE = true; // Set to false once domain is verified at resend.com/domains
-const SANDBOX_EMAIL = "sabih.usman@gmail.com";
+// Sandbox mode is opt-in via env var — previously this was hard-coded
+// to true with a personal email as the redirect target, which silently
+// hijacked every transactional email in production. Set EMAIL_SANDBOX
+// to "true" and EMAIL_SANDBOX_REDIRECT to a test inbox during local
+// testing only; in prod, leave both unset so emails go to real users.
+const SANDBOX_MODE = Deno.env.get("EMAIL_SANDBOX") === "true";
+const SANDBOX_EMAIL = Deno.env.get("EMAIL_SANDBOX_REDIRECT") || "";
 
 function brandedHtml(bodyContent: string): string {
   return `<!DOCTYPE html>
@@ -272,7 +277,54 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
         ),
       };
 
+    case "shift_cancelled":
+      // Sent when an admin or coordinator cancels an entire shift that
+      // a volunteer was booked on.
+      return {
+        subject: `Shift Cancelled — ${shiftTitle || "your shift"}`,
+        html: brandedHtml(
+          h2("Your Shift Was Cancelled") +
+          p(`Unfortunately, <strong>${shiftTitle || "your shift"}</strong> has been cancelled by the coordinator.`) +
+          (shiftDate ? detail("Date", shiftDate) : "") +
+          (shiftTime ? detail("Time", shiftTime) : "") +
+          (department ? detail("Department", department) : "") +
+          p("We're sorry for the inconvenience. Please browse other available shifts to book a new one.") +
+          button("Browse Shifts", `${APP_URL}/shifts`)
+        ),
+      };
+
+    case "booking_cancelled":
+      // Confirmation email to a volunteer who just cancelled their
+      // own booking (from the dashboard / shift list).
+      return {
+        subject: `Booking cancelled — ${shiftTitle || "your shift"}`,
+        html: brandedHtml(
+          h2("Booking Cancelled") +
+          p(`Your booking for <strong>${shiftTitle || "this shift"}</strong> has been cancelled.`) +
+          (shiftDate ? detail("Date", shiftDate) : "") +
+          (shiftTime ? detail("Time", shiftTime) : "") +
+          (department ? detail("Department", department) : "") +
+          p("If this was a mistake, you can rebook the shift from the shifts page — it may still be available.") +
+          button("Browse Shifts", `${APP_URL}/shifts`)
+        ),
+      };
+
+    case "new_message":
+      // In-app messaging notification.
+      return {
+        subject: `New message — ${APP_NAME}`,
+        html: brandedHtml(
+          h2("You have a new message") +
+          p(`${volunteerName || coordinatorName || "Someone"} just sent you a message in the volunteer portal.`) +
+          button("Open Messages", `${APP_URL}/messages`)
+        ),
+      };
+
     default:
+      // Log the missing type so adding new notification types without
+      // a corresponding template surfaces quickly instead of silently
+      // dropping outbound email.
+      console.warn(`send-email: no template for notification type "${type}"`);
       return null;
   }
 }
@@ -329,10 +381,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Sandbox mode: redirect all emails to test address
-    const actualTo = SANDBOX_MODE ? SANDBOX_EMAIL : to;
-    const actualSubject = SANDBOX_MODE ? `[TEST] ${subject}` : subject;
-    if (SANDBOX_MODE) {
+    // Sandbox mode (opt-in via EMAIL_SANDBOX env var): redirect every
+    // outgoing email to the configured test inbox. If EMAIL_SANDBOX is
+    // set but EMAIL_SANDBOX_REDIRECT is empty, fall through and send to
+    // the real recipient (the misconfiguration shouldn't silently drop
+    // mail).
+    const sandboxActive = SANDBOX_MODE && SANDBOX_EMAIL;
+    const actualTo = sandboxActive ? SANDBOX_EMAIL : to;
+    const actualSubject = sandboxActive ? `[TEST] ${subject}` : subject;
+    if (sandboxActive) {
       console.log(`Sandbox mode: redirecting email for ${to} to ${SANDBOX_EMAIL}`);
     }
 

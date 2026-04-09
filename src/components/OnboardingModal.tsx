@@ -380,9 +380,23 @@ export default function OnboardingModal() {
   if (!open) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) setOpen(false); }}>
+    // Volunteers must complete onboarding — don't let Escape or
+    // clicking the backdrop dismiss the modal. The "Complete Setup"
+    // button on the last step is the only way out. Previously a user
+    // could close mid-flow and re-open the app, and the modal would
+    // just re-appear at step 0, or worse — they'd bypass required
+    // steps entirely if onboarding_complete happened to be set early.
+    <Dialog
+      open={open}
+      onOpenChange={() => {
+        /* no-op — modal is modal */
+      }}
+    >
       <DialogContent
         className="max-w-md gap-0 p-0"
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         {/* Step content */}
         <div className="px-6 pt-6 pb-2">{renderStep()}</div>

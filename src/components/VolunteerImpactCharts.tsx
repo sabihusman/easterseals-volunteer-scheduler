@@ -39,11 +39,16 @@ export function VolunteerImpactCharts() {
       const sixMonthsAgo = startOfMonth(subMonths(now, 5));
       const fromDate = format(sixMonthsAgo, "yyyy-MM-dd");
 
-      // Fetch confirmed bookings with shifts for the last 6 months
+      // Fetch confirmed bookings with shifts for the last 6 months.
+      // Must filter booking_status = 'confirmed' too — otherwise a
+      // booking that was cancelled AFTER the volunteer was marked
+      // confirmation_status='confirmed' (e.g. admin cancelled the
+      // shift) still counts as impact, inflating the monthly totals.
       const { data: bookings } = await supabase
         .from("shift_bookings")
         .select("confirmation_status, final_hours, shifts(shift_date)")
         .eq("volunteer_id", user.id)
+        .eq("booking_status", "confirmed")
         .gte("shifts.shift_date", fromDate)
         .in("confirmation_status", ["confirmed", "no_show"]);
 

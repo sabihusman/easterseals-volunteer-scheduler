@@ -28,7 +28,8 @@ interface ComposeMessageProps {
 }
 
 export function ComposeMessage({ open, onOpenChange, onSent }: ComposeMessageProps) {
-  const { user, role } = useAuth();
+  const { user, role, profile } = useAuth();
+  const messagingBlocked = (profile as any)?.messaging_blocked === true;
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -129,7 +130,11 @@ export function ComposeMessage({ open, onOpenChange, onSent }: ComposeMessagePro
       .eq("id", conversationId);
 
     // Send notification
-    const senderName = users.find((u) => u.id === user.id)?.full_name || "Someone";
+    // NOTE: `users` is filtered to exclude the current user (line 49),
+    // so the previous `users.find(u => u.id === user.id)` always failed
+    // and every compose-notification said "Someone". Pull the sender's
+    // name directly from their own profile via useAuth instead.
+    const senderName = profile?.full_name || user.email || "Someone";
     await supabase.from("notifications").insert({
       user_id: selectedUserId,
       title: `New message from ${senderName || "a user"}`,
@@ -202,9 +207,17 @@ export function ComposeMessage({ open, onOpenChange, onSent }: ComposeMessagePro
             <Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Type your message..." rows={4} />
           </div>
         </div>
+        {messagingBlocked && (
+          <p className="text-xs text-destructive">
+            Messaging has been disabled for your account. You cannot send new messages.
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSend} disabled={!selectedUserId || !content.trim() || sending}>
+          <Button
+            onClick={handleSend}
+            disabled={!selectedUserId || !content.trim() || sending || messagingBlocked}
+          >
             {sending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Sending...</> : "Send"}
           </Button>
         </DialogFooter>

@@ -134,7 +134,11 @@ export default function Auth() {
       return;
     }
     if (data.user) {
-      await supabase.from("profiles").insert({
+      // Create the profile row. Previously the result was ignored, so
+      // an RLS/network failure here would leave the auth user orphaned
+      // without a profile row — the rest of the app would then fail
+      // to resolve their role on first login.
+      const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         email: result.data.email,
         username: result.data.username,
@@ -145,6 +149,17 @@ export default function Auth() {
         onboarding_complete: false,
         tos_accepted_at: new Date().toISOString(),
       });
+      if (profileError) {
+        setLoading(false);
+        toast({
+          title: "Account partially created",
+          description:
+            "Your login was created but we couldn't finish setting up your profile. Please contact an administrator before signing in: " +
+            profileError.message,
+          variant: "destructive",
+        });
+        return;
+      }
       // Fire and forget welcome email
       sendEmail({
         to: result.data.email,
