@@ -111,6 +111,19 @@ test.describe("Volunteer books a shift", () => {
   }) => {
     const vol = await signInAsRole(request, "volunteer");
 
+    // Cancel any confirmed bookings this volunteer has on the test
+    // date. This MUST run inside the test body (not just beforeAll)
+    // because on Playwright retries, beforeAll does NOT re-run — if
+    // the previous attempt failed after creating a booking on a
+    // DIFFERENT E2E shift that shares the same date+time, the
+    // overlap trigger would fire again. Belt-and-suspenders.
+    await cancelVolunteerBookingsOnDate(
+      request,
+      vol.access_token,
+      vol.user.id,
+      shiftDate
+    );
+
     // Counter starts at 0 of 2.
     const before = await getShift(request, coordAccess, shiftId!);
     expect(before).not.toBeNull();
