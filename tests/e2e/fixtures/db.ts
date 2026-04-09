@@ -285,17 +285,44 @@ export async function getTestDepartmentId(
  * A human-created shift would have to be intentionally named with
  * that prefix to be affected.
  */
+/**
+ * IMPORTANT: call this with the ADMIN access token, not the
+ * coordinator's. The coordinator's RLS only allows deleting shifts
+ * in their own departments — E2E shifts in other departments
+ * silently survive the DELETE. The admin has unrestricted DELETE.
+ */
 export async function cleanupStaleE2EShifts(
   request: APIRequestContext,
-  accessToken: string
+  adminAccessToken: string
 ): Promise<number> {
+  // 1. Find all E2E shift IDs first
+  const listRes = await request.get(
+    `${SUPABASE_URL}/rest/v1/shifts?select=id&title=like.E2E-%25`,
+    { headers: headers(adminAccessToken) }
+  );
+  if (!listRes.ok()) return 0;
+  const shiftRows = (await listRes.json()) as Array<{ id: string }>;
+  if (!shiftRows || shiftRows.length === 0) return 0;
+
+  const ids = shiftRows.map((r) => r.id);
+
+  // 2. Explicitly delete bookings for these shifts (belt-and-suspenders
+  // in case CASCADE doesn't fire through RLS context)
+  for (const id of ids) {
+    await request.delete(
+      `${SUPABASE_URL}/rest/v1/shift_bookings?shift_id=eq.${id}`,
+      { headers: headers(adminAccessToken) }
+    );
+  }
+
+  // 3. Delete the shifts themselves
   const res = await request.delete(
     `${SUPABASE_URL}/rest/v1/shifts?title=like.E2E-%25`,
-    { headers: { ...headers(accessToken), Prefer: "return=representation" } }
+    { headers: { ...headers(adminAccessToken), Prefer: "return=representation" } }
   );
   if (!res.ok()) return 0;
-  const rows = await res.json();
-  return Array.isArray(rows) ? rows.length : 0;
+  const deleted = await res.json();
+  return Array.isArray(deleted) ? deleted.length : 0;
 }
 
 /** Nuke a shift and everything it owns — used for teardown safety. */
