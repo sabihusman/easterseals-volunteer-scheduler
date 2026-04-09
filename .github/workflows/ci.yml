@@ -10,7 +10,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  lint-and-test:
+  lint-and-unit:
+    name: Lint + Vitest unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -29,22 +30,163 @@ jobs:
       - name: Run ESLint
         run: bun run lint
 
-      - name: Run tests
-        run: bunx vitest run --reporter=verbose
+      - name: Run Vitest (unit + integration)
+        shell: bash
+        run: |
+          set -o pipefail
+          bunx vitest run --reporter=verbose 2>&1 | tee vitest-output.txt
 
-      - name: Comment test results on PR
-        if: github.event_name == 'pull_request' && always()
+      - name: Upload Vitest output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitest-output
+          path: vitest-output.txt
+          if-no-files-found: warn
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    needs: lint-and-unit
+    env:
+      # Point Playwright at the right URL: prod for main branch runs,
+      # Vercel preview for PR runs. PLAYWRIGHT_BASE_URL is resolved
+      # per-branch below.
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      TEST_VOLUNTEER_EMAIL: ${{ secrets.TEST_VOLUNTEER_EMAIL }}
+      TEST_COORDINATOR_EMAIL: ${{ secrets.TEST_COORDINATOR_EMAIL }}
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Playwright browser (chromium only)
+        run: bunx playwright install --with-deps chromium
+
+      - name: Resolve PLAYWRIGHT_BASE_URL
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Vercel's deterministic git-branch preview alias.
+            BRANCH_SLUG=$(echo "${{ github.head_ref }}" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+            URL="https://easterseals-volunteer-scheduler-git-${BRANCH_SLUG}-sabihusmans-projects.vercel.app"
+            echo "Resolved PR preview URL: $URL"
+          else
+            URL="https://easterseals-volunteer-scheduler.vercel.app"
+            echo "Using production URL: $URL"
+          fi
+          echo "PLAYWRIGHT_BASE_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Wait for Vercel deployment (PR runs only)
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          for i in $(seq 1 18); do
+            if curl -fsS -o /dev/null "$PLAYWRIGHT_BASE_URL"; then
+              echo "Preview is live at $PLAYWRIGHT_BASE_URL"
+              exit 0
+            fi
+            echo "Attempt $i: preview not yet live, sleeping 10s..."
+            sleep 10
+          done
+          echo "Preview never became available at $PLAYWRIGHT_BASE_URL"
+          exit 1
+
+      - name: Run Playwright E2E
+        shell: bash
+        run: |
+          set -o pipefail
+          bunx playwright test --config tests/e2e/playwright.config.ts 2>&1 | tee playwright-output.txt
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: warn
+
+      - name: Upload Playwright output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-output
+          path: playwright-output.txt
+          if-no-files-found: warn
+
+  comment-on-pr:
+    name: Comment test results on PR
+    runs-on: ubuntu-latest
+    needs: [lint-and-unit, e2e]
+    if: github.event_name == 'pull_request' && always()
+    steps:
+      - name: Download Vitest output
+        uses: actions/download-artifact@v4
+        with:
+          name: vitest-output
+          path: ./vitest
+        continue-on-error: true
+
+      - name: Download Playwright output
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-output
+          path: ./playwright
+        continue-on-error: true
+
+      - name: Post combined comment
         uses: actions/github-script@v7
         with:
           script: |
-            const { execSync } = require('child_process');
-            let result;
-            try {
-              result = execSync('bunx vitest run --reporter=verbose 2>&1', { encoding: 'utf-8' });
-            } catch (e) {
-              result = e.stdout || e.message;
-            }
-            const body = `### 🧪 Test Results\n\`\`\`\n${result.slice(-3000)}\n\`\`\``;
+            const fs = require('fs');
+            const read = (p) => {
+              try {
+                return fs.readFileSync(p, 'utf-8').slice(-2000);
+              } catch {
+                return '(no output captured)';
+              }
+            };
+            const vitest = read('./vitest/vitest-output.txt');
+            const playwright = read('./playwright/playwright-output.txt');
+            const unitStatus = '${{ needs.lint-and-unit.result }}';
+            const e2eStatus = '${{ needs.e2e.result }}';
+            const badge = (r) => r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌';
+            const body = [
+              '### 🧪 Test Results',
+              '',
+              `| Stage | Status |`,
+              `| --- | --- |`,
+              `| Lint + Vitest | ${badge(unitStatus)} ${unitStatus} |`,
+              `| Playwright E2E | ${badge(e2eStatus)} ${e2eStatus} |`,
+              '',
+              '<details><summary>Vitest output (tail)</summary>',
+              '',
+              '```',
+              vitest,
+              '```',
+              '',
+              '</details>',
+              '',
+              '<details><summary>Playwright output (tail)</summary>',
+              '',
+              '```',
+              playwright,
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
