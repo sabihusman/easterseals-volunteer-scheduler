@@ -25,9 +25,12 @@ import {
  * This test locks that behavior down — any regression that leaves
  * orphaned rows fails CI.
  *
- * Uses a unique date 32 days in the future + 06:00-07:00 so neither
- * the test volunteer nor the admin (used here as a second booker) has
- * a real-life overlap with the test shift.
+ * Uses a unique date in the booking window + 06:00-07:00 so the test
+ * volunteer's bookings don't collide with anything else. We only book
+ * ONE volunteer onto the shift — the cascade test only needs at
+ * least one child row in each FK'd table to validate, and only
+ * volunteer-role accounts can insert into shift_bookings (the
+ * enforce_volunteer_role trigger blocks coordinators/admins).
  */
 
 // Must be within the 14-day default booking window — see enforce_booking_window
@@ -67,14 +70,8 @@ test.describe("Admin hard-deletes shift with bookings", () => {
       volA.user.id,
       shiftDate
     );
-    await cancelVolunteerBookingsOnDate(
-      request,
-      admin.access_token,
-      admin.user.id,
-      shiftDate
-    );
 
-    // --- 3. Two bookers (volunteer + admin) book the shift ---
+    // --- 3. Volunteer books the shift ---
     const bookARes = await request.post(
       `${SUPABASE_URL}/rest/v1/shift_bookings`,
       {
@@ -88,25 +85,12 @@ test.describe("Admin hard-deletes shift with bookings", () => {
     );
     await expectOk(bookARes, "vol A book");
 
-    const bookAdminRes = await request.post(
-      `${SUPABASE_URL}/rest/v1/shift_bookings`,
-      {
-        headers: authHeaders(admin.access_token),
-        data: {
-          shift_id: shiftId,
-          volunteer_id: admin.user.id,
-          booking_status: "confirmed",
-        },
-      }
-    );
-    await expectOk(bookAdminRes, "admin book");
-
     const bookingsBefore = await listBookingsForShift(
       request,
       admin.access_token,
       shiftId
     );
-    expect(bookingsBefore.length).toBeGreaterThanOrEqual(2);
+    expect(bookingsBefore.length).toBeGreaterThanOrEqual(1);
 
     // --- 4. Admin signs in via UI (smoke) then issues the DELETE ---
     await loginAndVisit(request, context, page, "admin", "/admin");
