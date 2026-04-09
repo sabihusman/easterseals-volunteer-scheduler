@@ -97,7 +97,7 @@ export default function BrowseShifts() {
   // Booking window based on consistency score
   const extendedBooking = profile?.extended_booking === true;
   const maxBookingDays = extendedBooking ? 21 : 14;
-  const consistencyScore = profile?.consistency_score ?? 0;
+  const consistencyScore = profile?.consistency_score; // null = < 5 shifts completed
 
   const fetchData = useCallback(async () => {
     // Calculate max booking date based on profile
@@ -256,7 +256,9 @@ export default function BrowseShifts() {
                   Extended booking unlocked — book up to <strong>3 weeks</strong> in advance
                 </p>
                 <p className="text-muted-foreground text-xs mt-0.5">
-                  Your consistency score is {consistencyScore}% over your last 5 shifts. Keep it above 90% to retain this perk.
+                  {consistencyScore != null
+                    ? `Your consistency score is ${consistencyScore}% over your last 5 shifts. Keep it above 90% to retain this perk.`
+                    : "Keep completing shifts and maintaining 90%+ attendance to retain this perk."}
                 </p>
               </>
             ) : (
@@ -265,7 +267,7 @@ export default function BrowseShifts() {
                   Standard booking window — 2 weeks in advance
                 </p>
                 <p className="text-muted-foreground text-xs mt-0.5">
-                  {consistencyScore > 0
+                  {consistencyScore != null
                     ? `Your consistency score is ${consistencyScore}%. Reach 90% over your last 5 shifts to unlock a 3-week booking window.`
                     : "Complete 5 shifts with a 90% attendance rate to unlock a 3-week booking window."}
                 </p>
