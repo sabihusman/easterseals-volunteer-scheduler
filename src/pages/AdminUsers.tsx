@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle, Trash2 } from "lucide-react";
+import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle, Trash2, Building2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
@@ -50,6 +51,15 @@ export default function AdminUsers() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; role: UserRole } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Department assignment
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [deptAssign, setDeptAssign] = useState<{
+    userId: string;
+    name: string;
+    selectedDepts: Set<string>;
+  } | null>(null);
+  const [deptAssignSaving, setDeptAssignSaving] = useState(false);
+
   // Add user modal
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -66,7 +76,16 @@ export default function AdminUsers() {
       setProfiles(data || []);
       setLoading(false);
     };
+    const fetchDepartments = async () => {
+      const { data } = await supabase
+        .from("departments")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      if (data) setDepartments(data);
+    };
     fetchProfiles();
+    fetchDepartments();
   }, []);
 
   const adminCount = profiles.filter((p) => p.role === "admin").length;
@@ -126,14 +145,49 @@ export default function AdminUsers() {
   const confirmRoleChange = async () => {
     if (!roleChange) return;
     setRoleChanging(true);
-    const { error } = await supabase.from("profiles").update({ role: roleChange.to }).eq("id", roleChange.id);
+
+    // Use .select() so PostgREST returns the updated row — without it
+    // a silent RLS filter (0 rows affected) returns 204 with no error
+    // and the UI thinks the update succeeded when it didn't.
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ role: roleChange.to })
+      .eq("id", roleChange.id)
+      .select("id, role")
+      .single();
+
     setRoleChanging(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      setProfiles((prev) => prev.map((p) => p.id === roleChange.id ? { ...p, role: roleChange.to } : p));
-      toast({ title: `${roleChange.name}'s role updated to ${roleChange.to}` });
+
+    if (error || !data) {
+      toast({
+        title: "Error",
+        description: error?.message || "Role update failed — the row may not have been updated. Check RLS policies.",
+        variant: "destructive",
+      });
+      setRoleChange(null);
+      return;
     }
+
+    // Verify the returned role matches what we requested
+    if (data.role !== roleChange.to) {
+      toast({
+        title: "Warning",
+        description: `Role was set to "${data.role}" instead of "${roleChange.to}". A database trigger may have intervened.`,
+        variant: "destructive",
+      });
+    }
+
+    setProfiles((prev) =>
+      prev.map((p) => (p.id === roleChange.id ? { ...p, role: data.role } : p))
+    );
+    toast({ title: `${roleChange.name}'s role updated to ${data.role}` });
+
+    // If promoted to coordinator, open department assignment immediately
+    // so the admin can assign them to departments in the same flow.
+    if (roleChange.to === "coordinator") {
+      openDeptAssignment(roleChange.id, roleChange.name);
+    }
+
     setRoleChange(null);
   };
 
@@ -143,6 +197,57 @@ export default function AdminUsers() {
     if (to === "coordinator") return "This volunteer will gain access to the coordinator dashboard for their assigned department.";
     if (to === "admin") return "Admins have full access to all data. There can only be 2 admins at any time.";
     return "";
+  };
+
+  // Department assignment helpers
+  const openDeptAssignment = async (userId: string, name: string) => {
+    // Fetch current assignments for this coordinator
+    const { data } = await supabase
+      .from("department_coordinators")
+      .select("department_id")
+      .eq("coordinator_id", userId);
+    const current = new Set((data || []).map((r: { department_id: string }) => r.department_id));
+    setDeptAssign({ userId, name, selectedDepts: current });
+  };
+
+  const toggleDept = (deptId: string) => {
+    if (!deptAssign) return;
+    const next = new Set(deptAssign.selectedDepts);
+    if (next.has(deptId)) next.delete(deptId);
+    else next.add(deptId);
+    setDeptAssign({ ...deptAssign, selectedDepts: next });
+  };
+
+  const saveDeptAssignment = async () => {
+    if (!deptAssign) return;
+    setDeptAssignSaving(true);
+
+    // Delete all existing assignments for this coordinator
+    await supabase
+      .from("department_coordinators")
+      .delete()
+      .eq("coordinator_id", deptAssign.userId);
+
+    // Insert new assignments
+    if (deptAssign.selectedDepts.size > 0) {
+      const rows = [...deptAssign.selectedDepts].map((deptId) => ({
+        coordinator_id: deptAssign.userId,
+        department_id: deptId,
+      }));
+      const { error } = await supabase.from("department_coordinators").insert(rows);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        setDeptAssignSaving(false);
+        return;
+      }
+    }
+
+    setDeptAssignSaving(false);
+    toast({
+      title: "Departments updated",
+      description: `${deptAssign.name} is now assigned to ${deptAssign.selectedDepts.size} department${deptAssign.selectedDepts.size !== 1 ? "s" : ""}.`,
+    });
+    setDeptAssign(null);
   };
 
   // Delete user
@@ -313,6 +418,16 @@ export default function AdminUsers() {
                     </SelectContent>
                   </Select>
 
+                  {(p.role === "coordinator" || p.role === "admin") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openDeptAssignment(p.id, p.full_name)}
+                    >
+                      <Building2 className="h-3 w-3 mr-1" />
+                      Assign Depts
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => handleToggleActive(p.id, p.is_active)}>
                     {p.is_active ? <Lock className="h-3 w-3 mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
                     {p.is_active ? "Deactivate" : "Activate"}
@@ -401,6 +516,50 @@ export default function AdminUsers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Department assignment dialog */}
+      <Dialog
+        open={!!deptAssign}
+        onOpenChange={(open) => { if (!open) setDeptAssign(null); }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Departments</DialogTitle>
+            <DialogDescription>
+              Select which departments {deptAssign?.name} should coordinate.
+              They will see shifts and volunteers for these departments.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-64 overflow-y-auto py-2">
+            {departments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No active departments found.
+              </p>
+            ) : (
+              departments.map((dept) => (
+                <label
+                  key={dept.id}
+                  className="flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
+                >
+                  <Checkbox
+                    checked={deptAssign?.selectedDepts.has(dept.id) ?? false}
+                    onCheckedChange={() => toggleDept(dept.id)}
+                  />
+                  <span className="text-sm">{dept.name}</span>
+                </label>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeptAssign(null)}>
+              Cancel
+            </Button>
+            <Button onClick={saveDeptAssignment} disabled={deptAssignSaving}>
+              {deptAssignSaving ? "Saving..." : `Save (${deptAssign?.selectedDepts.size ?? 0} selected)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add user modal */}
       <Dialog open={addUserOpen} onOpenChange={(open) => { if (!open) closeAddUser(); else setAddUserOpen(true); }}>
