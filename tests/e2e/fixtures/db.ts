@@ -1,6 +1,15 @@
 import type { APIRequestContext } from "@playwright/test";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./session";
 
+// Re-export so spec files can import these constants from a single
+// fixtures entry point. The original split between session.ts and
+// db.ts was an internal artifact — every spec that calls a db helper
+// also needs the URL/key to make ad-hoc REST calls under the user's
+// own session, and forcing them to import from two paths just to
+// satisfy module boundaries was a footgun. Several specs already
+// import these from "./fixtures/db" expecting them to be exported.
+export { SUPABASE_URL, SUPABASE_ANON_KEY };
+
 /**
  * Supabase REST helpers for E2E setup / teardown / verification.
  *
