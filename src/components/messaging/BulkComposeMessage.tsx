@@ -45,21 +45,46 @@ export function BulkComposeMessage({ open, onOpenChange, onSent }: BulkComposeMe
     fetchDepts();
   }, [open]);
 
+  /**
+   * Fetch the set of volunteer IDs who have at least one booking in
+   * the selected department. Returns null when departmentId === "all"
+   * (no filtering needed). Used for both the preview count and the
+   * actual send query so the two always agree.
+   */
+  const fetchDeptVolunteerIds = async (): Promise<Set<string> | null> => {
+    if (departmentId === "all") return null;
+    const { data } = await (supabase as any)
+      .from("shift_bookings")
+      .select("volunteer_id, shifts!inner(department_id)")
+      .eq("shifts.department_id", departmentId);
+    if (!data) return new Set();
+    const ids = new Set<string>(
+      (data as Array<{ volunteer_id: string }>).map((r) => r.volunteer_id)
+    );
+    return ids;
+  };
+
   // Preview recipient count when filters change
   useEffect(() => {
     if (!open) return;
     const previewCount = async () => {
+      const deptIds = await fetchDeptVolunteerIds();
       let query = supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "volunteer");
       if (bgFilter !== "all") {
         query = query.eq("bg_check_status", bgFilter as any);
       }
-      // Department filter requires checking department_coordinators or shift_bookings
-      // For simplicity, we skip department filtering in count — applied at send time
+      if (deptIds !== null) {
+        // Only count volunteers who have booked in this department.
+        // PostgREST .in() caps at ~300 items but that's well above
+        // realistic volunteer counts per department.
+        query = query.in("id", [...deptIds]);
+      }
       const { count } = await query;
       setRecipientCount(count || 0);
     };
     previewCount();
-  }, [open, bgFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, bgFilter, departmentId]);
 
   const resetForm = () => {
     setDepartmentId("all"); setBgFilter("all"); setSubject(""); setContent("");
@@ -70,10 +95,15 @@ export function BulkComposeMessage({ open, onOpenChange, onSent }: BulkComposeMe
     if (!content.trim() || !user) return;
     setSending(true);
 
-    // Fetch recipients
+    // Fetch recipients — same filters as the preview count so the
+    // number in the button and the actual send-list always agree.
+    const deptIds = await fetchDeptVolunteerIds();
     let query = supabase.from("profiles").select("id, full_name, email").eq("role", "volunteer");
     if (bgFilter !== "all") {
       query = query.eq("bg_check_status", bgFilter as any);
+    }
+    if (deptIds !== null) {
+      query = query.in("id", [...deptIds]);
     }
     const { data: recipients } = await query;
 

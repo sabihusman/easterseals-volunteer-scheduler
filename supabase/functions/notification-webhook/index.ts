@@ -84,7 +84,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Type-specific preference check
+    // Type-specific preference check. Every type in typeMap MUST have
+    // a mapping here, otherwise the user's opt-out preference for that
+    // category is silently ignored and the notification always sends.
+    // Previously bg_check_status_change, shift_invitation, and
+    // admin_escalation were missing from this map.
     const typePrefs: Record<string, string> = {
       shift_reminder: "notif_shift_reminders",
       shift_reminder_auto: "notif_shift_reminders",
@@ -104,6 +108,11 @@ Deno.serve(async (req) => {
       unactioned_shift_coord_reminder: "notif_shift_reminders",
       waitlist_offer: "notif_booking_changes",
       waitlist_offer_expired: "notif_booking_changes",
+      // Previously missing — sent regardless of user opt-out:
+      bg_check_status_change: "notif_booking_changes",
+      shift_invitation: "notif_shift_reminders",
+      admin_escalation: "notif_shift_reminders",
+      coordinator_confirmation_reminder: "notif_shift_reminders",
     };
     const prefCol = typePrefs[record.type];
     if (prefCol && (profile as any)[prefCol] === false) {
@@ -130,8 +139,13 @@ Deno.serve(async (req) => {
     }
 
     // ── Send SMS ──
-    // Fall back to emergency_contact_phone if no primary phone — matches Settings UI
-    const smsTarget = profile.phone || (profile as any).emergency_contact_phone;
+    // Only send to the volunteer's own phone number. Previously this
+    // fell back to emergency_contact_phone when profile.phone was null,
+    // which was a privacy concern — the emergency contact (likely a
+    // family member) would receive shift reminders and late-cancellation
+    // alerts without any opt-in from them. Fail closed: if the
+    // volunteer hasn't set a phone number, SMS is simply not sent.
+    const smsTarget = profile.phone || null;
     if (profile.notif_sms && smsTarget) {
       // Build a concise SMS message from notification
       let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
