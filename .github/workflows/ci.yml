@@ -48,6 +48,12 @@ jobs:
     name: Playwright E2E
     runs-on: ubuntu-latest
     needs: lint-and-unit
+    # Only one E2E suite at a time — tests create/delete shifts on a
+    # shared production DB. Parallel runs (push + PR sync events)
+    # delete each other's test shifts mid-test, causing FK errors.
+    concurrency:
+      group: e2e-playwright
+      cancel-in-progress: false
     env:
       # Always run Playwright against the production deployment for
       # now. The earlier attempt to construct the Vercel PR preview
