@@ -5,6 +5,7 @@ import {
   getShift,
   listBookingsForShift,
   hardCleanupShift,
+  cleanupStaleE2EShifts,
   getTestDepartmentId,
   uniqueShiftDate,
   expectOk,
@@ -52,6 +53,8 @@ test.describe("Volunteer books a shift", () => {
     const request = await playwright.request.newContext();
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
+    // Clean up any orphaned E2E shifts from previous failed runs
+    await cleanupStaleE2EShifts(request, coordAccess);
     const departmentId = await getTestDepartmentId(request, coordAccess);
     shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     uniqueTitle = `E2E-BookFlow-${Date.now()}`;
