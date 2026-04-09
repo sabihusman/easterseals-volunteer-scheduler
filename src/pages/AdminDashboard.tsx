@@ -262,7 +262,7 @@ export default function AdminDashboard() {
           {filtered.map((s) => (
             <Card key={s.id}>
               <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="font-medium truncate">{s.title}</div>
                     <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
@@ -280,7 +280,7 @@ export default function AdminDashboard() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center flex-wrap gap-2 sm:flex-shrink-0">
                     <Badge className={`border ${deptBadgeClass(s.departments?.name)}`}>
                       {s.departments?.name}
                     </Badge>
