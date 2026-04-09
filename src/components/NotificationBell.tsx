@@ -27,10 +27,14 @@ export function NotificationBell() {
   useEffect(() => {
     if (!user) return;
     const fetch = async () => {
+      // Only surface unread notifications in the bell dropdown — once a
+      // notification has been acted on (clicked or "mark all read"), it
+      // should disappear from this inbox. History is not shown here.
       const { data } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", user.id)
+        .eq("is_read", false)
         .order("created_at", { ascending: false })
         .limit(30);
       setNotifications((data as Notification[]) || []);
@@ -40,29 +44,33 @@ export function NotificationBell() {
     const channel = supabase
       .channel("notifications")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
-        setNotifications((prev) => [payload.new as Notification, ...prev].slice(0, 30));
+        const n = payload.new as Notification;
+        if (!n.is_read) {
+          setNotifications((prev) => [n, ...prev].slice(0, 30));
+        }
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  // Because we only fetch unread notifications, the list length IS the
+  // unread count. Keeping it as a separate derived value for clarity.
+  const unreadCount = notifications.length;
 
   const markAllRead = async () => {
     if (!user) return;
-    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
-    if (unreadIds.length === 0) return;
-    await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds);
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    const ids = notifications.map((n) => n.id);
+    if (ids.length === 0) return;
+    // Optimistic: clear the list immediately.
+    setNotifications([]);
+    await supabase.from("notifications").update({ is_read: true }).in("id", ids);
   };
 
   const handleNotificationClick = async (n: Notification) => {
-    // Mark just this one read (optimistic), then navigate if it has a link
-    if (!n.is_read) {
-      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
-      void supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
-    }
+    // Optimistic: drop this notification from the dropdown immediately.
+    setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+    void supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
     setOpen(false);
     if (n.link) {
       navigate(n.link);
@@ -86,7 +94,7 @@ export function NotificationBell() {
           <h4 className="font-semibold text-sm">Notifications</h4>
           {unreadCount > 0 && (
             <Button variant="ghost" size="sm" className="text-xs h-auto py-1" onClick={markAllRead}>
-              Mark all read
+              Clear all
             </Button>
           )}
         </div>
@@ -99,7 +107,7 @@ export function NotificationBell() {
                 key={n.id}
                 type="button"
                 onClick={() => handleNotificationClick(n)}
-                className={`block w-full text-left px-4 py-3 border-b last:border-0 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-green-50 border-l-4 border-l-primary" : !n.is_read ? "bg-accent/50" : ""}`}
+                className={`block w-full text-left px-4 py-3 border-b last:border-0 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-green-50 border-l-4 border-l-primary" : "bg-accent/50"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -119,7 +127,7 @@ export function NotificationBell() {
                       </span>
                     )}
                   </div>
-                  {!n.is_read && <span className="mt-1 flex-shrink-0 h-2 w-2 rounded-full bg-primary" />}
+                  <span className="mt-1 flex-shrink-0 h-2 w-2 rounded-full bg-primary" />
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1">{format(new Date(n.created_at), "MMM d, h:mm a")}</p>
               </button>
