@@ -5,7 +5,7 @@ import { ConversationList } from "@/components/messaging/ConversationList";
 import { ConversationThread } from "@/components/messaging/ConversationThread";
 import { ComposeMessage } from "@/components/messaging/ComposeMessage";
 import { BulkComposeMessage } from "@/components/messaging/BulkComposeMessage";
-import { MessageSquarePlus, Megaphone, MessageSquare, Ban } from "lucide-react";
+import { MessageSquarePlus, Megaphone, MessageSquare, Ban, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function Messages() {
@@ -30,17 +30,31 @@ export default function Messages() {
   };
 
   return (
-    <div className="h-[calc(100vh-120px)] flex flex-col">
+    <div className="h-[calc(100dvh-8rem)] md:h-[calc(100vh-120px)] flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between pb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
         <h1 className="text-2xl font-bold">Messages</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setComposeOpen(true)} disabled={messagingBlocked}>
-            <MessageSquarePlus className="h-4 w-4 mr-2" /> New Message
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setComposeOpen(true)}
+            disabled={messagingBlocked}
+          >
+            <MessageSquarePlus className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">New Message</span>
+            <span className="sm:hidden">New</span>
           </Button>
           {(role === "coordinator" || role === "admin") && (
-            <Button variant="outline" onClick={() => setBulkOpen(true)} disabled={messagingBlocked}>
-              <Megaphone className="h-4 w-4 mr-2" /> Bulk Message
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setBulkOpen(true)}
+              disabled={messagingBlocked}
+            >
+              <Megaphone className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Bulk Message</span>
+              <span className="sm:hidden">Bulk</span>
             </Button>
           )}
         </div>
@@ -57,10 +71,14 @@ export default function Messages() {
         </Alert>
       )}
 
-      {/* Split layout */}
+      {/* Split layout: side-by-side on md+, master/detail on mobile */}
       <div className="flex flex-1 border rounded-lg overflow-hidden bg-background min-h-0">
-        {/* Left: Conversation list */}
-        <div className="w-80 shrink-0">
+        {/* Left: Conversation list (hidden on mobile when a thread is open) */}
+        <div
+          className={`w-full md:w-80 md:shrink-0 md:border-r ${
+            selectedConvoId ? "hidden md:block" : "block"
+          }`}
+        >
           <ConversationList
             selectedId={selectedConvoId}
             onSelect={handleSelect}
@@ -68,13 +86,26 @@ export default function Messages() {
           />
         </div>
 
-        {/* Right: Thread or empty state */}
-        <div className="flex-1 flex flex-col">
+        {/* Right: Thread or empty state (takes full width on mobile when open) */}
+        <div
+          className={`flex-1 flex-col min-w-0 ${
+            selectedConvoId ? "flex" : "hidden md:flex"
+          }`}
+        >
           {selectedConvoId ? (
             <>
-              {/* Thread header */}
-              <div className="px-4 py-3 border-b bg-muted/30">
-                <p className="font-medium text-sm">
+              {/* Thread header with mobile back button */}
+              <div className="px-3 py-3 border-b bg-muted/30 flex items-center gap-2">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="md:hidden h-8 w-8 shrink-0"
+                  onClick={() => handleSelect(null, {})}
+                  aria-label="Back to conversations"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <p className="font-medium text-sm truncate">
                   {Object.entries(participantNames)
                     .filter(([, name]) => name !== "You")
                     .map(([, name]) => name)
@@ -88,7 +119,7 @@ export default function Messages() {
               />
             </>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
               <MessageSquare className="h-12 w-12 mb-3" />
               <p className="text-lg font-medium">Select a conversation</p>
               <p className="text-sm">Or start a new one</p>

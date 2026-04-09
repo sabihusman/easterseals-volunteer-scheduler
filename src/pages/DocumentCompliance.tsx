@@ -160,15 +160,15 @@ export default function DocumentCompliance() {
       <h1 className="text-2xl font-bold">Document Compliance</h1>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
         <Input
           placeholder="Search volunteers..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
         />
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -180,7 +180,7 @@ export default function DocumentCompliance() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6 text-center">
             <p className="text-3xl font-bold text-primary">{volunteers.length}</p>

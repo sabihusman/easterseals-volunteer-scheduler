@@ -179,10 +179,10 @@ export default function CoordinatorDashboard() {
           <h2 className="text-2xl font-bold">Department Shifts</h2>
           <p className="text-muted-foreground">{role === "admin" ? "All department shifts" : "Manage shifts for your department"}</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center w-full sm:w-auto">
           {role === "admin" && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
-              <SelectTrigger className="w-[220px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="All Departments" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
                 {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
@@ -191,7 +191,7 @@ export default function CoordinatorDashboard() {
           )}
           {role !== "admin" && departments.length > 0 && (
             <Select value={selectedDept} onValueChange={setSelectedDept}>
-              <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[220px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {/* Offer an All option when coordinator manages more than one department */}
                 {departments.length > 1 && (
@@ -208,9 +208,9 @@ export default function CoordinatorDashboard() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="w-full grid grid-cols-3 h-auto sm:w-auto sm:inline-flex">
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
-          <TabsTrigger value="activity">Volunteer Activity</TabsTrigger>
+          <TabsTrigger value="activity" className="text-xs sm:text-sm">Volunteer Activity</TabsTrigger>
           <TabsTrigger value="volunteers">Volunteers</TabsTrigger>
         </TabsList>
 

@@ -259,7 +259,7 @@ export default function AdminUsers() {
           <Input className="pl-10" placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="volunteer">Volunteer</SelectItem>
@@ -297,13 +297,13 @@ export default function AdminUsers() {
                     {(p as any).messaging_blocked && <Badge variant="destructive" className="text-xs">Messaging Blocked</Badge>}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
                   {/* Role dropdown */}
                   <Select
                     value={p.role}
                     onValueChange={(v) => initiateRoleChange(p.id, p.full_name, p.role as UserRole, v as UserRole)}
                   >
-                    <SelectTrigger className="h-8 w-[130px] text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="volunteer">Volunteer</SelectItem>
                       <SelectItem value="coordinator">Coordinator</SelectItem>
@@ -330,7 +330,7 @@ export default function AdminUsers() {
                     </Button>
                   )}
                   <Select onValueChange={(v) => handleBgCheck(p.id, v as "cleared" | "pending" | "failed" | "expired")}>
-                    <SelectTrigger className="h-8 w-[120px] text-xs"><SelectValue placeholder="BG Check" /></SelectTrigger>
+                    <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs"><SelectValue placeholder="BG Check" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cleared">Cleared</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
