@@ -123,7 +123,13 @@ function formatTime12(t: string): string {
 }
 
 export function getShiftTimes(s: { time_type: string; start_time?: string | null; end_time?: string | null }): { start: string; end: string } {
-  if (s.time_type === "custom" && s.start_time && s.end_time) {
+  // Always prefer the actual start/end times when present, regardless
+  // of time_type. A coordinator might select "Morning" as a category
+  // but enter hours outside the 9-12 default (e.g. 2 PM – 3 PM).
+  // Previously this only used actual times when time_type === "custom",
+  // causing "Morning · 9:00 AM – 12:00 PM" to display when the real
+  // hours were completely different.
+  if (s.start_time && s.end_time) {
     return { start: s.start_time.slice(0, 5), end: s.end_time.slice(0, 5) };
   }
   const defaults = SHIFT_TIME_DEFAULTS[s.time_type];
@@ -133,6 +139,11 @@ export function getShiftTimes(s: { time_type: string; start_time?: string | null
 
 export function timeLabel(s: { time_type: string; start_time?: string | null; end_time?: string | null }): string {
   const times = getShiftTimes(s);
-  const label = s.time_type === "custom" ? "Custom" : (SHIFT_TIME_DEFAULTS[s.time_type]?.label || s.time_type);
+  const defaults = SHIFT_TIME_DEFAULTS[s.time_type];
+  // Show the preset label (Morning/Afternoon/All Day) only if the
+  // actual times match the defaults. Otherwise show "Custom" to
+  // avoid misleading labels like "Morning · 3:00 PM – 4:00 PM".
+  const timesMatchDefaults = defaults && times.start === defaults.start && times.end === defaults.end;
+  const label = timesMatchDefaults ? defaults.label : "Custom";
   return `${label} · ${formatTime12(times.start)} – ${formatTime12(times.end)}`;
 }
