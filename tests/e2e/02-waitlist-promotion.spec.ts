@@ -62,8 +62,9 @@ test.describe("Waitlist promotion lifecycle", () => {
     // --- 1. Coordinator creates the 1-slot shift ---
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
-    // Clean up orphaned E2E shifts from previous failed runs
-    await cleanupStaleE2EShifts(request, coordAccess);
+    // Clean up orphaned E2E shifts using ADMIN token
+    const adminForCleanup = await signInAsRole(request, "admin");
+    await cleanupStaleE2EShifts(request, adminForCleanup.access_token);
     const departmentId = await getTestDepartmentId(request, coordAccess);
     const shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {
