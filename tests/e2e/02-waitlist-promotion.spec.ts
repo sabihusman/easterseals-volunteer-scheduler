@@ -20,8 +20,10 @@ import {
  *   1. Coordinator creates a 1-slot shift on a unique date so the
  *      prevent_overlapping_bookings trigger can't fire across tests.
  *   2. Volunteer A books it → confirmed, slot counter = 1.
- *   3. Volunteer B (the admin account, used here as a second booking
- *      identity) attempts to book → trigger demotes to waitlisted.
+ *   3. Volunteer B (a SECOND volunteer account — the DB rejects
+ *      coordinators/admins from booking shifts via the
+ *      enforce_volunteer_role trigger) attempts to book → trigger
+ *      demotes to waitlisted.
  *   4. Vol A cancels → cancel trigger fires promote_next_waitlist
  *      which gives Vol B an offer (waitlist_offer_expires_at set).
  *   5. Vol B accepts via the waitlist_accept RPC → becomes confirmed,
@@ -75,7 +77,7 @@ test.describe("Waitlist promotion lifecycle", () => {
     // --- 2. Pre-cleanup: clear any leftover bookings the test users
     //    have on this date so the overlap trigger can't fire. ---
     const volA = await signInAsRole(request, "volunteer");
-    const volB = await signInAsRole(request, "admin");
+    const volB = await signInAsRole(request, "volunteer2");
     await cancelVolunteerBookingsOnDate(
       request,
       volA.access_token,
