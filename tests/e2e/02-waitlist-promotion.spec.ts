@@ -72,6 +72,7 @@ test.describe("Waitlist promotion lifecycle", () => {
     const departmentId = await getTestDepartmentId(request, coordAccess);
     const shift = await createShift(request, coordAccess, {
       department_id: departmentId,
+      created_by: coord.user.id,
       total_slots: 1,
       title: `E2E-Waitlist-${Date.now()}`,
     });

@@ -51,6 +51,7 @@ test.describe("Admin hard-deletes shift with bookings", () => {
     );
     const shift = await createShift(request, coord.access_token, {
       department_id: departmentId,
+      created_by: coord.user.id,
       total_slots: 2,
       title: `E2E-Delete-${Date.now()}`,
     });
