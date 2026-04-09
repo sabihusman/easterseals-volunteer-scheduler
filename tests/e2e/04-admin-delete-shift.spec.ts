@@ -46,8 +46,9 @@ test.describe("Admin hard-deletes shift with bookings", () => {
   }) => {
     // --- 1. Coordinator creates a 2-slot shift on a unique date ---
     const coord = await signInAsRole(request, "coordinator");
-    // Clean up orphaned E2E shifts from previous failed runs
-    await cleanupStaleE2EShifts(request, coord.access_token);
+    // Clean up orphaned E2E shifts using ADMIN token
+    const adminForCleanup = await signInAsRole(request, "admin");
+    await cleanupStaleE2EShifts(request, adminForCleanup.access_token);
     const departmentId = await getTestDepartmentId(
       request,
       coord.access_token

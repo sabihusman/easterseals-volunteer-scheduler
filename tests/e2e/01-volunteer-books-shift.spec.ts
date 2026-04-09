@@ -53,8 +53,10 @@ test.describe("Volunteer books a shift", () => {
     const request = await playwright.request.newContext();
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
-    // Clean up any orphaned E2E shifts from previous failed runs
-    await cleanupStaleE2EShifts(request, coordAccess);
+    // Clean up orphaned E2E shifts using ADMIN token (coordinator
+    // RLS can't delete shifts in other departments)
+    const admin = await signInAsRole(request, "admin");
+    await cleanupStaleE2EShifts(request, admin.access_token);
     const departmentId = await getTestDepartmentId(request, coordAccess);
     shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     uniqueTitle = `E2E-BookFlow-${Date.now()}`;
