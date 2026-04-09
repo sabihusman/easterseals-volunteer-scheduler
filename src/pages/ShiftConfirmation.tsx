@@ -214,6 +214,43 @@ export default function ShiftConfirmation() {
 
   const shift = booking?.shifts;
 
+  // Block confirmation if the shift hasn't ended yet.
+  // Compute end datetime using actual times (or time_type defaults).
+  const shiftEndAt = (() => {
+    if (!shift) return null;
+    const endStr =
+      shift.end_time ||
+      (shift.time_type === "morning"
+        ? "12:00:00"
+        : shift.time_type === "afternoon"
+        ? "16:00:00"
+        : "17:00:00");
+    return new Date(`${shift.shift_date}T${endStr}`);
+  })();
+  const shiftNotEnded = shiftEndAt && shiftEndAt > new Date();
+
+  if (shiftNotEnded) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-4">
+        <h2 className="text-2xl font-bold">Shift Confirmation</h2>
+        <Card>
+          <CardContent className="pt-6 text-center space-y-3">
+            <Clock className="h-12 w-12 text-muted-foreground mx-auto" />
+            <h3 className="text-lg font-semibold">This shift hasn't ended yet</h3>
+            <p className="text-muted-foreground text-sm">
+              You can confirm your attendance after the shift ends at{" "}
+              <strong>{format(shiftEndAt, "h:mm a")}</strong> on{" "}
+              <strong>{format(shiftEndAt, "MMMM d, yyyy")}</strong>.
+            </p>
+            <Button variant="outline" onClick={() => navigate("/dashboard")}>
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <h2 className="text-2xl font-bold">Shift Confirmation</h2>
