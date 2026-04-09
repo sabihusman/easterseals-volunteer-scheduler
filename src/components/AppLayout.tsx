@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { MobileNav } from "@/components/MobileNav";
 import { NotificationBell } from "@/components/NotificationBell";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { Leaf, MessageSquare, Sun, Moon } from "lucide-react";
@@ -33,25 +34,41 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <h1 className="text-lg font-bold text-foreground hidden sm:block">Easterseals Iowa</h1>
               <h1 className="text-lg font-bold text-foreground sm:hidden">Easterseals</h1>
             </div>
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-md hover:bg-muted transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </button>
-            <button
-              onClick={() => navigate("/messages")}
-              className="relative p-2 rounded-md hover:bg-muted transition-colors"
-              aria-label="Messages"
-            >
-              <MessageSquare className="h-5 w-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 flex items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="p-2 rounded-md hover:bg-muted transition-colors"
+                  aria-label="Toggle theme"
+                >
+                  {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => navigate("/messages")}
+                  className="relative p-2 rounded-md hover:bg-muted transition-colors"
+                  aria-label={`Messages${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+                >
+                  <MessageSquare className="h-5 w-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 flex items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {unreadCount > 0
+                  ? `Messages (${unreadCount} unread)`
+                  : "Messages"}
+              </TooltipContent>
+            </Tooltip>
             <NotificationBell />
           </header>
           <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto" role="main">

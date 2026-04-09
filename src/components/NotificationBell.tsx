@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 
@@ -64,14 +65,30 @@ export function NotificationBell() {
     if (ids.length === 0) return;
     // Optimistic: clear the list immediately.
     setNotifications([]);
-    await supabase.from("notifications").update({ is_read: true }).in("id", ids);
+    // NOTE: PostgrestFilterBuilder is lazy — the HTTP request is only
+    // dispatched when the thenable is awaited (or `.then()` is called).
+    // `void supabase.from(...).update(...)` would silently no-op.
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .in("id", ids);
+    if (error) console.warn("markAllRead failed:", error);
   };
 
   const handleNotificationClick = async (n: Notification) => {
     // Optimistic: drop this notification from the dropdown immediately.
     setNotifications((prev) => prev.filter((x) => x.id !== n.id));
-    void supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
     setOpen(false);
+    // Fire-and-forget the DB update, but use .then() so the thenable
+    // actually executes (PostgrestFilterBuilder is lazy). Navigate in
+    // parallel so the user doesn't wait for the round-trip.
+    supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", n.id)
+      .then(({ error }) => {
+        if (error) console.warn("markNotificationRead failed:", error);
+      });
     if (n.link) {
       navigate(n.link);
     }
@@ -79,16 +96,25 @@ export function NotificationBell() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}>
-          <Bell className="h-5 w-5" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}>
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          {unreadCount > 0
+            ? `Notifications (${unreadCount} unread)`
+            : "Notifications"}
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h4 className="font-semibold text-sm">Notifications</h4>
