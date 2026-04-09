@@ -35,7 +35,12 @@ import {
  * volunteer is booked on in real life or in another test.
  */
 
-const SHIFT_DATE_OFFSET_DAYS = 30;
+// Must be within the volunteer's 14-day default booking window — the
+// enforce_booking_window trigger raises P0001 ("Booking window
+// exceeded") for anything beyond. Each test uses a distinct day in
+// the window so the prevent_overlapping_bookings trigger also stays
+// quiet.
+const SHIFT_DATE_OFFSET_DAYS = 7;
 
 test.describe("Volunteer books a shift", () => {
   let shiftId: string | null = null;
