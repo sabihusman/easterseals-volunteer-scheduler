@@ -34,6 +34,14 @@ export const SUPABASE_URL =
   process.env.SUPABASE_URL || "https://esycmohgumryeqteiwla.supabase.co";
 export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 
+// The service_role key bypasses Cloudflare Turnstile captcha on
+// auth endpoints. The anon key triggers captcha verification, which
+// can't be satisfied from a headless CI runner (no browser widget).
+// We use service_role ONLY for sign-in; all subsequent requests use
+// the user-scoped access_token with the anon key, so RLS still
+// applies normally.
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
 export type TestRole = "volunteer" | "volunteer2" | "coordinator" | "admin";
 
 function emailFor(role: TestRole): string {
@@ -53,6 +61,11 @@ function assertCreds() {
   if (!SUPABASE_ANON_KEY) {
     throw new Error(
       "SUPABASE_ANON_KEY env var is required for E2E tests"
+    );
+  }
+  if (!SERVICE_ROLE_KEY) {
+    throw new Error(
+      "SUPABASE_SERVICE_ROLE_KEY env var is required for E2E tests (bypasses captcha on auth)"
     );
   }
   if (!process.env.TEST_PASSWORD) {
@@ -81,12 +94,15 @@ export async function signInAsRole(
   if (!email) {
     throw new Error(`No test email configured for role "${role}"`);
   }
+  // Use service_role key for the auth call to bypass Cloudflare
+  // Turnstile captcha. The anon key would trigger captcha
+  // verification which always fails from headless CI runners.
   const res = await request.post(
     `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
     {
       headers: {
         "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
+        apikey: SERVICE_ROLE_KEY,
       },
       data: { email, password: process.env.TEST_PASSWORD },
     }
