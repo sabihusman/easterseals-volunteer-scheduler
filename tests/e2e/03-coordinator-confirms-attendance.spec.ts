@@ -5,39 +5,34 @@ import {
   listBookingsForShift,
   hardCleanupShift,
   getTestDepartmentId,
+  uniquePastShiftDate,
+  expectOk,
+  cancelVolunteerBookingsOnDate,
+  authHeaders,
   SUPABASE_URL,
-  SUPABASE_ANON_KEY,
 } from "./fixtures/db";
 
 /**
  * E2E 3 — Coordinator confirms volunteer attendance.
  *
  * Flow:
- *   1. Setup: coordinator creates a shift dated in the past so the
- *      "confirmation" action is available.
- *   2. Volunteer A books that shift via REST (under their own auth).
- *   3. Coordinator signs in, opens the coordinator dashboard,
- *      confirms the volunteer's attendance with a specific hours
- *      value via the RPC path the UI exercises.
- *   4. Verify in DB:
- *        - confirmation_status = 'confirmed'
- *        - final_hours matches what we submitted
- *
- * Note: we exercise the confirm action through the coordinator REST
- * path rather than the exact DOM click sequence. The DOM-driven
- * version is brittle because confirmation UI varies by dashboard tab
- * and the "attended" button is only visible for post-shift bookings.
- * The authoritative behavior check is the DB state.
+ *   1. Coordinator creates a shift with a date 60+ days in the past
+ *      so that (a) the shift is well past confirmation eligibility,
+ *      and (b) the date is unlikely to collide with any real
+ *      production booking the test volunteer might have.
+ *   2. Volunteer books that shift via REST under their own session.
+ *   3. Coordinator smoke-loads /coordinator (proves auth works) then
+ *      submits the confirmation PATCH via REST — the same call the
+ *      UI makes under the hood. We do REST instead of clicking the
+ *      DOM because the confirmation control is buried inside a
+ *      tab/subview that varies by role config and is brittle to
+ *      select against.
+ *   4. Verify DB: confirmation_status = 'confirmed', final_hours set,
+ *      booking_status still 'confirmed' (booking state is orthogonal
+ *      to attendance state).
  */
 
-function authHeaders(token: string) {
-  return {
-    "Content-Type": "application/json",
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${token}`,
-    Prefer: "return=representation",
-  };
-}
+const PAST_DATE_OFFSET_DAYS = 60;
 
 test.describe("Coordinator confirms attendance", () => {
   let shiftId: string | null = null;
@@ -53,32 +48,35 @@ test.describe("Coordinator confirms attendance", () => {
   });
 
   test("marks volunteer attended and records final_hours", async ({
-    playwright,
     page,
     context,
     request,
   }) => {
-    // --- 1. Coordinator creates a past-dated shift ---
+    // --- 1. Coordinator creates a far-past shift ---
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
     const departmentId = await getTestDepartmentId(request, coordAccess);
-    // Dated 2 days ago so that checkin / confirmation is available.
-    const pastDate = new Date(Date.now() - 2 * 86400000)
-      .toISOString()
-      .slice(0, 10);
+    const pastDate = uniquePastShiftDate(PAST_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {
       department_id: departmentId,
       created_by: coord.user.id,
       total_slots: 1,
       title: `E2E-Confirm-${Date.now()}`,
       shift_date: pastDate,
-      start_time: "09:00:00",
-      end_time: "11:00:00",
+      start_time: "06:00:00",
+      end_time: "07:00:00",
     });
     shiftId = shift.id;
 
-    // --- 2. Volunteer books it under their own session ---
+    // --- 2. Pre-cleanup, then volunteer books under their own session ---
     const vol = await signInAsRole(request, "volunteer");
+    await cancelVolunteerBookingsOnDate(
+      request,
+      vol.access_token,
+      vol.user.id,
+      pastDate
+    );
+
     const bookRes = await request.post(
       `${SUPABASE_URL}/rest/v1/shift_bookings`,
       {
@@ -90,24 +88,16 @@ test.describe("Coordinator confirms attendance", () => {
         },
       }
     );
-    expect(bookRes.ok(), "volunteer book").toBeTruthy();
-    const bookRows = await bookRes.json();
+    await expectOk(bookRes, "volunteer book");
+    const bookRows = (await bookRes.json()) as Array<{ id: string }>;
     const bookingId = bookRows[0].id;
 
-    // --- 3. Coordinator opens the dashboard (smoke-checks the UI
-    //    renders with the shift present) then submits confirmation via
-    //    the REST PATCH that the UI uses under the hood ---
+    // --- 3. Coordinator UI smoke + REST confirmation ---
     await loginAndVisit(request, context, page, "coordinator", "/coordinator");
-    // Just make sure the coordinator page loads successfully (not
-    // asserting on the specific shift card — it could be on a
-    // different tab / subview depending on role config).
     await expect(page.locator("h1, h2").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // Submit confirmation via the same REST call the UI makes. This
-    // is the contract we actually care about — the client sends a
-    // PATCH to mark confirmation_status=confirmed with final_hours.
     const confirmRes = await request.patch(
       `${SUPABASE_URL}/rest/v1/shift_bookings?id=eq.${bookingId}`,
       {
@@ -118,10 +108,7 @@ test.describe("Coordinator confirms attendance", () => {
         },
       }
     );
-    expect(
-      confirmRes.ok(),
-      `confirm attendance: ${await confirmRes.text()}`
-    ).toBeTruthy();
+    await expectOk(confirmRes, "confirm attendance");
 
     await new Promise((r) => setTimeout(r, 500));
 
@@ -134,8 +121,6 @@ test.describe("Coordinator confirms attendance", () => {
     const ours = bookings.find((b) => b.id === bookingId);
     expect(ours?.confirmation_status).toBe("confirmed");
     expect(Number(ours?.final_hours)).toBe(finalHoursToSet);
-    // The booking stays in booking_status='confirmed' (booking_status
-    // is about booking state, confirmation_status is about attendance).
     expect(ours?.booking_status).toBe("confirmed");
   });
 });
