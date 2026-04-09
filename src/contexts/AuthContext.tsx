@@ -44,11 +44,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Defer the profile fetch with setTimeout(..., 0) as recommended by
     // Supabase docs.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
           setTimeout(() => { fetchProfile(session.user.id); }, 0);
+
+          // Increment signin_count on actual sign-in (not token
+          // refresh). Drives the onboarding modal: show on the first
+          // 3 sign-ins if onboarding isn't complete. Best-effort
+          // read-then-write — if it fails the counter just stays the
+          // same. Low stakes.
+          if (event === "SIGNED_IN") {
+            const uid = session.user.id;
+            setTimeout(async () => {
+              const { data } = await supabase
+                .from("profiles")
+                .select("signin_count")
+                .eq("id", uid)
+                .single();
+              const current = (data as { signin_count?: number } | null)?.signin_count ?? 0;
+              await supabase
+                .from("profiles")
+                .update({ signin_count: current + 1 } as never)
+                .eq("id", uid);
+            }, 0);
+          }
         } else {
           setProfile(null);
         }

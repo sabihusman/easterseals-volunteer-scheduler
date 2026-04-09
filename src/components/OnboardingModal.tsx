@@ -105,14 +105,21 @@ export default function OnboardingModal() {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("onboarding_complete, full_name, phone, emergency_contact_name, emergency_contact_phone, role")
+      .select("onboarding_complete, signin_count, full_name, phone, emergency_contact_name, emergency_contact_phone, role")
       .eq("id", user.id)
       .single();
 
     // Skip onboarding for admins and coordinators
     if (profile && (profile.role === "admin" || profile.role === "coordinator")) return;
 
-    if (profile && !profile.onboarding_complete) {
+    // Show the modal if the user hasn't completed onboarding AND
+    // they've signed in 3 or fewer times. After 3 sign-ins, stop
+    // showing it automatically — the user can still open it from
+    // the dashboard checklist if they want to finish later.
+    const signinCount = (profile as { signin_count?: number } | null)?.signin_count ?? 0;
+    const shouldShow = profile && !profile.onboarding_complete && signinCount <= 3;
+
+    if (shouldShow) {
       setForm({
         full_name: profile.full_name ?? "",
         phone: profile.phone ?? "",
