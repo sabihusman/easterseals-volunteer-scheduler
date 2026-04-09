@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Bell } from "lucide-react";
@@ -19,6 +20,7 @@ type Notification = {
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
@@ -55,6 +57,18 @@ export function NotificationBell() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
   };
 
+  const handleNotificationClick = async (n: Notification) => {
+    // Mark just this one read (optimistic), then navigate if it has a link
+    if (!n.is_read) {
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
+      void supabase.from("notifications").update({ is_read: true }).eq("id", n.id);
+    }
+    setOpen(false);
+    if (n.link) {
+      navigate(n.link);
+    }
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -81,7 +95,12 @@ export function NotificationBell() {
             <div className="p-4 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
             notifications.map((n) => (
-              <div key={n.id} className={`px-4 py-3 border-b last:border-0 ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-green-50 border-l-4 border-l-primary" : !n.is_read ? "bg-accent/50" : ""}`}>
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => handleNotificationClick(n)}
+                className={`block w-full text-left px-4 py-3 border-b last:border-0 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-green-50 border-l-4 border-l-primary" : !n.is_read ? "bg-accent/50" : ""}`}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -95,15 +114,15 @@ export function NotificationBell() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{n.message}</p>
                     {n.type === "self_confirmation_reminder" && n.link && (
-                      <a href={n.link} onClick={() => setOpen(false)} className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded px-2.5 py-1">
+                      <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-white bg-primary rounded px-2.5 py-1">
                         Confirm Now →
-                      </a>
+                      </span>
                     )}
                   </div>
                   {!n.is_read && <span className="mt-1 flex-shrink-0 h-2 w-2 rounded-full bg-primary" />}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-1">{format(new Date(n.created_at), "MMM d, h:mm a")}</p>
-              </div>
+              </button>
             ))
           )}
         </ScrollArea>
