@@ -5,6 +5,7 @@ import {
   getShift,
   listBookingsForShift,
   hardCleanupShift,
+  cleanupStaleE2EShifts,
   getTestDepartmentId,
   uniqueShiftDate,
   expectOk,
@@ -61,6 +62,8 @@ test.describe("Waitlist promotion lifecycle", () => {
     // --- 1. Coordinator creates the 1-slot shift ---
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
+    // Clean up orphaned E2E shifts from previous failed runs
+    await cleanupStaleE2EShifts(request, coordAccess);
     const departmentId = await getTestDepartmentId(request, coordAccess);
     const shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {

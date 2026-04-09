@@ -9,6 +9,7 @@ import {
   uniqueShiftDate,
   expectOk,
   cancelVolunteerBookingsOnDate,
+  cleanupStaleE2EShifts,
   authHeaders,
   SUPABASE_URL,
 } from "./fixtures/db";
@@ -45,6 +46,8 @@ test.describe("Admin hard-deletes shift with bookings", () => {
   }) => {
     // --- 1. Coordinator creates a 2-slot shift on a unique date ---
     const coord = await signInAsRole(request, "coordinator");
+    // Clean up orphaned E2E shifts from previous failed runs
+    await cleanupStaleE2EShifts(request, coord.access_token);
     const departmentId = await getTestDepartmentId(
       request,
       coord.access_token
