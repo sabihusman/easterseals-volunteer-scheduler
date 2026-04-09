@@ -68,6 +68,7 @@ test.describe("Coordinator confirms attendance", () => {
       .slice(0, 10);
     const shift = await createShift(request, coordAccess, {
       department_id: departmentId,
+      created_by: coord.user.id,
       total_slots: 1,
       title: `E2E-Confirm-${Date.now()}`,
       shift_date: pastDate,
