@@ -56,7 +56,9 @@ test.describe("Coordinator confirms attendance", () => {
     // --- 1. Coordinator creates a far-past shift ---
     const coord = await signInAsRole(request, "coordinator");
     coordAccess = coord.access_token;
-    await cleanupStaleE2EShifts(request, coordAccess);
+    // Clean up orphaned E2E shifts using ADMIN token
+    const adminForCleanup = await signInAsRole(request, "admin");
+    await cleanupStaleE2EShifts(request, adminForCleanup.access_token);
     const departmentId = await getTestDepartmentId(request, coordAccess);
     const pastDate = uniquePastShiftDate(PAST_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {
