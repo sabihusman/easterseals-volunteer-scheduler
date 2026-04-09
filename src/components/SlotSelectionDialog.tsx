@@ -66,6 +66,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
 
   const hasSlots = slots.length > 0;
   const availableSlots = slots.filter(s => s.booked_slots < s.total_slots);
+  const allSlotsFull = hasSlots && availableSlots.length === 0;
   const allSelected = availableSlots.length > 0 && availableSlots.every(s => selected.has(s.id));
 
   const toggleAll = () => {
@@ -332,7 +333,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                 </div>
               )}
 
-              {/* Individual slots */}
+              {/* Individual slots — full slots ARE selectable for waitlist */}
               <div className="space-y-1.5">
                 {slots.map(slot => {
                   const isFull = slot.booked_slots >= slot.total_slots;
@@ -343,28 +344,30 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                       key={slot.id}
                       role="checkbox"
                       aria-checked={isSelected}
-                      aria-disabled={isFull}
-                      tabIndex={isFull ? -1 : 0}
-                      className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
-                        isFull ? "opacity-50 cursor-not-allowed bg-muted" : isSelected ? "border-primary bg-primary/5 cursor-pointer" : "hover:bg-muted/50 cursor-pointer"
+                      tabIndex={0}
+                      className={`flex items-center gap-3 p-3 rounded-md border transition-colors cursor-pointer ${
+                        isSelected
+                          ? isFull
+                            ? "border-warning bg-warning/5"
+                            : "border-primary bg-primary/5"
+                          : "hover:bg-muted/50"
                       }`}
-                      onClick={() => !isFull && toggleSlot(slot.id)}
+                      onClick={() => toggleSlot(slot.id)}
                       onKeyDown={(e) => {
-                        if ((e.key === " " || e.key === "Enter") && !isFull) {
+                        if (e.key === " " || e.key === "Enter") {
                           e.preventDefault();
                           toggleSlot(slot.id);
                         }
                       }}
                     >
-                      {/* Visual-only — parent div owns the toggle */}
-                      <Checkbox checked={isSelected} disabled={isFull} tabIndex={-1} aria-hidden="true" />
+                      <Checkbox checked={isSelected} tabIndex={-1} aria-hidden="true" />
                       <div className="flex-1">
                         <div className="text-sm">{formatSlotRange(slot.slot_start, slot.slot_end)}</div>
                         <div className="text-xs text-muted-foreground">{slotHours(slot.slot_start, slot.slot_end)} hours</div>
                       </div>
                       <div className="text-xs">
                         {isFull ? (
-                          <Badge variant="secondary" className="text-[10px]">Full</Badge>
+                          <Badge variant="outline" className="text-[10px] border-warning text-warning">Full — Waitlist</Badge>
                         ) : (
                           <span className="text-muted-foreground flex items-center gap-1">
                             <Users className="h-3 w-3" />{remaining} left
@@ -378,18 +381,40 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
             </div>
 
             {/* Summary */}
-            {selected.size > 0 && (
-              <div className="bg-muted rounded-md p-3 text-sm space-y-1">
-                <div className="font-medium">Booking Summary</div>
-                <div className="text-muted-foreground">
-                  {selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ")}
+            {selected.size > 0 && (() => {
+              const anySelectedFull = selectedSlots.some(
+                s => s.booked_slots >= s.total_slots
+              );
+              return (
+                <div className={`rounded-md p-3 text-sm space-y-1 ${anySelectedFull ? "bg-warning/10 border border-warning/30" : "bg-muted"}`}>
+                  <div className="font-medium">
+                    {anySelectedFull ? "Waitlist Summary" : "Booking Summary"}
+                  </div>
+                  <div className="text-muted-foreground">
+                    {selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ")}
+                  </div>
+                  <div className="font-medium">Selected: {totalHours} hours</div>
+                  {anySelectedFull && (
+                    <p className="text-xs text-warning">
+                      One or more selected slots are full. You'll be added to the waitlist and notified if a spot opens up.
+                    </p>
+                  )}
                 </div>
-                <div className="font-medium">Selected: {totalHours} hours</div>
-              </div>
-            )}
+              );
+            })()}
 
-            <Button onClick={handleConfirm} disabled={submitting || selected.size === 0} className="w-full">
-              {submitting ? "Booking..." : selected.size === 0 ? "Select at least one slot" : "Confirm Booking"}
+            <Button
+              onClick={handleConfirm}
+              disabled={submitting || selected.size === 0}
+              className="w-full"
+            >
+              {submitting
+                ? "Booking..."
+                : selected.size === 0
+                ? "Select your preferred hours"
+                : selectedSlots.some(s => s.booked_slots >= s.total_slots)
+                ? "Join Waitlist"
+                : "Confirm Booking"}
             </Button>
           </div>
         )}
