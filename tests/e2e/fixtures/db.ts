@@ -26,6 +26,96 @@ function headers(accessToken: string) {
   };
 }
 
+/**
+ * Public version of `headers` for spec files that issue ad-hoc REST
+ * calls under their own session token.
+ */
+export function authHeaders(accessToken: string) {
+  return headers(accessToken);
+}
+
+/**
+ * Generate a unique YYYY-MM-DD date in the future, offset N days from
+ * today. Each spec uses a distinct offset so no two test shifts share
+ * a date — this avoids the prevent_overlapping_bookings trigger ever
+ * firing across tests, since the trigger keys on (volunteer_id,
+ * shift_date, time-overlap).
+ *
+ * Far-future dates also stay clear of any real production shifts the
+ * test users might already be booked on.
+ */
+export function uniqueShiftDate(offsetDays: number): string {
+  return new Date(Date.now() + offsetDays * 86400000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+export function uniquePastShiftDate(offsetDays: number): string {
+  return new Date(Date.now() - Math.abs(offsetDays) * 86400000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+/**
+ * Wrap a Playwright APIResponse so a non-OK status throws with the
+ * full response body included in the error message — instead of the
+ * useless "expect(false).toBeTruthy()" we were getting before.
+ */
+export async function expectOk(
+  res: { ok: () => boolean; status: () => number; text: () => Promise<string> },
+  label: string
+): Promise<void> {
+  if (!res.ok()) {
+    const body = await res.text();
+    throw new Error(`${label} failed: HTTP ${res.status()} ${body}`);
+  }
+}
+
+/**
+ * Cancel any active (confirmed/waitlisted) bookings the given
+ * volunteer has on the given shift_date. Used as belt-and-suspenders
+ * pre-test cleanup so a volunteer's leftover state from a real-life
+ * booking or a previous failed test run can't poison the overlap
+ * trigger.
+ *
+ * Runs as the postgres role via the supabase admin REST endpoint
+ * (we use the coordinator's token here, which has SELECT visibility
+ * via the dept-coordinator policy; the actual cancel is performed by
+ * the volunteer themselves below since UPDATE on shift_bookings is
+ * locked to the row's owner).
+ */
+export async function cancelVolunteerBookingsOnDate(
+  request: APIRequestContext,
+  volunteerAccessToken: string,
+  volunteerId: string,
+  shiftDate: string
+): Promise<number> {
+  // First find all active bookings the volunteer has via shifts JOIN.
+  // PostgREST embedded resource syntax: shifts!inner so the join
+  // applies as a filter on the parent.
+  const findRes = await request.get(
+    `${SUPABASE_URL}/rest/v1/shift_bookings?select=id,shifts!inner(shift_date)&volunteer_id=eq.${volunteerId}&booking_status=in.(confirmed,waitlisted)&shifts.shift_date=eq.${shiftDate}`,
+    { headers: headers(volunteerAccessToken) }
+  );
+  if (!findRes.ok()) return 0;
+  const rows = (await findRes.json()) as Array<{ id: string }>;
+  if (!rows || rows.length === 0) return 0;
+  // Cancel each one (UPDATE booking_status=cancelled).
+  for (const row of rows) {
+    await request.patch(
+      `${SUPABASE_URL}/rest/v1/shift_bookings?id=eq.${row.id}`,
+      {
+        headers: headers(volunteerAccessToken),
+        data: {
+          booking_status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+        },
+      }
+    );
+  }
+  return rows.length;
+}
+
 export interface CreatedShift {
   id: string;
   title: string;
