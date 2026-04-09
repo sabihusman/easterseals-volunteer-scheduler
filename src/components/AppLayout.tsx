@@ -75,7 +75,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
             {children}
           </main>
         </div>
-        {isMobile && <MobileNav />}
+        {isMobile && (
+          <MobileNav
+            userRole={profile?.role as "volunteer" | "coordinator" | "admin" | undefined}
+            userName={profile?.full_name || undefined}
+          />
+        )}
       </div>
     </SidebarProvider>
   );
