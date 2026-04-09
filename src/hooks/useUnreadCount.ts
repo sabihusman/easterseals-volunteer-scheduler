@@ -55,6 +55,9 @@ export function useUnreadCount() {
     const channelName = `unread-count:${user.id}`;
     const channel = supabase
       .channel(channelName)
+      // A new incoming message from someone else → refetch authoritative
+      // count from the RPC. Previously this hook incremented a local
+      // counter, which was only correct on INSERTs and never decremented.
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
@@ -62,8 +65,20 @@ export function useUnreadCount() {
       }, (payload) => {
         const msg = payload.new as { sender_id: string };
         if (msg.sender_id !== user.id) {
-          setCount((c) => c + 1);
+          fetchCount();
         }
+      })
+      // The user marked a conversation as read (ConversationThread.markRead
+      // bumps last_read_at on their own participant row). Without this
+      // the badge count was "sticky" — it only ever went up, never down,
+      // until a full page reload.
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "conversation_participants",
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchCount();
       })
       .subscribe();
 

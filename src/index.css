@@ -50,6 +50,57 @@
 
     --navy: 224 100% 27%;
   }
+
+  /*
+   * Dark theme — dark-grey Claude Code-style palette.
+   * Background is a warm dark grey rather than pure black so text and
+   * surfaces have enough contrast without being harsh.
+   */
+  .dark {
+    --background: 0 0% 12%;
+    --foreground: 0 0% 95%;
+
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 153 60% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 224 60% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 153 40% 20%;
+    --accent-foreground: 153 60% 80%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 153 60% 50%;
+
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 153 60% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 153 60% 50%;
+
+    --warning: 38 92% 58%;
+    --warning-foreground: 30 81% 12%;
+    --success: 142 60% 50%;
+    --success-foreground: 0 0% 100%;
+
+    --navy: 224 70% 65%;
+  }
 }
 
 @layer base {

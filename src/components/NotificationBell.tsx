@@ -107,7 +107,7 @@ export function NotificationBell() {
                 key={n.id}
                 type="button"
                 onClick={() => handleNotificationClick(n)}
-                className={`block w-full text-left px-4 py-3 border-b last:border-0 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-green-50 border-l-4 border-l-primary" : "bg-accent/50"}`}
+                className={`block w-full text-left px-4 py-3 border-b last:border-0 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none ${n.type === "late_cancellation" ? "bg-destructive/10 border-l-4 border-l-destructive" : n.type === "self_confirmation_reminder" ? "bg-primary/10 border-l-4 border-l-primary" : "bg-accent/50"}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
