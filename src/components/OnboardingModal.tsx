@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -18,6 +20,7 @@ import {
   Building2,
   CalendarSearch,
   CheckCircle2,
+  X,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -78,6 +81,7 @@ export default function OnboardingModal() {
   const [step, setStep] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [doNotShowAgain, setDoNotShowAgain] = useState(false);
 
   // Step 2: profile
   const [form, setForm] = useState<ProfileForm>({
@@ -140,6 +144,22 @@ export default function OnboardingModal() {
 
   function prev() {
     if (step > 0) setStep((s) => s - 1);
+  }
+
+  /**
+   * Dismiss the modal. If "do not show again" is checked, persist
+   * onboarding_complete = true in the DB so the modal never returns.
+   * Otherwise the dismissal is session-only and the modal will
+   * reappear on the next page load.
+   */
+  async function dismiss() {
+    if (doNotShowAgain && userId) {
+      await supabase
+        .from("profiles")
+        .update({ onboarding_complete: true })
+        .eq("id", userId);
+    }
+    setOpen(false);
   }
 
   /* ---------- Save profile (step 2 → 3) ---------- */
@@ -380,91 +400,113 @@ export default function OnboardingModal() {
   if (!open) return null;
 
   return (
-    // Volunteers must complete onboarding — don't let Escape or
-    // clicking the backdrop dismiss the modal. The "Complete Setup"
-    // button on the last step is the only way out. Previously a user
-    // could close mid-flow and re-open the app, and the modal would
-    // just re-appear at step 0, or worse — they'd bypass required
-    // steps entirely if onboarding_complete happened to be set early.
-    <Dialog
-      open={open}
-      onOpenChange={() => {
-        /* no-op — modal is modal */
-      }}
-    >
-      <DialogContent
-        className="max-w-md gap-0 p-0"
-        onEscapeKeyDown={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+    <Dialog open={open} onOpenChange={(v) => { if (!v) dismiss(); }}>
+      <DialogContent className="max-w-md gap-0 p-0">
+        {/* Accessible title (visually hidden if the step renders its own heading) */}
+        <DialogTitle className="sr-only">Getting Started</DialogTitle>
+
+        {/* Close / skip button (top-right) */}
+        <button
+          type="button"
+          onClick={dismiss}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 z-10"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
         {/* Step content */}
         <div className="px-6 pt-6 pb-2">{renderStep()}</div>
 
-        {/* Step dots + nav */}
-        <div className="flex items-center justify-between border-t px-6 py-4">
-          {/* Dots */}
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
-              <StepDot key={i} active={i === step} complete={i < step} />
-            ))}
+        {/* Footer: dots + "do not show again" + nav */}
+        <div className="border-t px-6 py-4 space-y-3">
+          {/* Row 1: step dots + nav buttons */}
+          <div className="flex items-center justify-between">
+            {/* Dots */}
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+                <StepDot key={i} active={i === step} complete={i < step} />
+              ))}
+            </div>
+
+            {/* Buttons */}
+            <div className="flex items-center gap-2">
+              {step > 0 && step < TOTAL_STEPS - 1 && (
+                <Button variant="ghost" size="sm" onClick={prev}>
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Back
+                </Button>
+              )}
+
+              {/* Skip link — available on every step except the last */}
+              {step < TOTAL_STEPS - 1 && (
+                <Button variant="ghost" size="sm" onClick={dismiss}>
+                  Skip
+                </Button>
+              )}
+
+              {step === 0 && (
+                <Button
+                  size="sm"
+                  onClick={next}
+                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                >
+                  Get Started
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              )}
+
+              {step === 1 && (
+                <Button
+                  size="sm"
+                  onClick={saveProfile}
+                  disabled={saving}
+                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                >
+                  {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Save & Continue
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              )}
+
+              {(step === 2 || step === 3) && (
+                <Button
+                  size="sm"
+                  onClick={next}
+                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                >
+                  Next
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              )}
+
+              {step === TOTAL_STEPS - 1 && (
+                <Button
+                  size="sm"
+                  onClick={completeOnboarding}
+                  disabled={saving}
+                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                >
+                  {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                  Finish
+                </Button>
+              )}
+            </div>
           </div>
 
-          {/* Buttons */}
+          {/* Row 2: "Do not show again" checkbox */}
           <div className="flex items-center gap-2">
-            {step > 0 && step < TOTAL_STEPS - 1 && (
-              <Button variant="ghost" size="sm" onClick={prev}>
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Back
-              </Button>
-            )}
-
-            {step === 0 && (
-              <Button
-                size="sm"
-                onClick={next}
-                className="bg-[#006B3E] hover:bg-[#005a33]"
-              >
-                Get Started
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            )}
-
-            {step === 1 && (
-              <Button
-                size="sm"
-                onClick={saveProfile}
-                disabled={saving}
-                className="bg-[#006B3E] hover:bg-[#005a33]"
-              >
-                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                Save & Continue
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            )}
-
-            {(step === 2 || step === 3) && (
-              <Button
-                size="sm"
-                onClick={next}
-                className="bg-[#006B3E] hover:bg-[#005a33]"
-              >
-                Next
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            )}
-
-            {step === TOTAL_STEPS - 1 && (
-              <Button
-                size="sm"
-                onClick={completeOnboarding}
-                disabled={saving}
-                className="bg-[#006B3E] hover:bg-[#005a33]"
-              >
-                {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-                Finish
-              </Button>
-            )}
+            <Checkbox
+              id="do-not-show-again"
+              checked={doNotShowAgain}
+              onCheckedChange={(v) => setDoNotShowAgain(v === true)}
+            />
+            <label
+              htmlFor="do-not-show-again"
+              className="text-xs text-muted-foreground cursor-pointer select-none"
+            >
+              Don't show this again
+            </label>
           </div>
         </div>
       </DialogContent>
