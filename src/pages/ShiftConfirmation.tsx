@@ -154,10 +154,15 @@ export default function ShiftConfirmation() {
     // Save to volunteer_shift_reports — upsert so it works whether or not a row exists.
     // The DB trigger automatically syncs self_reported_hours to
     // shift_bookings.volunteer_reported_hours and runs resolve_hours_discrepancy().
+    // volunteer_id is required by the RLS policy (volunteer_id = auth.uid()).
+    // Without it the inserted row gets volunteer_id = NULL which fails
+    // the WITH CHECK and returns "new row violates row-level security
+    // policy for table volunteer_shift_reports".
     const { error: reportErr } = await supabase
       .from("volunteer_shift_reports")
       .upsert({
         booking_id: bookingId!,
+        volunteer_id: user.id,
         self_confirm_status: "attended" as any,
         self_reported_hours: hoursNum,
         star_rating: rating,
