@@ -91,10 +91,12 @@ export default function ShiftConfirmation() {
 
     if (attended === false) {
       // Self-reported no-show — upsert so it works whether or not a row exists
+      // volunteer_id is required by RLS (volunteer_id = auth.uid())
       const { error: reportErr } = await supabase
         .from("volunteer_shift_reports")
         .upsert({
           booking_id: bookingId!,
+          volunteer_id: user.id,
           self_confirm_status: "no_show" as any,
           submitted_at: new Date().toISOString(),
         }, { onConflict: "booking_id" });
