@@ -60,10 +60,10 @@ function StepDot({ active, complete }: { active: boolean; complete: boolean }) {
       className={[
         "h-2 w-2 rounded-full transition-all",
         active
-          ? "w-6 bg-[#006B3E]"
+          ? "w-6 bg-primary"
           : complete
-          ? "bg-[#006B3E]/40"
-          : "bg-gray-200",
+          ? "bg-primary/40"
+          : "bg-muted",
       ].join(" ")}
     />
   );
@@ -229,13 +229,13 @@ export default function OnboardingModal() {
         return (
           <div className="flex flex-col items-center text-center py-6 px-2">
             {/* Logo placeholder — replace src with your actual logo path */}
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-[#006B3E]">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary">
               <Sparkles className="h-10 w-10 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-foreground">
               Welcome to the Volunteer Portal
             </h2>
-            <p className="mt-3 max-w-sm text-sm text-gray-600">
+            <p className="mt-3 max-w-sm text-sm text-muted-foreground">
               Thanks for joining Easterseals Iowa! Let's get you set up in a
               few quick steps so you can start browsing and signing up for
               volunteer shifts.
@@ -247,7 +247,7 @@ export default function OnboardingModal() {
       case 1:
         return (
           <div className="space-y-4 py-2">
-            <div className="flex items-center gap-2 text-[#006B3E]">
+            <div className="flex items-center gap-2 text-primary">
               <User className="h-5 w-5" />
               <h3 className="text-lg font-semibold">Complete Your Profile</h3>
             </div>
@@ -318,17 +318,17 @@ export default function OnboardingModal() {
       case 2:
         return (
           <div className="space-y-4 py-2">
-            <div className="flex items-center gap-2 text-[#006B3E]">
+            <div className="flex items-center gap-2 text-primary">
               <Building2 className="h-5 w-5" />
               <h3 className="text-lg font-semibold">Our Departments</h3>
             </div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Here are the departments you can volunteer with. Each has
               different activities and requirements.
             </p>
 
             {departments.length === 0 ? (
-              <p className="py-4 text-center text-sm text-gray-400">
+              <p className="py-4 text-center text-sm text-muted-foreground/60">
                 No departments found.
               </p>
             ) : (
@@ -336,13 +336,13 @@ export default function OnboardingModal() {
                 {departments.map((d) => (
                   <li
                     key={d.id}
-                    className="rounded-lg border p-3 transition-colors hover:border-[#006B3E]/30"
+                    className="rounded-lg border p-3 transition-colors hover:border-primary/30"
                   >
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-foreground">
                       {d.name}
                     </p>
                     {d.description && (
-                      <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">
+                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
                         {d.description}
                       </p>
                     )}
@@ -357,19 +357,19 @@ export default function OnboardingModal() {
       case 3:
         return (
           <div className="flex flex-col items-center text-center py-6 px-2">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#006B3E]/10">
-              <CalendarSearch className="h-7 w-7 text-[#006B3E]" />
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+              <CalendarSearch className="h-7 w-7 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-foreground">
               Browse Your First Shift
             </h3>
-            <p className="mt-2 max-w-sm text-sm text-gray-600">
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
               You're almost done! After completing onboarding, head over to the
               Browse Shifts page to find an opportunity that fits your schedule.
             </p>
             <Button
               variant="outline"
-              className="mt-4 border-[#006B3E] text-[#006B3E] hover:bg-[#006B3E]/5"
+              className="mt-4 border-primary text-primary hover:bg-primary/5"
               onClick={() => {
                 setOpen(false);
                 navigate("/shifts");
@@ -384,13 +384,13 @@ export default function OnboardingModal() {
       case 4:
         return (
           <div className="flex flex-col items-center text-center py-6 px-2">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
-              <CheckCircle2 className="h-8 w-8 text-[#006B3E]" />
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+              <CheckCircle2 className="h-8 w-8 text-primary" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-foreground">
               You're All Set!
             </h3>
-            <p className="mt-2 max-w-sm text-sm text-gray-600">
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
               Your profile is complete. Click <strong>Finish</strong> to dismiss
               this guide and start volunteering.
             </p>
@@ -456,7 +456,7 @@ export default function OnboardingModal() {
                 <Button
                   size="sm"
                   onClick={next}
-                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   Get Started
                   <ChevronRight className="ml-1 h-4 w-4" />
@@ -468,7 +468,7 @@ export default function OnboardingModal() {
                   size="sm"
                   onClick={saveProfile}
                   disabled={saving}
-                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                   Save & Continue
@@ -480,7 +480,7 @@ export default function OnboardingModal() {
                 <Button
                   size="sm"
                   onClick={next}
-                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   Next
                   <ChevronRight className="ml-1 h-4 w-4" />
@@ -492,7 +492,7 @@ export default function OnboardingModal() {
                   size="sm"
                   onClick={completeOnboarding}
                   disabled={saving}
-                  className="bg-[#006B3E] hover:bg-[#005a33]"
+                  className="bg-primary hover:bg-primary/90"
                 >
                   {saving && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                   Finish
