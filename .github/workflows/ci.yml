@@ -60,6 +60,7 @@ jobs:
       PLAYWRIGHT_BASE_URL: https://easterseals-volunteer-scheduler.vercel.app
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_VOLUNTEER_EMAIL: ${{ secrets.TEST_VOLUNTEER_EMAIL }}
       TEST_VOLUNTEER_2_EMAIL: ${{ secrets.TEST_VOLUNTEER_2_EMAIL }}
       TEST_COORDINATOR_EMAIL: ${{ secrets.TEST_COORDINATOR_EMAIL }}
