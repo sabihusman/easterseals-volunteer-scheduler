@@ -29,7 +29,11 @@ export function ConversationThread({ conversationId, participantNames: externalN
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  // scrollRef was previously attached to <ScrollArea> but shadcn's
+  // ScrollArea (Radix) renders a nested viewport div — scrollTop on
+  // the outer wrapper is a no-op. A sentinel div at the bottom of
+  // the message list + scrollIntoView() is the reliable pattern.
+  const bottomRef = useRef<HTMLDivElement>(null);
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
 
   // Fetch participant names by looking up sender IDs from messages
@@ -117,11 +121,15 @@ export function ConversationThread({ conversationId, participantNames: externalN
     return () => { supabase.removeChannel(channel); };
   }, [conversationId]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll to bottom on new messages. Uses a sentinel div
+  // at the bottom of the list + scrollIntoView so it works
+  // regardless of the ScrollArea viewport nesting.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    // Small delay lets the DOM render the new message before scrolling
+    const timer = setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+    return () => clearTimeout(timer);
   }, [messages]);
 
   const handleSend = async () => {
@@ -180,7 +188,7 @@ export function ConversationThread({ conversationId, participantNames: externalN
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 p-4">
         {messages.length === 0 ? (
           <p className="text-center text-muted-foreground text-sm py-8">
             No messages yet. Start the conversation!
@@ -196,6 +204,8 @@ export function ConversationThread({ conversationId, participantNames: externalN
             />
           ))
         )}
+        {/* Sentinel element — scrollIntoView target for auto-scroll */}
+        <div ref={bottomRef} />
       </ScrollArea>
 
       {/* Compose */}
