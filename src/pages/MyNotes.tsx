@@ -266,10 +266,10 @@ export default function MyNotes() {
           <h2 className="text-2xl font-bold">My Notes</h2>
           <p className="text-muted-foreground">Private notes from your shifts</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
           {departments.length > 0 && (
             <Select value={deptFilter} onValueChange={setDeptFilter}>
-              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All departments" /></SelectTrigger>
+              <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="All departments" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
                 {departments.map(([id, name]) => <SelectItem key={id} value={id}>{name}</SelectItem>)}

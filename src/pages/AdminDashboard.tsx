@@ -219,8 +219,8 @@ export default function AdminDashboard() {
       {/* Filters */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">All Shifts</h3>
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-[200px]">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+          <div className="relative flex-1 sm:min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by title..."
@@ -230,14 +230,14 @@ export default function AdminDashboard() {
             />
           </div>
           <Select value={selectedDept} onValueChange={setSelectedDept}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Department" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Department" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Departments</SelectItem>
               {departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="upcoming">Upcoming</SelectItem>
               <SelectItem value="all">All Statuses</SelectItem>
@@ -247,8 +247,8 @@ export default function AdminDashboard() {
               <SelectItem value="completed">Completed</SelectItem>
             </SelectContent>
           </Select>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" placeholder="From" />
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" placeholder="To" />
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-full sm:w-[150px]" placeholder="From" />
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-full sm:w-[150px]" placeholder="To" />
         </div>
       </div>
 

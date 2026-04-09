@@ -280,9 +280,9 @@ export default function BrowseShifts() {
           <h2 className="text-2xl font-bold">Available Shifts</h2>
           <p className="text-muted-foreground">Browse and book volunteer shifts</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full sm:w-auto">
           <Select value={selectedDept} onValueChange={setSelectedDept}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <Filter className="h-4 w-4 mr-1" />
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
@@ -294,7 +294,7 @@ export default function BrowseShifts() {
             </SelectContent>
           </Select>
           <Select value={timeRange} onValueChange={(v) => setTimeRange(v as "1w" | "2w" | "3w" | "1m")}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-full sm:w-[160px]">
               <CalendarIcon className="h-4 w-4 mr-1" />
               <SelectValue />
             </SelectTrigger>

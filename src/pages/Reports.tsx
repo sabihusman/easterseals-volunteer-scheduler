@@ -341,7 +341,7 @@ export default function Reports() {
         <Card><CardContent className="pt-6 text-center text-muted-foreground">No shifts in the selected range.</CardContent></Card>
       ) : (
         <Tabs defaultValue="overview">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 h-auto sm:grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="popularity">Popularity</TabsTrigger>
             <TabsTrigger value="ratings">Ratings</TabsTrigger>
