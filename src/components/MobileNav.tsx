@@ -67,6 +67,7 @@ function getSections(role: UserRole): NavSection[] {
       items: [
         { label: "My Shifts", to: "/dashboard", icon: Home },
         { label: "Browse Shifts", to: "/shifts", icon: Calendar },
+        { label: "Unactioned Shifts", to: "/unactioned", icon: AlertCircle },
         { label: "Events", to: "/events", icon: CalendarDays },
         { label: "My History", to: "/history", icon: ClipboardList },
         { label: "My Notes", to: "/notes", icon: FileText },
