@@ -5,7 +5,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare, BarChart3, AlertCircle } from "lucide-react";
+import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare, BarChart3, AlertCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -43,6 +43,7 @@ export function AppSidebar() {
     { title: "Admin Settings", url: "/admin/settings", icon: Shield },
     { title: "Doc Types", url: "/admin/documents", icon: FolderOpen },
     { title: "Compliance", url: "/admin/compliance", icon: CheckSquare },
+    { title: "Disputes", url: "/admin/disputes", icon: Scale },
   ];
 
   const isActive = (path: string) => location.pathname === path;

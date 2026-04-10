@@ -28,6 +28,7 @@ import {
   Building2,
   Bell,
   CheckSquare,
+  Scale,
   BarChart3,
   AlertCircle,
 } from "lucide-react";
@@ -102,6 +103,7 @@ function getSections(role: UserRole): NavSection[] {
         { label: "Admin Settings", to: "/admin/settings", icon: Shield },
         { label: "Doc Types", to: "/admin/documents", icon: FolderOpen },
         { label: "Compliance", to: "/admin/compliance", icon: CheckSquare },
+        { label: "Disputes", to: "/admin/disputes", icon: Scale },
       ],
     });
   }
