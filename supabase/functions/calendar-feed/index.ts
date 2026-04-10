@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
 
   const volunteerId = profile.id;
 
-  // Fetch upcoming confirmed bookings
+  // Fetch upcoming confirmed bookings with slot info
   const { data: bookings } = await supabase
     .from("shift_bookings")
-    .select("id, shifts(id, title, shift_date, start_time, end_time, coordinator_note, departments(name, locations(name, address, timezone)))")
+    .select("id, time_slot_id, shift_time_slots(slot_start, slot_end), shifts(id, title, shift_date, start_time, end_time, coordinator_note, departments(name, locations(name, address, timezone)))")
     .eq("volunteer_id", volunteerId)
     .eq("booking_status", "confirmed")
     .gte("shifts.shift_date", new Date().toISOString().split("T")[0]);
@@ -40,15 +40,24 @@ Deno.serve(async (req) => {
     const dept = s.departments;
     const loc = dept?.locations;
     const date = s.shift_date.replace(/-/g, "");
-    const start = (s.start_time || "09:00:00").replace(/:/g, "").slice(0, 6);
-    const end = (s.end_time || "17:00:00").replace(/:/g, "").slice(0, 6);
+
+    // Use slot times if available, otherwise fall back to shift times
+    const slotInfo = b.shift_time_slots;
+    const start = slotInfo?.slot_start
+      ? slotInfo.slot_start.replace(/:/g, "").slice(0, 6)
+      : (s.start_time || "09:00:00").replace(/:/g, "").slice(0, 6);
+    const end = slotInfo?.slot_end
+      ? slotInfo.slot_end.replace(/:/g, "").slice(0, 6)
+      : (s.end_time || "17:00:00").replace(/:/g, "").slice(0, 6);
+
     const location = loc?.address || loc?.name || "";
     const tz = loc?.timezone || "America/Chicago";
     const description = [dept?.name, s.coordinator_note, "Managed via Easterseals Iowa Volunteer Scheduler"].filter(Boolean).join("\\n");
 
+    // Use booking ID as UID to avoid duplicates when multiple slot-bookings exist per shift
     return [
       "BEGIN:VEVENT",
-      `UID:${s.id}@easterseals-volunteer-scheduler`,
+      `UID:${b.id}@easterseals-volunteer-scheduler`,
       `DTSTART;TZID=${tz}:${date}T${start}`,
       `DTEND;TZID=${tz}:${date}T${end}`,
       `SUMMARY:${s.title}`,

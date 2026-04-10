@@ -33,17 +33,20 @@ interface ShiftRow {
 
 interface ShiftCardProps {
   s: ShiftRow;
-  bookingIds: Set<string>;
+  bookedShiftSlots: Map<string, Set<string>>; // shiftId → Set<slotId>
   profile: { booking_privileges?: boolean; bg_check_status?: string } | null;
   privilegesSuspended: boolean;
   setSlotDialogShift: (shift: ShiftRow) => void;
   trackViewed: (shiftId: string) => void;
 }
 
-function ShiftCard({ s, bookingIds, profile, privilegesSuspended, setSlotDialogShift, trackViewed }: ShiftCardProps) {
+function ShiftCard({ s, bookedShiftSlots, profile, privilegesSuspended, setSlotDialogShift, trackViewed }: ShiftCardProps) {
   const slotsLeft = s.total_slots - s.booked_slots;
   const isFull = slotsLeft <= 0;
-  const alreadyBooked = bookingIds.has(s.id);
+  const mySlots = bookedShiftSlots.get(s.id);
+  const hasBooking = mySlots && mySlots.size > 0;
+  // A volunteer may have booked some but not all slots — allow booking more
+  const partiallyBooked = hasBooking;
   return (
     <Card key={s.id}>
       <CardContent className="pt-4 pb-4">
@@ -58,18 +61,19 @@ function ShiftCard({ s, bookingIds, profile, privilegesSuspended, setSlotDialogS
             <div className="flex gap-2">
               <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
               {s.requires_bg_check && <Badge variant="outline" className="text-xs"><Shield className="h-3 w-3 mr-1" />BG Check Required</Badge>}
+              {partiallyBooked && <Badge className="text-xs bg-primary/20 text-primary border-primary/30">Partially Booked</Badge>}
             </div>
           </div>
           <div className="flex gap-2 items-center">
-            {alreadyBooked && !s.requires_bg_check && !s.departments?.requires_bg_check && (
+            {hasBooking && !s.requires_bg_check && !s.departments?.requires_bg_check && (
               <InviteFriendModal shiftId={s.id} shiftTitle={s.title} shiftDate={s.shift_date} shiftTime={timeLabel(s)} />
             )}
             <Button
               size="sm"
-              disabled={alreadyBooked || !profile?.booking_privileges || privilegesSuspended}
+              disabled={!profile?.booking_privileges || privilegesSuspended}
               onClick={() => { setSlotDialogShift(s); trackViewed(s.id); }}
             >
-              {alreadyBooked ? "Booked" : isFull ? "Join Waitlist" : "Book Shift"}
+              {partiallyBooked ? "Book More Slots" : isFull ? "Join Waitlist" : "Book Shift"}
             </Button>
           </div>
         </div>
@@ -88,7 +92,7 @@ export default function BrowseShifts() {
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [timeRange, setTimeRange] = useState<"1w" | "2w" | "3w" | "1m">("2w");
   const [loading, setLoading] = useState(true);
-  const [bookingIds, setBookingIds] = useState<Set<string>>(new Set());
+  const [bookedShiftSlots, setBookedShiftSlots] = useState<Map<string, Set<string>>>(new Map());
   const [view, setView] = useState<"list" | "calendar">("list");
   const [calMonth, setCalMonth] = useState(new Date());
   const [slotDialogShift, setSlotDialogShift] = useState<ShiftRow | null>(null);
@@ -122,7 +126,7 @@ export default function BrowseShifts() {
         .order("shift_date", { ascending: true })
         .order("start_time", { ascending: true, nullsFirst: false }),
       user
-        ? supabase.from("shift_bookings").select("shift_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
+        ? supabase.from("shift_bookings").select("shift_id, time_slot_id").eq("volunteer_id", user.id).in("booking_status", ["confirmed", "waitlisted"])
         : Promise.resolve({ data: [] }),
       user
         ? supabase.from("department_restrictions").select("department_id").eq("volunteer_id", user.id)
@@ -145,8 +149,13 @@ export default function BrowseShifts() {
     };
     const now = new Date();
 
-    // Build a set of shift IDs the user has already booked (confirmed or waitlisted)
-    const alreadyBookedIds = new Set((myBookings || []).map((b: { shift_id: string }) => b.shift_id));
+    // Build a map of shiftId → Set<slotId> for the user's bookings
+    const slotMap = new Map<string, Set<string>>();
+    for (const b of (myBookings || []) as { shift_id: string; time_slot_id: string | null }[]) {
+      if (!slotMap.has(b.shift_id)) slotMap.set(b.shift_id, new Set());
+      if (b.time_slot_id) slotMap.get(b.shift_id)!.add(b.time_slot_id);
+    }
+    const alreadyBookedIds = new Set(slotMap.keys());
 
     // Count BG-gated shifts that would be hidden BEFORE filtering, so the
     // banner shows even when every relevant shift was filtered out.
@@ -155,8 +164,8 @@ export default function BrowseShifts() {
       .filter((s) => !restrictedDeptIds.has(s.department_id))
       // Drop shifts whose end time has already passed
       .filter((s) => shiftEndAt(s) > now)
-      // Hide shifts the user has already booked so they don't see them twice
-      .filter((s) => !alreadyBookedIds.has(s.id));
+      // NOTE: Don't hide partially-booked shifts — volunteers can book more slots
+      ;
     const bgHidden = rawShifts.filter((s) =>
       (s.requires_bg_check || s.departments?.requires_bg_check) && bgStatus !== "cleared"
     ).length;
@@ -170,7 +179,7 @@ export default function BrowseShifts() {
 
     setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
-    setBookingIds(alreadyBookedIds);
+    setBookedShiftSlots(slotMap);
     setLoading(false);
   }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
@@ -357,7 +366,7 @@ export default function BrowseShifts() {
           <Card><CardContent className="pt-6 text-center text-muted-foreground">No available shifts found.</CardContent></Card>
         ) : (
           <div className="grid gap-3">
-            {filtered.map((s) => <ShiftCard key={s.id} s={s} bookingIds={bookingIds} profile={profile} privilegesSuspended={privilegesSuspended} setSlotDialogShift={setSlotDialogShift} trackViewed={trackViewed} />)}
+            {filtered.map((s) => <ShiftCard key={s.id} s={s} bookedShiftSlots={bookedShiftSlots} profile={profile} privilegesSuspended={privilegesSuspended} setSlotDialogShift={setSlotDialogShift} trackViewed={trackViewed} />)}
           </div>
         )}
         </>      ) : (
@@ -383,7 +392,7 @@ export default function BrowseShifts() {
                   <div className="text-xs font-medium mb-1">{format(day, "d")}</div>
                   <div className="space-y-0.5">
                     {dayShifts.slice(0, 3).map((s) => {
-                      const isBooked = bookingIds.has(s.id);
+                      const isBooked = bookedShiftSlots.has(s.id);
                       return (
                         <div
                           key={s.id}
@@ -423,6 +432,7 @@ export default function BrowseShifts() {
           open={!!slotDialogShift}
           onOpenChange={(open) => { if (!open) setSlotDialogShift(null); }}
           shift={slotDialogShift}
+          bookedSlotIds={bookedShiftSlots.get(slotDialogShift.id)}
           onBooked={handleBooked}
         />
       )}

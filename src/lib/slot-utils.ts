@@ -34,3 +34,35 @@ export function previewSlotCount(startTime: string, endTime: string): number {
   if (totalMinutes <= 0) return 0;
   return Math.ceil(totalMinutes / 120);
 }
+
+/**
+ * Preview the actual 2-hour slot boundaries for a shift.
+ * Returns array of {start, end} time strings in HH:MM format.
+ * Last slot gets the remainder if not evenly divisible by 2h.
+ */
+export function previewSlots(
+  startTime: string,
+  endTime: string
+): Array<{ start: string; end: string }> {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  if (endMin <= startMin) return [];
+
+  const slots: Array<{ start: string; end: string }> = [];
+  let cursor = startMin;
+  while (cursor < endMin) {
+    const slotEnd = Math.min(cursor + 120, endMin);
+    const sH = Math.floor(cursor / 60);
+    const sM = cursor % 60;
+    const eH = Math.floor(slotEnd / 60);
+    const eM = slotEnd % 60;
+    slots.push({
+      start: `${String(sH).padStart(2, "0")}:${String(sM).padStart(2, "0")}`,
+      end: `${String(eH).padStart(2, "0")}:${String(eM).padStart(2, "0")}`,
+    });
+    cursor = slotEnd;
+  }
+  return slots;
+}
