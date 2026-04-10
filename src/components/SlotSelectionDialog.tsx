@@ -104,6 +104,9 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
   const missingEmergencyContact =
     !(profile as any)?.emergency_contact_name ||
     !(profile as any)?.emergency_contact_phone;
+  const isMinorWithoutConsent =
+    (profile as any)?.is_minor === true &&
+    !(profile as any)?.has_active_consent;
 
   const handleConfirm = async () => {
     if (!user || !profile) return;
@@ -113,6 +116,15 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       toast({
         title: "Emergency contact required",
         description: "Please add an emergency contact in your profile settings before booking.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isMinorWithoutConsent) {
+      toast({
+        title: "Parental consent required",
+        description: "Volunteers under 18 need parental consent on file before booking. Go to Settings to submit consent.",
         variant: "destructive",
       });
       return;
@@ -310,6 +322,19 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
             <p className="font-medium text-foreground">Emergency contact required</p>
             <p className="text-muted-foreground text-xs mt-1">
               You must add an emergency contact before booking.{" "}
+              <a href="/settings" className="text-primary underline" onClick={() => onOpenChange(false)}>
+                Go to Settings →
+              </a>
+            </p>
+          </div>
+        )}
+
+        {/* Minor consent gate */}
+        {isMinorWithoutConsent && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+            <p className="font-medium text-foreground">Parental consent required</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              Volunteers under 18 must have parental consent on file.{" "}
               <a href="/settings" className="text-primary underline" onClick={() => onOpenChange(false)}>
                 Go to Settings →
               </a>

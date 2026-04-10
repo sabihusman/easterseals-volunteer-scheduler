@@ -333,6 +333,19 @@ export default function VolunteerDashboard() {
         </Alert>
       ) : null}
 
+      {(profile as any)?.is_minor && (
+        <Alert className={(profile as any)?.has_active_consent ? "border-primary/50 bg-primary/5" : "border-destructive/50 bg-destructive/10"}>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>{(profile as any)?.has_active_consent ? "Parental Consent on File" : "Parental Consent Required"}</AlertTitle>
+          <AlertDescription>
+            {(profile as any)?.has_active_consent
+              ? "Your parent/guardian's consent is on file. You're cleared to book shifts."
+              : <>Volunteers under 18 need parental consent before booking shifts. <a href="/settings" className="text-primary font-medium underline">Go to Settings →</a></>
+            }
+          </AlertDescription>
+        </Alert>
+      )}
+
 
 
       {pendingConfirmations.length > 0 && (
