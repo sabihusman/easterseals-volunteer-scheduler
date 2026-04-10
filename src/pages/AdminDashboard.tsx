@@ -19,7 +19,7 @@ const DEPT_COLORS: Record<string, string> = {
   "Adult Day Services": "bg-blue-100 text-blue-800 border-blue-200",
   "Children's Services": "bg-purple-100 text-purple-800 border-purple-200",
   "Transportation": "bg-orange-100 text-orange-800 border-orange-200",
-  "Administration": "bg-gray-100 text-gray-800 border-gray-200",
+  "Administration": "bg-muted text-foreground border-border",
 };
 
 function deptBadgeClass(name: string) {

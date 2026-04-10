@@ -178,7 +178,7 @@ export default function VolunteerEvents() {
           )}
         </CardHeader>
 
-        <CardContent className="space-y-1.5 text-sm text-gray-600">
+        <CardContent className="space-y-1.5 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-3.5 w-3.5" />
             {new Date(ev.event_date + "T00:00").toLocaleDateString("en-US", {
@@ -205,7 +205,7 @@ export default function VolunteerEvents() {
 
           <div className="flex gap-1 pt-1">
             {ev.requires_bg_check && (
-              <Badge variant="outline" className="text-xs border-[#006B3E] text-[#006B3E]">
+              <Badge variant="outline" className="text-xs border-primary text-primary">
                 BG Check
               </Badge>
             )}
@@ -221,7 +221,7 @@ export default function VolunteerEvents() {
           <CardFooter>
             {registered ? (
               <div className="flex w-full items-center justify-between">
-                <span className="flex items-center gap-1.5 text-sm font-medium text-[#006B3E]">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-primary">
                   <CheckCircle2 className="h-4 w-4" />
                   Registered
                 </span>
@@ -241,7 +241,7 @@ export default function VolunteerEvents() {
               </div>
             ) : (
               <Button
-                className="w-full bg-[#006B3E] hover:bg-[#005a33]"
+                className="w-full bg-primary hover:bg-primary/90"
                 disabled={full || busy}
                 onClick={() => handleRegister(ev.id)}
               >
@@ -262,14 +262,14 @@ export default function VolunteerEvents() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[#006B3E]" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
-      <h1 className="text-2xl font-bold text-gray-900">Events</h1>
+      <h1 className="text-2xl font-bold text-foreground">Events</h1>
 
       <Tabs defaultValue="browse">
         <TabsList>
@@ -277,7 +277,7 @@ export default function VolunteerEvents() {
           <TabsTrigger value="mine">
             My Registrations
             {myEvents.length > 0 && (
-              <Badge className="ml-2 bg-[#006B3E] text-white text-[10px] px-1.5 py-0">
+              <Badge className="ml-2 bg-primary text-white text-[10px] px-1.5 py-0">
                 {myEvents.length}
               </Badge>
             )}
@@ -287,7 +287,7 @@ export default function VolunteerEvents() {
         {/* Browse */}
         <TabsContent value="browse" className="pt-4">
           {events.length === 0 ? (
-            <p className="py-12 text-center text-gray-500">
+            <p className="py-12 text-center text-muted-foreground">
               No upcoming events right now. Check back soon!
             </p>
           ) : (
@@ -302,7 +302,7 @@ export default function VolunteerEvents() {
         {/* My Registrations */}
         <TabsContent value="mine" className="pt-4">
           {myEvents.length === 0 ? (
-            <p className="py-12 text-center text-gray-500">
+            <p className="py-12 text-center text-muted-foreground">
               You haven't registered for any events yet.
             </p>
           ) : (

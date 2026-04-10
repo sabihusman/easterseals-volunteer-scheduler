@@ -343,7 +343,7 @@ export default function ManageShifts() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[#006B3E]" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
@@ -351,8 +351,8 @@ export default function ManageShifts() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Manage Shifts</h1>
-        <Button onClick={openCreate} className="bg-[#006B3E] hover:bg-[#005a33]">
+        <h1 className="text-2xl font-bold text-foreground">Manage Shifts</h1>
+        <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
           <Plus className="mr-2 h-4 w-4" /> New Shift
         </Button>
       </div>
@@ -373,7 +373,7 @@ export default function ManageShifts() {
           <TableBody>
             {shifts.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-gray-500">
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   No shifts yet. Create one to get started.
                 </TableCell>
               </TableRow>
@@ -390,9 +390,9 @@ export default function ManageShifts() {
                 <TableCell className="text-center">{s.total_slots}</TableCell>
                 <TableCell className="text-center">
                   {s.coordinator_note ? (
-                    <StickyNote className="mx-auto h-4 w-4 text-[#006B3E]" />
+                    <StickyNote className="mx-auto h-4 w-4 text-primary" />
                   ) : (
-                    <span className="text-gray-300">—</span>
+                    <span className="text-muted-foreground/40">—</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
@@ -530,7 +530,7 @@ export default function ManageShifts() {
             {/* Coordinator Note */}
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5">
-                <StickyNote className="h-3.5 w-3.5 text-[#006B3E]" />
+                <StickyNote className="h-3.5 w-3.5 text-primary" />
                 Coordinator Note
               </Label>
 
@@ -555,7 +555,7 @@ export default function ManageShifts() {
                 disabled={!noteEditable}
                 className="resize-none disabled:opacity-60"
               />
-              <p className="text-right text-xs text-gray-400">
+              <p className="text-right text-xs text-muted-foreground/60">
                 {form.coordinator_note.length}/{NOTE_MAX}
               </p>
             </div>
@@ -568,7 +568,7 @@ export default function ManageShifts() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-[#006B3E] hover:bg-[#005a33]"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingId ? "Update Shift" : "Create Shift"}
