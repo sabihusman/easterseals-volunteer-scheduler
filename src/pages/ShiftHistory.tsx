@@ -41,21 +41,39 @@ export default function ShiftHistory() {
           .order("created_at", { ascending: false }),
       ]);
       const bookingsArr = (bookingData as any) || [];
-      // Fetch booked slots for all bookings to calculate hours
+      // Calculate slot hours per booking
+      // New model: each booking has time_slot_id → fetch slot times
       const bookingIds = bookingsArr.map((b: any) => b.id);
       const slotMap: Record<string, number> = {};
       if (bookingIds.length > 0) {
-        const { data: slotData } = await supabase
-          .from("shift_booking_slots")
-          .select("booking_id, shift_time_slots(slot_start, slot_end)")
-          .in("booking_id", bookingIds);
-        (slotData || []).forEach((s: any) => {
+        // New model: bookings with time_slot_id
+        const { data: newSlots } = await supabase
+          .from("shift_bookings")
+          .select("id, shift_time_slots(slot_start, slot_end)")
+          .in("id", bookingIds)
+          .not("time_slot_id", "is", null);
+        (newSlots || []).forEach((s: any) => {
           if (!s.shift_time_slots) return;
           const [sh, sm] = s.shift_time_slots.slot_start.split(":").map(Number);
           const [eh, em] = s.shift_time_slots.slot_end.split(":").map(Number);
-          const hours = (eh * 60 + em - sh * 60 - sm) / 60;
-          slotMap[s.booking_id] = (slotMap[s.booking_id] || 0) + hours;
+          slotMap[s.id] = (eh * 60 + em - sh * 60 - sm) / 60;
         });
+
+        // Legacy fallback: bookings via junction table
+        const legacyIds = bookingIds.filter((id: string) => !slotMap[id]);
+        if (legacyIds.length > 0) {
+          const { data: legacySlots } = await supabase
+            .from("shift_booking_slots")
+            .select("booking_id, shift_time_slots(slot_start, slot_end)")
+            .in("booking_id", legacyIds);
+          (legacySlots || []).forEach((s: any) => {
+            if (!s.shift_time_slots) return;
+            const [sh, sm] = s.shift_time_slots.slot_start.split(":").map(Number);
+            const [eh, em] = s.shift_time_slots.slot_end.split(":").map(Number);
+            const hours = (eh * 60 + em - sh * 60 - sm) / 60;
+            slotMap[s.booking_id] = (slotMap[s.booking_id] || 0) + hours;
+          });
+        }
       }
       // Attach slot hours to each booking
       bookingsArr.forEach((b: any) => { b._slotHours = slotMap[b.id] || 0; });
