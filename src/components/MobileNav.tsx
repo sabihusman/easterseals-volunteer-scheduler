@@ -161,7 +161,7 @@ export function MobileNav({ userRole = "volunteer", userName }: MobileNavProps) 
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="left" className="flex w-72 flex-col p-0">
+      <SheetContent side="left" className="flex w-72 flex-col p-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* ---- Header ---- */}
         <SheetHeader className="border-b px-4 py-4">
           <SheetTitle className="text-left text-lg font-bold text-primary">
