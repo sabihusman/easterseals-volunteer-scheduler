@@ -198,7 +198,7 @@ export default function AdminEvents() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[#006B3E]" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
@@ -206,14 +206,14 @@ export default function AdminEvents() {
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Events</h1>
-        <Button onClick={openCreate} className="bg-[#006B3E] hover:bg-[#005a33]">
+        <h1 className="text-2xl font-bold text-foreground">Events</h1>
+        <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
           <Plus className="mr-2 h-4 w-4" /> Create Event
         </Button>
       </div>
 
       {events.length === 0 && (
-        <p className="py-12 text-center text-gray-500">
+        <p className="py-12 text-center text-muted-foreground">
           No events yet. Create one to get started.
         </p>
       )}
@@ -247,7 +247,7 @@ export default function AdminEvents() {
                 </CardDescription>
               )}
             </CardHeader>
-            <CardContent className="space-y-1.5 text-sm text-gray-600">
+            <CardContent className="space-y-1.5 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-3.5 w-3.5" />
                 {ev.event_date}
@@ -268,7 +268,7 @@ export default function AdminEvents() {
               </div>
               <div className="pt-1">
                 {ev.requires_bg_check && (
-                  <Badge variant="outline" className="text-xs border-[#006B3E] text-[#006B3E]">
+                  <Badge variant="outline" className="text-xs border-primary text-primary">
                     BG Check Required
                   </Badge>
                 )}
@@ -373,7 +373,7 @@ export default function AdminEvents() {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <p className="text-sm font-medium">Requires Background Check</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Only cleared volunteers may register.
                 </p>
               </div>
@@ -382,7 +382,7 @@ export default function AdminEvents() {
                 onCheckedChange={(v) =>
                   setForm((f) => ({ ...f, requires_bg_check: v }))
                 }
-                className="data-[state=checked]:bg-[#006B3E]"
+                className="data-[state=checked]:bg-primary"
               />
             </div>
           </div>
@@ -394,7 +394,7 @@ export default function AdminEvents() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-[#006B3E] hover:bg-[#005a33]"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingId ? "Save Changes" : "Create Event"}

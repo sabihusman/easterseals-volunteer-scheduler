@@ -235,17 +235,17 @@ export default function AdminDepartments() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-6 w-6 animate-spin text-[#006B3E]" />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
-        <Button onClick={openCreate} className="bg-[#006B3E] hover:bg-[#005a33]">
-          <Plus className="mr-2 h-4 w-4" /> Add Department
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold text-foreground">Departments</h1>
+        <Button size="sm" onClick={openCreate} className="bg-primary hover:bg-primary/90 whitespace-nowrap">
+          <Plus className="mr-1.5 h-4 w-4" /> Add Department
         </Button>
       </div>
 
@@ -263,7 +263,7 @@ export default function AdminDepartments() {
           <TableBody>
             {departments.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-gray-500">
+                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
                   No departments yet.
                 </TableCell>
               </TableRow>
@@ -285,7 +285,7 @@ export default function AdminDepartments() {
                         }}
                       />
                       <Button variant="ghost" size="icon" onClick={saveRename}>
-                        <Check className="h-4 w-4 text-[#006B3E]" />
+                        <Check className="h-4 w-4 text-primary" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -317,7 +317,7 @@ export default function AdminDepartments() {
                         .eq("id", dept.id);
                       fetchDepartments();
                     }}
-                    className="data-[state=checked]:bg-[#006B3E]"
+                    className="data-[state=checked]:bg-primary"
                   />
                 </TableCell>
 
@@ -327,7 +327,7 @@ export default function AdminDepartments() {
                     variant={dept.is_active ? "default" : "secondary"}
                     className={
                       dept.is_active
-                        ? "cursor-pointer bg-[#006B3E] text-white hover:bg-[#005a33]"
+                        ? "cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
                         : "cursor-pointer"
                     }
                     onClick={() => toggleActive(dept)}
@@ -396,7 +396,7 @@ export default function AdminDepartments() {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <p className="text-sm font-medium">Requires Background Check</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Volunteers must have a cleared BG check to sign up.
                 </p>
               </div>
@@ -405,7 +405,7 @@ export default function AdminDepartments() {
                 onCheckedChange={(v) =>
                   setForm((f) => ({ ...f, requires_bg_check: v }))
                 }
-                className="data-[state=checked]:bg-[#006B3E]"
+                className="data-[state=checked]:bg-primary"
               />
             </div>
 
@@ -425,7 +425,7 @@ export default function AdminDepartments() {
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <p className="text-sm font-medium">Allows Group Volunteering</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Let groups sign up together for shifts.
                 </p>
               </div>
@@ -434,7 +434,7 @@ export default function AdminDepartments() {
                 onCheckedChange={(v) =>
                   setForm((f) => ({ ...f, allows_groups: v }))
                 }
-                className="data-[state=checked]:bg-[#006B3E]"
+                className="data-[state=checked]:bg-primary"
               />
             </div>
           </div>
@@ -446,7 +446,7 @@ export default function AdminDepartments() {
             <Button
               onClick={handleSaveDialog}
               disabled={saving}
-              className="bg-[#006B3E] hover:bg-[#005a33]"
+              className="bg-primary hover:bg-primary/90"
             >
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingId ? "Save Changes" : "Create Department"}
