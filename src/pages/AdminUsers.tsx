@@ -396,10 +396,48 @@ export default function AdminUsers() {
                       Emergency: {p.emergency_contact_name}{p.emergency_contact_name && p.emergency_contact_phone ? " · " : ""}{p.emergency_contact_phone}
                     </div>
                   )}
+                  {p.role === "volunteer" && (p as any).is_minor && (
+                    <div className="text-xs text-muted-foreground">
+                      Minor (DOB: {(p as any).date_of_birth}) —{" "}
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-primary"
+                        onClick={async () => {
+                          // Check if consent exists
+                          const { data } = await supabase
+                            .from("parental_consents")
+                            .select("id, parent_name, is_active, expires_at")
+                            .eq("volunteer_id", p.id)
+                            .eq("is_active", true)
+                            .limit(1);
+                          if (data && data.length > 0) {
+                            toast({ title: "Consent on file", description: `Parent: ${(data[0] as any).parent_name}` });
+                          } else {
+                            // Admin manually marks consent (paper form)
+                            const parentName = window.prompt("Enter parent/guardian name (for paper consent):");
+                            if (!parentName) return;
+                            const { error } = await (supabase as any).from("parental_consents").insert({
+                              volunteer_id: p.id,
+                              parent_name: parentName,
+                              parent_email: "paper-consent@easterseals.com",
+                              consent_method: "paper",
+                              expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+                            });
+                            if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+                            else toast({ title: "Consent recorded", description: `Paper consent from ${parentName} recorded.` });
+                          }
+                        }}
+                      >
+                        Manage Consent
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex gap-2 flex-wrap">
                     {bgBadge(p.bg_check_status)}
                     {!p.booking_privileges && <Badge variant="outline" className="text-xs">No Booking</Badge>}
                     {(p as any).messaging_blocked && <Badge variant="destructive" className="text-xs">Messaging Blocked</Badge>}
+                    {(p as any).is_minor && <Badge className="text-xs bg-yellow-500 text-white">Minor</Badge>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
