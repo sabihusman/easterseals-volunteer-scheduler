@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { previewSlots, formatSlotRange } from "@/lib/slot-utils";
 import {
   Loader2,
   Plus,
@@ -560,6 +561,29 @@ export default function ManageShifts() {
               </p>
             </div>
           </div>
+
+          {/* Slot preview */}
+          {form.start_time && form.end_time && form.end_time > form.start_time && (() => {
+            const slots = previewSlots(form.start_time, form.end_time);
+            if (slots.length === 0) return null;
+            return (
+              <div className="rounded-md border border-muted bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  This shift will be split into {slots.length} × 2-hour slot{slots.length !== 1 ? "s" : ""}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {slots.map((slot, i) => (
+                    <span key={i} className="inline-block text-xs bg-background border rounded px-2 py-0.5">
+                      {formatSlotRange(slot.start, slot.end)}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Each slot has capacity for {form.total_slots} volunteer{form.total_slots !== 1 ? "s" : ""}. Slots are generated automatically.
+                </p>
+              </div>
+            );
+          })()}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>

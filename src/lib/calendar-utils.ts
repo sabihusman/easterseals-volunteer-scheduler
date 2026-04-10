@@ -7,12 +7,22 @@ export function generateICS(shift: {
   end_time?: string | null;
   time_type: string;
   departments?: { name: string } | null;
+}, opts?: {
+  /** Override start/end for slot-level export */
+  slotStart?: string;
+  slotEnd?: string;
+  /** Use booking ID as UID base (avoids collision across slots) */
+  bookingId?: string;
 }): string {
   const date = shift.shift_date.replace(/-/g, "");
   let dtStart = `${date}T090000`;
   let dtEnd = `${date}T170000`;
 
-  if (shift.time_type === "morning") { dtStart = `${date}T090000`; dtEnd = `${date}T120000`; }
+  // Slot-level override: use specific slot times if provided
+  if (opts?.slotStart && opts?.slotEnd) {
+    dtStart = `${date}T${opts.slotStart.replace(/:/g, "").slice(0, 6)}`;
+    dtEnd = `${date}T${opts.slotEnd.replace(/:/g, "").slice(0, 6)}`;
+  } else if (shift.time_type === "morning") { dtStart = `${date}T090000`; dtEnd = `${date}T120000`; }
   else if (shift.time_type === "afternoon") { dtStart = `${date}T130000`; dtEnd = `${date}T160000`; }
   else if (shift.time_type === "all_day") { dtStart = `${date}T090000`; dtEnd = `${date}T170000`; }
   else if (shift.time_type === "custom" && shift.start_time && shift.end_time) {
@@ -20,10 +30,8 @@ export function generateICS(shift: {
     dtEnd = `${date}T${shift.end_time.replace(/:/g, "").slice(0, 6)}`;
   }
 
-  // Stable UID — uses the shift ID if available, otherwise falls back to a
-  // deterministic hash of date+title so re-imports overwrite instead of
-  // duplicating. DTSTAMP is required by RFC 5545.
-  const uidBase = shift.id || `${shift.shift_date}-${shift.title}`.replace(/[^a-zA-Z0-9-]/g, "_");
+  // Stable UID — use bookingId for per-slot exports to avoid collision
+  const uidBase = opts?.bookingId || shift.id || `${shift.shift_date}-${shift.title}`.replace(/[^a-zA-Z0-9-]/g, "_");
   const uid = `${uidBase}@easterseals-iowa-volunteer`;
   const dtstamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "").replace(/Z$/, "Z");
 
@@ -49,8 +57,8 @@ export function generateICS(shift: {
   ].join("\r\n");
 }
 
-export function downloadICS(shift: Parameters<typeof generateICS>[0]) {
-  const ics = generateICS(shift);
+export function downloadICS(shift: Parameters<typeof generateICS>[0], opts?: Parameters<typeof generateICS>[1]) {
+  const ics = generateICS(shift, opts);
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -60,12 +68,15 @@ export function downloadICS(shift: Parameters<typeof generateICS>[0]) {
   URL.revokeObjectURL(url);
 }
 
-export function googleCalendarUrl(shift: Parameters<typeof generateICS>[0]): string {
+export function googleCalendarUrl(shift: Parameters<typeof generateICS>[0], opts?: { slotStart?: string; slotEnd?: string }): string {
   const date = shift.shift_date.replace(/-/g, "");
   let startTime = "090000";
   let endTime = "170000";
 
-  if (shift.time_type === "morning") { startTime = "090000"; endTime = "120000"; }
+  if (opts?.slotStart && opts?.slotEnd) {
+    startTime = opts.slotStart.replace(/:/g, "").slice(0, 6);
+    endTime = opts.slotEnd.replace(/:/g, "").slice(0, 6);
+  } else if (shift.time_type === "morning") { startTime = "090000"; endTime = "120000"; }
   else if (shift.time_type === "afternoon") { startTime = "130000"; endTime = "160000"; }
   else if (shift.time_type === "all_day") { startTime = "090000"; endTime = "170000"; }
   else if (shift.time_type === "custom" && shift.start_time && shift.end_time) {
