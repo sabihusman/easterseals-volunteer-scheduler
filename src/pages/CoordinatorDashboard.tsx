@@ -134,16 +134,43 @@ export default function CoordinatorDashboard() {
     toast({ title: "Hours updated", description: `Set to ${parsed}h and volunteer total recalculated.` });
   };
 
-  const handleConfirm = async (bookingId: string, status: "confirmed" | "no_show") => {
+  const handleAttendance = async (bookingId: string, status: "attended" | "absent") => {
+    if (status === "absent") {
+      const ok = window.confirm(
+        "This will mark the volunteer as absent. If the volunteer has reported attending this shift, the matter will be escalated to an admin for review."
+      );
+      if (!ok) return;
+    }
     const { error } = await supabase
       .from("shift_bookings")
-      .update({ confirmation_status: status, confirmed_by: user!.id, confirmed_at: new Date().toISOString() })
+      .update({
+        coordinator_status: status,
+        coordinator_actioned_by: user!.id,
+      })
       .eq("id", bookingId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, confirmation_status: status } : b));
-      toast({ title: `Marked as ${status.replace("_", " ")}` });
+      // Re-fetch to get the trigger's side effects (confirmation_status, final_hours, dispute)
+      const { data: updated } = await supabase
+        .from("shift_bookings")
+        .select("id, confirmation_status, coordinator_status, coordinator_actioned_at, final_hours, hours_source")
+        .eq("id", bookingId)
+        .single();
+      if (updated) {
+        setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, ...updated } : b));
+      }
+      // Check if dispute was created
+      const { data: dispute } = await supabase
+        .from("attendance_disputes")
+        .select("id")
+        .eq("booking_id", bookingId)
+        .maybeSingle();
+      if (dispute) {
+        toast({ title: "Dispute created", description: "The volunteer reported attending. An admin will review this dispute.", variant: "default" });
+      } else {
+        toast({ title: `Marked as ${status}` });
+      }
     }
   };
 
@@ -298,41 +325,51 @@ export default function CoordinatorDashboard() {
                                 {b.profiles?.phone && <div className="text-xs text-muted-foreground">📞 {b.profiles.phone}</div>}
                                 {b.profiles?.emergency_contact && <div className="text-xs text-muted-foreground">🆘 {b.profiles.emergency_contact}</div>}
                               </div>
-                              <div className="flex items-center gap-2">
-                                {b.confirmation_status === "pending_confirmation" ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {!b.coordinator_status && b.confirmation_status === "pending_confirmation" ? (
                                   <>
-                                    <Button size="sm" variant="outline" onClick={() => handleConfirm(b.id, "confirmed")}>
-                                      <CheckCircle className="h-3 w-3 mr-1" />Confirm
+                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleAttendance(b.id, "attended")}>
+                                      <CheckCircle className="h-3 w-3 mr-1" />Mark Attended
                                     </Button>
-                                    <Button size="sm" variant="outline" onClick={() => handleConfirm(b.id, "no_show")}>
-                                      <XCircle className="h-3 w-3 mr-1" />No Show
+                                    <Button size="sm" variant="destructive" onClick={() => handleAttendance(b.id, "absent")}>
+                                      <XCircle className="h-3 w-3 mr-1" />Mark Absent
                                     </Button>
                                   </>
-                                ) : (
+                                ) : b.coordinator_status ? (
                                   <>
-                                    <Badge variant={b.confirmation_status === "confirmed" ? "default" : "destructive"} className="text-xs">
-                                      {b.confirmation_status.replace("_", " ")}
+                                    <Badge variant={b.coordinator_status === "attended" ? "default" : "destructive"} className="text-xs">
+                                      {b.coordinator_status === "attended" ? "Attended" : "Absent"}
                                     </Badge>
+                                    {b.coordinator_actioned_at && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {format(new Date(b.coordinator_actioned_at), "MMM d, h:mm a")}
+                                      </span>
+                                    )}
+                                    {/* Dispute badge — show if confirmation is still pending after absent marking */}
+                                    {b.coordinator_status === "absent" && b.confirmation_status === "pending_confirmation" && (
+                                      <Badge className="text-[10px] bg-amber-500/20 text-amber-700 border-amber-500/40">
+                                        <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Disputed — Pending Admin Review
+                                      </Badge>
+                                    )}
                                     {b.confirmation_status === "confirmed" && (
                                       <>
                                         {b.final_hours != null && (
-                                          <Badge variant="secondary" className="text-xs">
-                                            {b.final_hours}h
-                                          </Badge>
+                                          <Badge variant="secondary" className="text-xs">{b.final_hours}h</Badge>
                                         )}
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 px-2"
-                                          onClick={() => openHoursEditor(b, s)}
-                                          title="Edit recorded hours"
-                                        >
-                                          <Pencil className="h-3 w-3 mr-1" />
-                                          Edit Hours
+                                        <Button size="sm" variant="ghost" className="h-7 px-2"
+                                          onClick={() => openHoursEditor(b, s)} title="Edit recorded hours">
+                                          <Pencil className="h-3 w-3 mr-1" />Edit Hours
                                         </Button>
                                       </>
                                     )}
+                                    {b.confirmation_status === "no_show" && (
+                                      <Badge variant="destructive" className="text-xs">No Show</Badge>
+                                    )}
                                   </>
+                                ) : (
+                                  <Badge variant={b.confirmation_status === "confirmed" ? "default" : "destructive"} className="text-xs">
+                                    {b.confirmation_status.replace("_", " ")}
+                                  </Badge>
                                 )}
                               </div>
                             </div>
