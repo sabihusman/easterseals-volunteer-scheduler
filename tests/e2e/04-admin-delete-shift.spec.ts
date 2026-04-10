@@ -9,6 +9,7 @@ import {
   uniqueShiftDate,
   expectOk,
   cancelVolunteerBookingsOnDate,
+  ensureEmergencyContact,
   cleanupStaleE2EShifts,
   authHeaders,
   SUPABASE_URL,
@@ -65,8 +66,9 @@ test.describe("Admin hard-deletes shift with bookings", () => {
     });
     const shiftId = shift.id;
 
-    // --- 2. Pre-cleanup: clear any leftover bookings on that date ---
+    // --- 2. Pre-cleanup + ensure emergency contacts ---
     const volA = await signInAsRole(request, "volunteer");
+    await ensureEmergencyContact(request, volA.access_token, volA.user.id);
     const admin = await signInAsRole(request, "admin");
     await cancelVolunteerBookingsOnDate(
       request,

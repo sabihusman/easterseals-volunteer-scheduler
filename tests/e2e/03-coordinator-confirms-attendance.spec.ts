@@ -9,6 +9,7 @@ import {
   uniquePastShiftDate,
   expectOk,
   cancelVolunteerBookingsOnDate,
+  ensureEmergencyContact,
   authHeaders,
   SUPABASE_URL,
 } from "./fixtures/db";
@@ -74,6 +75,7 @@ test.describe("Coordinator confirms attendance", () => {
 
     // --- 2. Pre-cleanup, then volunteer books under their own session ---
     const vol = await signInAsRole(request, "volunteer");
+    await ensureEmergencyContact(request, vol.access_token, vol.user.id);
     await cancelVolunteerBookingsOnDate(
       request,
       vol.access_token,
