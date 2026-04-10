@@ -72,6 +72,39 @@ export async function expectOk(
 }
 
 /**
+ * Ensure the test volunteer has emergency contacts set. The
+ * enforce_booking_window trigger rejects bookings when either
+ * emergency_contact_name or emergency_contact_phone is null.
+ * Call this once per test run (not per test) to avoid failures
+ * when running against a freshly-wiped DB.
+ */
+export async function ensureEmergencyContact(
+  request: APIRequestContext,
+  volunteerAccessToken: string,
+  volunteerId: string
+): Promise<void> {
+  const { data } = await request
+    .get(
+      `${SUPABASE_URL}/rest/v1/profiles?select=emergency_contact_name,emergency_contact_phone&id=eq.${volunteerId}`,
+      { headers: headers(volunteerAccessToken) }
+    )
+    .then(async (r) => ({ data: (await r.json())?.[0] }));
+
+  if (!data?.emergency_contact_name || !data?.emergency_contact_phone) {
+    await request.patch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${volunteerId}`,
+      {
+        headers: headers(volunteerAccessToken),
+        data: {
+          emergency_contact_name: "Test Emergency Contact",
+          emergency_contact_phone: "555-000-1234",
+        },
+      }
+    );
+  }
+}
+
+/**
  * Cancel any active (confirmed/waitlisted) bookings the given
  * volunteer has on the given shift_date. Used as belt-and-suspenders
  * pre-test cleanup so a volunteer's leftover state from a real-life

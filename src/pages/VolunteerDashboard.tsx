@@ -322,7 +322,18 @@ export default function VolunteerDashboard() {
         </Alert>
       )}
 
-      
+      {!(profile as any)?.emergency_contact_name || !(profile as any)?.emergency_contact_phone ? (
+        <Alert className="border-warning/50 bg-warning/10">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertTitle>Emergency Contact Required</AlertTitle>
+          <AlertDescription>
+            Please add an emergency contact before booking shifts. This is required for insurance and liability.{" "}
+            <a href="/settings" className="text-primary font-medium underline">Go to Settings →</a>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+
 
       {pendingConfirmations.length > 0 && (
         <Card className="border-primary/30 bg-primary/5">

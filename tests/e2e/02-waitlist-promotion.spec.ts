@@ -10,6 +10,7 @@ import {
   uniqueShiftDate,
   expectOk,
   cancelVolunteerBookingsOnDate,
+  ensureEmergencyContact,
   authHeaders,
   SUPABASE_URL,
 } from "./fixtures/db";
@@ -82,6 +83,8 @@ test.describe("Waitlist promotion lifecycle", () => {
     //    have on this date so the overlap trigger can't fire. ---
     const volA = await signInAsRole(request, "volunteer");
     const volB = await signInAsRole(request, "volunteer2");
+    await ensureEmergencyContact(request, volA.access_token, volA.user.id);
+    await ensureEmergencyContact(request, volB.access_token, volB.user.id);
     await cancelVolunteerBookingsOnDate(
       request,
       volA.access_token,

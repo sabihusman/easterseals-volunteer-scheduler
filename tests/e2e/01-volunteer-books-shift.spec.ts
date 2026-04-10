@@ -10,6 +10,7 @@ import {
   uniqueShiftDate,
   expectOk,
   cancelVolunteerBookingsOnDate,
+  ensureEmergencyContact,
   authHeaders,
   SUPABASE_URL,
 } from "./fixtures/db";
@@ -75,6 +76,10 @@ test.describe("Volunteer books a shift", () => {
     // volunteer might already have on this exact date so the overlap
     // trigger can't fire.
     const vol = await signInAsRole(request, "volunteer");
+    // Ensure volunteer has emergency contacts (required by
+    // enforce_booking_window trigger since the emergency-contacts
+    // feature landed).
+    await ensureEmergencyContact(request, vol.access_token, vol.user.id);
     await cancelVolunteerBookingsOnDate(
       request,
       vol.access_token,
