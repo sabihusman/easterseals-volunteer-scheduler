@@ -36,6 +36,7 @@ import DocumentCompliance from "./pages/DocumentCompliance";
 import VolunteerDocuments from "./pages/VolunteerDocuments";
 import Messages from "./pages/Messages";
 import VolunteerUnactionedShifts from "./pages/VolunteerUnactionedShifts";
+import AdminBreakGlass from "./pages/AdminBreakGlass";
 
 const queryClient = new QueryClient();
 
@@ -98,6 +99,8 @@ const App = () => (
             <Route path="/admin/events" element={<ProtectedRoute requiredRole={["admin"]}><AdminEvents /></ProtectedRoute>} />
             <Route path="/admin/documents" element={<ProtectedRoute requiredRole={["admin"]}><AdminDocumentTypes /></ProtectedRoute>} />
             <Route path="/admin/compliance" element={<ProtectedRoute requiredRole={["admin"]}><DocumentCompliance /></ProtectedRoute>} />
+            {/* Break-glass: no sidebar link — URL-only access for legal/safety investigations */}
+            <Route path="/admin/break-glass" element={<ProtectedRoute requiredRole={["admin"]}><AdminBreakGlass /></ProtectedRoute>} />
             <Route path="/events" element={<ProtectedRoute><VolunteerEvents /></ProtectedRoute>} />
 
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
