@@ -215,7 +215,7 @@ export default function CoverageAlert() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-[#006B3E]" />
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
       </div>
     );
   }
@@ -243,10 +243,10 @@ export default function CoverageAlert() {
                   className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="space-y-0.5">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-foreground">
                       {s.department_name}
                     </p>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <CalendarDays className="h-3 w-3" />
                         {s.shift_date}
@@ -265,7 +265,7 @@ export default function CoverageAlert() {
 
                   <Button
                     size="sm"
-                    className="w-full sm:w-auto bg-[#006B3E] hover:bg-[#005a33]"
+                    className="w-full sm:w-auto bg-primary hover:bg-primary/90"
                     onClick={() => openInviteModal(s)}
                   >
                     <Users className="mr-1.5 h-3.5 w-3.5" />
@@ -283,7 +283,7 @@ export default function CoverageAlert() {
         open={!!inviteShift}
         onOpenChange={(open) => { if (!open) setInviteShift(null); }}
       >
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-lg max-h-[85dvh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Invite Volunteers</DialogTitle>
             <DialogDescription>
@@ -295,10 +295,10 @@ export default function CoverageAlert() {
 
           {loadingVols ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-[#006B3E]" />
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
             </div>
           ) : volunteers.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-500">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               No eligible volunteers found for this shift.
             </p>
           ) : (
@@ -308,7 +308,7 @@ export default function CoverageAlert() {
                 <Checkbox
                   checked={selected.size === volunteers.length}
                   onCheckedChange={selectAll}
-                  className="data-[state=checked]:bg-[#006B3E] data-[state=checked]:border-[#006B3E]"
+                  className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
                 <span className="text-sm font-medium">
                   Select all ({volunteers.length})
@@ -318,17 +318,17 @@ export default function CoverageAlert() {
               <ul className="divide-y">
                 {volunteers.map((v) => (
                   <li key={v.id}>
-                    <label className="flex cursor-pointer items-center gap-3 py-2.5 hover:bg-gray-50 -mx-2 px-2 rounded">
+                    <label className="flex cursor-pointer items-center gap-3 py-2.5 hover:bg-muted -mx-2 px-2 rounded">
                       <Checkbox
                         checked={selected.has(v.id)}
                         onCheckedChange={() => toggle(v.id)}
-                        className="data-[state=checked]:bg-[#006B3E] data-[state=checked]:border-[#006B3E]"
+                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                       />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-foreground">
                           {v.full_name}
                         </p>
-                        <p className="text-xs text-gray-500">{v.email}</p>
+                        <p className="text-xs text-muted-foreground">{v.email}</p>
                       </div>
                     </label>
                   </li>
@@ -347,7 +347,7 @@ export default function CoverageAlert() {
             <Button
               disabled={selected.size === 0 || sending}
               onClick={sendInvitations}
-              className="bg-[#006B3E] hover:bg-[#005a33]"
+              className="bg-primary hover:bg-primary/90"
             >
               {sending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
