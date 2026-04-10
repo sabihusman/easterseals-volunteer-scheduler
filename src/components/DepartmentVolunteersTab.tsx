@@ -15,6 +15,8 @@ interface Props {
 interface VolunteerEntry {
   volunteerId: string;
   volunteerName: string;
+  emergencyContactName: string | null;
+  emergencyContactPhone: string | null;
   departmentId: string;
   departmentName: string;
   isRestricted: boolean;
@@ -32,7 +34,7 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     const [{ data: bookings }, { data: restrictions }] = await Promise.all([
       supabase
         .from("shift_bookings")
-        .select("volunteer_id, profiles!shift_bookings_volunteer_id_fkey(full_name), shifts!shift_bookings_shift_id_fkey(department_id)"),
+        .select("volunteer_id, profiles!shift_bookings_volunteer_id_fkey(full_name, emergency_contact_name, emergency_contact_phone), shifts!shift_bookings_shift_id_fkey(department_id)"),
       supabase
         .from("department_restrictions")
         .select("id, volunteer_id, department_id")
@@ -54,6 +56,8 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
       result.push({
         volunteerId: b.volunteer_id,
         volunteerName: b.profiles?.full_name || "Unknown",
+        emergencyContactName: b.profiles?.emergency_contact_name || null,
+        emergencyContactPhone: b.profiles?.emergency_contact_phone || null,
         departmentId: b.shifts.department_id,
         departmentName: dept?.name || "",
         isRestricted: !!restriction,
@@ -89,6 +93,11 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
             <div className="space-y-0.5">
               <div className="text-sm font-medium">{e.volunteerName}</div>
               <div className="text-xs text-muted-foreground">{e.departmentName}</div>
+              {(e.emergencyContactName || e.emergencyContactPhone) && (
+                <div className="text-xs text-muted-foreground">
+                  Emergency: {e.emergencyContactName}{e.emergencyContactName && e.emergencyContactPhone ? " · " : ""}{e.emergencyContactPhone}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {e.isRestricted ? (

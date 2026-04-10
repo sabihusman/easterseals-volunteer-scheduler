@@ -101,9 +101,22 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
     }
   };
 
+  const missingEmergencyContact =
+    !(profile as any)?.emergency_contact_name ||
+    !(profile as any)?.emergency_contact_phone;
+
   const handleConfirm = async () => {
     if (!user || !profile) return;
     if (hasSlots && selected.size === 0) return;
+
+    if (missingEmergencyContact) {
+      toast({
+        title: "Emergency contact required",
+        description: "Please add an emergency contact in your profile settings before booking.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Reject booking if shift has already ended
     const shiftEndStr =
@@ -290,6 +303,19 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
             )}
           </div>
         </div>
+
+        {/* Emergency contact gate */}
+        {missingEmergencyContact && (
+          <div className="rounded-md border border-warning/50 bg-warning/10 p-3 text-sm">
+            <p className="font-medium text-foreground">Emergency contact required</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              You must add an emergency contact before booking.{" "}
+              <a href="/settings" className="text-primary underline" onClick={() => onOpenChange(false)}>
+                Go to Settings →
+              </a>
+            </p>
+          </div>
+        )}
 
         {/* Weather forecast for outdoor departments */}
         {shift.departments && shift.departments.requires_bg_check === false && (
