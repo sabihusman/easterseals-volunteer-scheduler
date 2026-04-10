@@ -114,8 +114,16 @@ Deno.serve(async (req) => {
       admin_escalation: "notif_shift_reminders",
       coordinator_confirmation_reminder: "notif_shift_reminders",
     };
+    // Urgent waitlist offers (< 30 minutes acceptance window) bypass
+    // ALL preference opt-outs and send via every channel. The volunteer
+    // needs maximum chance of seeing the offer before it expires.
+    const isUrgentWaitlistOffer =
+      record.type === "waitlist_offer" &&
+      record.data?.window_minutes != null &&
+      Number(record.data.window_minutes) < 30;
+
     const prefCol = typePrefs[record.type];
-    if (prefCol && (profile as any)[prefCol] === false) {
+    if (!isUrgentWaitlistOffer && prefCol && (profile as any)[prefCol] === false) {
       return new Response(JSON.stringify({ skipped: true, reason: "type preference disabled" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -129,7 +137,8 @@ Deno.serve(async (req) => {
     if (record.data?.volunteer_name) emailPayload.volunteerName = record.data.volunteer_name;
 
     // ── Send Email ──
-    if (profile.notif_email) {
+    // Urgent waitlist offers send email regardless of notif_email pref.
+    if (profile.notif_email || isUrgentWaitlistOffer) {
       const { error } = await supabase.functions.invoke("send-email", {
         body: emailPayload,
       });
@@ -146,7 +155,8 @@ Deno.serve(async (req) => {
     // alerts without any opt-in from them. Fail closed: if the
     // volunteer hasn't set a phone number, SMS is simply not sent.
     const smsTarget = profile.phone || null;
-    if (profile.notif_sms && smsTarget) {
+    // Urgent waitlist offers send SMS regardless of notif_sms pref.
+    if ((profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
       // Build a concise SMS message from notification
       let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
 
