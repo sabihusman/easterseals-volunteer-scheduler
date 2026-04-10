@@ -107,10 +107,24 @@
   * {
     @apply border-border;
   }
+  html {
+    /* Smooth scroll for anchor links but allow instant scroll for
+       programmatic scrollIntoView calls (which set behavior themselves) */
+    scroll-behavior: smooth;
+    /* Prevent pull-to-refresh and overscroll bounce on iOS/Android
+       when the user is scrolling inside a modal or nested container */
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     line-height: 1.6;
+    /* Safe-area padding for notched devices (iPhone X+). The viewport
+       meta has viewport-fit=cover so content extends edge-to-edge;
+       we pad the body so text/controls stay clear of the notch/home
+       indicator. */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   h1, h2, h3, h4, h5, h6 {
     line-height: 1.2;

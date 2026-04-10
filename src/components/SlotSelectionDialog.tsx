@@ -272,7 +272,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85dvh]">
         <DialogHeader>
           <DialogTitle>Book Shift</DialogTitle>
         </DialogHeader>

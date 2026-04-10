@@ -71,7 +71,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </Tooltip>
             <NotificationBell />
           </header>
-          <main className="flex-1 p-4 md:p-8 pb-20 md:pb-8 overflow-auto" role="main">
+          <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-auto" role="main" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>
             {children}
           </main>
         </div>
