@@ -244,8 +244,14 @@ export default function DocumentCompliance() {
                           const doc = getDoc(v.id, rt.id);
                           return (
                             <TableCell key={rt.id} className="text-center">
-                              <div className="flex items-center justify-center gap-1">
+                              <div className="flex flex-col items-center gap-1">
                                 <DocumentStatusBadge status={status} />
+                                {doc?.expires_at && (() => {
+                                  const days = Math.ceil((new Date(doc.expires_at).getTime() - Date.now()) / 86400000);
+                                  if (days <= 0) return <Badge variant="destructive" className="text-[9px] px-1 py-0">Expired</Badge>;
+                                  if (days <= 30) return <Badge className="text-[9px] px-1 py-0 bg-yellow-500 text-white">{days}d left</Badge>;
+                                  return <Badge variant="outline" className="text-[9px] px-1 py-0 text-primary border-primary">{days}d</Badge>;
+                                })()}
                                 {doc && doc.status === "pending_review" && (
                                   <Button
                                     variant="ghost"

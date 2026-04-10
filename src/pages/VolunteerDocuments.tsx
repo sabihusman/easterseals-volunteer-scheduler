@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DocumentStatusBadge } from "@/components/DocumentStatusBadge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Upload, FileText, Download, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 
@@ -38,6 +40,7 @@ export default function VolunteerDocuments() {
   const [myDocs, setMyDocs] = useState<VolunteerDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [customExpiry, setCustomExpiry] = useState<Record<string, string>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const fetchData = async () => {
@@ -78,11 +81,14 @@ export default function VolunteerDocuments() {
       return;
     }
 
-    // Calculate expiry
+    // Calculate expiry: manual override takes precedence, then auto from doc type
     const docType = docTypes.find((dt) => dt.id === typeId);
-    const expiresAt = docType?.has_expiry && docType.expiry_days
-      ? new Date(Date.now() + docType.expiry_days * 86400000).toISOString()
-      : null;
+    const manualExpiry = customExpiry[typeId];
+    const expiresAt = manualExpiry
+      ? new Date(manualExpiry + "T23:59:59").toISOString()
+      : docType?.has_expiry && docType.expiry_days
+        ? new Date(Date.now() + docType.expiry_days * 86400000).toISOString()
+        : null;
 
     const { error: insertError } = await (supabase as any).from("volunteer_documents").insert({
       volunteer_id: user.id,
@@ -274,9 +280,22 @@ export default function VolunteerDocuments() {
                 <Upload className="h-4 w-4 mr-2" />
                 {uploading === dt.id ? "Uploading..." : "Upload Document"}
               </Button>
+              <div className="mt-3 space-y-1.5">
+                <Label htmlFor={`expiry-${dt.id}`} className="text-xs text-muted-foreground">
+                  Expiration date (optional)
+                </Label>
+                <Input
+                  id={`expiry-${dt.id}`}
+                  type="date"
+                  value={customExpiry[dt.id] || ""}
+                  onChange={(e) => setCustomExpiry((prev) => ({ ...prev, [dt.id]: e.target.value }))}
+                  className="w-full sm:w-48"
+                  min={new Date().toISOString().slice(0, 10)}
+                />
+              </div>
               <p className="text-xs text-muted-foreground mt-2">
                 Accepted: PDF, JPG, PNG, DOC, DOCX (max 10MB)
-                {dt.has_expiry && dt.expiry_days && ` — expires ${dt.expiry_days} days after upload`}
+                {dt.has_expiry && dt.expiry_days && !customExpiry[dt.id] && ` — auto-expires ${dt.expiry_days} days after upload`}
               </p>
             </div>
           )}
