@@ -69,14 +69,17 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
   // Slots that are selectable (not already booked by this volunteer)
   const selectableSlots = slots.filter(s => !bookedSlotIds?.has(s.id));
   const availableSlots = selectableSlots.filter(s => s.booked_slots < s.total_slots);
-  const allSelected = availableSlots.length > 0 && availableSlots.every(s => selected.has(s.id));
+  // "Full Shift" is only valid when ALL selectable slots are available (none full)
+  const canSelectFullShift = selectableSlots.length > 1 && selectableSlots.every(s => s.booked_slots < s.total_slots);
+  // "Full Shift" is checked only when every selectable slot is selected
+  const allSelected = canSelectFullShift && selectableSlots.length > 0 && selectableSlots.every(s => selected.has(s.id));
 
   const toggleAll = () => {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      // Select all selectable slots (including full ones for waitlist)
-      setSelected(new Set(selectableSlots.map(s => s.id)));
+      // Select all selectable (available) slots
+      setSelected(new Set(availableSlots.map(s => s.id)));
     }
   };
 
@@ -324,8 +327,8 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
             <div>
               <h4 className="text-sm font-medium mb-2">Select Your Hours</h4>
 
-              {/* Full shift option — only show if more than 1 selectable slot */}
-              {selectableSlots.length > 1 && (
+              {/* Full shift option — only show if all selectable slots are available */}
+              {canSelectFullShift && (
                 <div
                   className={`flex items-center gap-3 p-3 rounded-md border mb-2 cursor-pointer transition-colors ${allSelected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
                   onClick={toggleAll}

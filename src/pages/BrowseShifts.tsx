@@ -34,18 +34,21 @@ interface ShiftRow {
 interface ShiftCardProps {
   s: ShiftRow;
   bookedShiftSlots: Map<string, Set<string>>; // shiftId → Set<slotId>
+  slotAvailability: Map<string, { total: number; available: number }>;
   profile: { booking_privileges?: boolean; bg_check_status?: string } | null;
   privilegesSuspended: boolean;
   setSlotDialogShift: (shift: ShiftRow) => void;
   trackViewed: (shiftId: string) => void;
 }
 
-function ShiftCard({ s, bookedShiftSlots, profile, privilegesSuspended, setSlotDialogShift, trackViewed }: ShiftCardProps) {
-  const slotsLeft = s.total_slots - s.booked_slots;
-  const isFull = slotsLeft <= 0;
+function ShiftCard({ s, bookedShiftSlots, slotAvailability, profile, privilegesSuspended, setSlotDialogShift, trackViewed }: ShiftCardProps) {
+  // Use sub-slot availability for accurate "Full" determination
+  const avail = slotAvailability.get(s.id);
+  const availableSubSlots = avail?.available ?? (s.total_slots - s.booked_slots);
+  const totalSubSlots = avail?.total ?? 1;
+  const isFull = availableSubSlots <= 0;
   const mySlots = bookedShiftSlots.get(s.id);
   const hasBooking = mySlots && mySlots.size > 0;
-  // A volunteer may have booked some but not all slots — allow booking more
   const partiallyBooked = hasBooking;
   return (
     <Card key={s.id}>
@@ -56,7 +59,7 @@ function ShiftCard({ s, bookedShiftSlots, profile, privilegesSuspended, setSlotD
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1"><CalendarIcon className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
               <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
-              <span className="flex items-center gap-1"><Users className="h-3 w-3" />{isFull ? "Full" : `${slotsLeft} slot${slotsLeft !== 1 ? "s" : ""} left`}</span>
+              <span className="flex items-center gap-1"><Users className="h-3 w-3" />{isFull ? "Full" : `${availableSubSlots}/${totalSubSlots} slot${totalSubSlots !== 1 ? "s" : ""} open`}</span>
             </div>
             <div className="flex gap-2">
               <Badge variant="secondary" className="text-xs">{s.departments?.name}</Badge>
@@ -97,6 +100,8 @@ export default function BrowseShifts() {
   const [calMonth, setCalMonth] = useState(new Date());
   const [slotDialogShift, setSlotDialogShift] = useState<ShiftRow | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // Per-shift slot availability: shiftId → { totalSubSlots, availableSubSlots }
+  const [slotAvailability, setSlotAvailability] = useState<Map<string, { total: number; available: number }>>(new Map());
 
   // Booking window based on consistency score
   const extendedBooking = profile?.extended_booking === true;
@@ -177,9 +182,32 @@ export default function BrowseShifts() {
       return true;
     });
 
+    // Fetch sub-slot availability for accurate "Full" / "X slots left" display
+    const shiftIds = filteredShifts.map((s) => s.id);
+    const availMap = new Map<string, { total: number; available: number }>();
+    if (shiftIds.length > 0) {
+      const { data: slotData } = await supabase
+        .from("shift_time_slots")
+        .select("shift_id, total_slots, booked_slots")
+        .in("shift_id", shiftIds);
+      // Group by shift_id and compute total sub-slots + available sub-slots
+      const grouped = new Map<string, Array<{ total_slots: number; booked_slots: number }>>();
+      for (const row of (slotData || []) as { shift_id: string; total_slots: number; booked_slots: number }[]) {
+        if (!grouped.has(row.shift_id)) grouped.set(row.shift_id, []);
+        grouped.get(row.shift_id)!.push(row);
+      }
+      for (const [sid, rows] of grouped) {
+        availMap.set(sid, {
+          total: rows.length,
+          available: rows.filter((r) => r.booked_slots < r.total_slots).length,
+        });
+      }
+    }
+
     setDepartments((depts || []).filter((d) => !restrictedDeptIds.has(d.id)));
     setShifts(filteredShifts);
     setBookedShiftSlots(slotMap);
+    setSlotAvailability(availMap);
     setLoading(false);
   }, [user, profile?.extended_booking, profile?.bg_check_status]);
 
@@ -366,7 +394,7 @@ export default function BrowseShifts() {
           <Card><CardContent className="pt-6 text-center text-muted-foreground">No available shifts found.</CardContent></Card>
         ) : (
           <div className="grid gap-3">
-            {filtered.map((s) => <ShiftCard key={s.id} s={s} bookedShiftSlots={bookedShiftSlots} profile={profile} privilegesSuspended={privilegesSuspended} setSlotDialogShift={setSlotDialogShift} trackViewed={trackViewed} />)}
+            {filtered.map((s) => <ShiftCard key={s.id} s={s} bookedShiftSlots={bookedShiftSlots} slotAvailability={slotAvailability} profile={profile} privilegesSuspended={privilegesSuspended} setSlotDialogShift={setSlotDialogShift} trackViewed={trackViewed} />)}
           </div>
         )}
         </>      ) : (
