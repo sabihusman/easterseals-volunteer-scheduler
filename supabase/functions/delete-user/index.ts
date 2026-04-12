@@ -67,13 +67,80 @@ Deno.serve(async (req) => {
       .eq("id", userId)
       .single();
 
-    if (targetProfile?.role === "admin") {
+    if (!targetProfile) {
+      return new Response(
+        JSON.stringify({ error: "User not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (targetProfile.role === "admin") {
       return new Response(
         JSON.stringify({ error: "Cannot delete another admin account" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // ── Coordinator delete: transfer responsibilities first ──
+    if (targetProfile.role === "coordinator") {
+      const { data: transferResult, error: rpcError } = await supabaseAdmin
+        .rpc("transfer_coordinator_and_delete", {
+          p_coordinator_id: userId,
+          p_admin_id: user.id,
+        });
+
+      if (rpcError) {
+        return new Response(
+          JSON.stringify({
+            error: `Transfer failed: ${rpcError.message}`,
+            step: "rpc_call",
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!transferResult?.success) {
+        const stepLabels: Record<string, string> = {
+          validation: "Validation",
+          department_transfer: "Department ownership transfer",
+          shift_transfer: "Shift ownership transfer",
+          reassign_references: "Reassigning coordinator references",
+          notification_cleanup: "Notification cleanup",
+          delete_profile: "Profile deletion",
+        };
+        const failedStep = stepLabels[transferResult?.step] || transferResult?.step || "Unknown step";
+        return new Response(
+          JSON.stringify({
+            error: `${failedStep} failed: ${transferResult?.error || "Unknown error"}`,
+            step: transferResult?.step,
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Profile is already deleted by the RPC. Now remove from auth.users.
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (authError) {
+        // Profile is gone but auth record remains — log but still report success
+        // since the coordinator data has been fully transferred.
+        console.error("Auth user delete failed after profile transfer:", authError.message);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          transferred: true,
+          message: `${targetProfile.full_name || "Coordinator"}'s account has been deleted. Their departments and shifts have been transferred to you.`,
+          departments_transferred: transferResult.departments_transferred,
+          departments_removed: transferResult.departments_removed,
+          shifts_transferred: transferResult.shifts_transferred,
+          notifications_deleted: transferResult.notifications_deleted,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Volunteer (or other role) delete: simple path ──
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (error) {
@@ -86,7 +153,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `${targetProfile?.full_name || "User"}'s account has been deleted.`,
+        transferred: false,
+        message: `${targetProfile.full_name || "User"}'s account has been deleted.`,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

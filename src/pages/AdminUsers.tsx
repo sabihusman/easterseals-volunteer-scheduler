@@ -259,10 +259,27 @@ export default function AdminUsers() {
     });
     setDeleting(false);
     if (error || data?.error) {
-      toast({ title: "Error", description: data?.error || error?.message || "Failed to delete user", variant: "destructive" });
+      const stepInfo = data?.step ? ` (step: ${data.step})` : "";
+      toast({
+        title: "Delete failed",
+        description: (data?.error || error?.message || "Failed to delete user") + stepInfo,
+        variant: "destructive",
+      });
     } else {
       setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      toast({ title: `${deleteTarget.name}'s account has been deleted.` });
+      if (data?.transferred) {
+        const parts: string[] = [];
+        if (data.departments_transferred > 0)
+          parts.push(`${data.departments_transferred} department${data.departments_transferred !== 1 ? "s" : ""} transferred to you`);
+        if (data.shifts_transferred > 0)
+          parts.push(`${data.shifts_transferred} shift${data.shifts_transferred !== 1 ? "s" : ""} reassigned`);
+        toast({
+          title: "Coordinator deleted",
+          description: `${deleteTarget.name}'s account has been deleted. ${parts.length > 0 ? parts.join(", ") + "." : "Their departments and shifts have been transferred to you."}`,
+        });
+      } else {
+        toast({ title: `${deleteTarget.name}'s account has been deleted.` });
+      }
     }
     setDeleteTarget(null);
   };
@@ -501,9 +518,11 @@ export default function AdminUsers() {
               <div className="flex items-start gap-2 mt-2 p-3 rounded-md bg-destructive/10 border border-destructive/30">
                 <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
                 <p className="text-sm text-foreground">
-                  {deleteTarget.role === "volunteer"
-                    ? "All of their active shift bookings will be automatically cancelled."
-                    : "Their created shifts will remain unchanged."}
+                  {deleteTarget.role === "coordinator"
+                    ? "Their departments and shifts will be transferred to you (or another coordinator in the department). Volunteer bookings on their shifts will remain intact."
+                    : deleteTarget.role === "volunteer"
+                      ? "All of their active shift bookings will be automatically cancelled."
+                      : "Their created shifts will remain unchanged."}
                 </p>
               </div>
             )}
