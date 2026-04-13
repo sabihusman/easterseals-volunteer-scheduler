@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { downloadCSV, timeLabel, parseShiftDate } from "@/lib/calendar-utils";
 import { DepartmentCoordinatorManager } from "@/components/DepartmentCoordinatorManager";
 import { VolunteerLeaderboard } from "@/components/VolunteerLeaderboard";
+import { AdminQRCheckIn } from "@/components/AdminQRCheckIn";
 import { useToast } from "@/hooks/use-toast";
 
 const DEPT_COLORS: Record<string, string> = {
@@ -215,6 +216,9 @@ export default function AdminDashboard() {
 
       {/* Top Volunteers Leaderboard */}
       <VolunteerLeaderboard />
+
+      {/* QR Code Check-In */}
+      <AdminQRCheckIn />
 
       {/* Filters */}
       <div className="space-y-3">
