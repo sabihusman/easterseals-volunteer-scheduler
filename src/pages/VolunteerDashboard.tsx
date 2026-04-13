@@ -4,8 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle, ChevronDown, CheckCircle } from "lucide-react";
+import { Calendar, Clock, MapPin, Shield, Award, UserPlus, AlertTriangle, XCircle, ChevronDown, CheckCircle, Mail, Loader2 } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format, differenceInHours } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
@@ -24,6 +28,13 @@ export default function VolunteerDashboard() {
   const [pendingConfirmations, setPendingConfirmations] = useState<any[]>([]);
   const [waitlistOffers, setWaitlistOffers] = useState<any[]>([]);
   const [waitlistPassive, setWaitlistPassive] = useState<any[]>([]);
+  const [invitations, setInvitations] = useState<any[]>([]);
+  const [invitationActioning, setInvitationActioning] = useState<string | null>(null);
+  const [inviteConflict, setInviteConflict] = useState<{
+    invitation: any;
+    conflictBookingId: string;
+    conflictShift: any;
+  } | null>(null);
 
   // Use LOCAL date, not UTC — otherwise in the evening Central time the UTC
   // rollover drops today's shifts from the filter and they disappear from the
@@ -98,6 +109,226 @@ export default function VolunteerDashboard() {
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+
+  // Fetch pending invitations
+  const fetchInvitations = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("shift_invitations")
+      .select("*, shifts(id, title, shift_date, start_time, end_time, total_slots, booked_slots, department_id, departments(name))")
+      .eq("volunteer_id", user.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    // Filter out expired invitations client-side until the cron catches them
+    const now = new Date();
+    setInvitations(
+      (data || []).filter((inv: any) => new Date(inv.expires_at) > now)
+    );
+  }, [user]);
+
+  useEffect(() => {
+    fetchInvitations();
+  }, [fetchInvitations]);
+
+  // Accept invitation
+  const handleInvitationAccept = async (inv: any) => {
+    if (!user) return;
+    const shift = inv.shifts;
+    if (!shift) return;
+    setInvitationActioning(inv.id);
+
+    // Check if shift still has slots
+    const { data: freshShift } = await supabase
+      .from("shifts")
+      .select("booked_slots, total_slots")
+      .eq("id", shift.id)
+      .single();
+
+    if (freshShift && freshShift.booked_slots >= freshShift.total_slots) {
+      toast({
+        title: "Shift fully booked",
+        description: "This shift is now fully booked. Thank you for being available to help fill this spot.",
+      });
+      // Mark as declined since they can't accept
+      await supabase
+        .from("shift_invitations")
+        .update({ status: "declined" })
+        .eq("id", inv.id);
+      setInvitationActioning(null);
+      fetchInvitations();
+      return;
+    }
+
+    // Check for conflicting bookings
+    const { data: myBookings } = await supabase
+      .from("shift_bookings")
+      .select("id, shifts(id, title, shift_date, start_time, end_time, department_id, departments(name))")
+      .eq("volunteer_id", user.id)
+      .eq("booking_status", "confirmed");
+
+    let conflictBooking: any = null;
+    for (const b of (myBookings || []) as any[]) {
+      const s = b.shifts;
+      if (!s || s.shift_date !== shift.shift_date) continue;
+      if (s.start_time < shift.end_time && s.end_time > shift.start_time) {
+        conflictBooking = b;
+        break;
+      }
+    }
+
+    if (conflictBooking) {
+      setInviteConflict({
+        invitation: inv,
+        conflictBookingId: conflictBooking.id,
+        conflictShift: conflictBooking.shifts,
+      });
+      setInvitationActioning(null);
+      return;
+    }
+
+    // No conflict — book directly
+    await completeInvitationAccept(inv);
+  };
+
+  const completeInvitationAccept = async (inv: any, cancelBookingId?: string, cancelledShift?: any) => {
+    if (!user) return;
+    const shift = inv.shifts;
+    setInvitationActioning(inv.id);
+
+    // If cancelling a conflicting booking first
+    if (cancelBookingId) {
+      await supabase
+        .from("shift_bookings")
+        .update({ booking_status: "cancelled", cancelled_at: new Date().toISOString() })
+        .eq("id", cancelBookingId);
+
+      // Notify volunteer and coordinator about the cancelled shift
+      if (cancelledShift) {
+        const { data: coords } = await supabase
+          .from("department_coordinators")
+          .select("coordinator_id")
+          .eq("department_id", cancelledShift.department_id);
+
+        const notifications = [
+          {
+            user_id: user.id,
+            type: "booking_cancelled",
+            title: `Booking cancelled — ${cancelledShift.title}`,
+            message: `Your booking for "${cancelledShift.title}" on ${cancelledShift.shift_date} was cancelled to accept an invitation for "${shift.title}".`,
+            link: "/dashboard",
+          },
+          ...(coords || []).map((c: any) => ({
+            user_id: c.coordinator_id,
+            type: "booking_cancelled",
+            title: `Volunteer cancelled — ${cancelledShift.title}`,
+            message: `${profile?.full_name} cancelled their booking for "${cancelledShift.title}" on ${cancelledShift.shift_date} to accept an admin invitation for "${shift.title}".`,
+            link: "/coordinator",
+          })),
+        ];
+        await supabase.from("notifications").insert(notifications);
+      }
+    }
+
+    // Create the booking for the invited shift
+    // Fetch time slots for the shift and book all of them (full shift)
+    const { data: slots } = await supabase
+      .from("shift_time_slots")
+      .select("id, total_slots, booked_slots")
+      .eq("shift_id", shift.id)
+      .order("slot_start", { ascending: true });
+
+    let bookingError = false;
+    if (slots && slots.length > 0) {
+      for (const slot of slots) {
+        const isFull = slot.booked_slots >= slot.total_slots;
+        const { error } = await supabase.from("shift_bookings").insert({
+          shift_id: shift.id,
+          volunteer_id: user.id,
+          booking_status: isFull ? "waitlisted" : "confirmed",
+          time_slot_id: slot.id,
+        });
+        if (error) { bookingError = true; break; }
+      }
+    } else {
+      // Fallback: shift without time slots
+      const { error } = await supabase.from("shift_bookings").insert({
+        shift_id: shift.id,
+        volunteer_id: user.id,
+        booking_status: "confirmed",
+      });
+      if (error) bookingError = true;
+    }
+
+    if (bookingError) {
+      toast({ title: "Could not book shift", description: "An error occurred while booking. Please try again.", variant: "destructive" });
+      setInvitationActioning(null);
+      return;
+    }
+
+    // Update invitation status
+    await supabase
+      .from("shift_invitations")
+      .update({ status: "accepted" })
+      .eq("id", inv.id);
+
+    // Notify admin and coordinator that invitation was accepted
+    const notifs: any[] = [
+      {
+        user_id: inv.invited_by,
+        type: "shift_invitation",
+        title: `Invitation accepted — ${shift.title}`,
+        message: `${profile?.full_name} accepted the invitation to "${shift.title}" on ${shift.shift_date}.`,
+        data: { shift_id: shift.id, shift_title: shift.title, shift_date: shift.shift_date },
+      },
+    ];
+    const { data: coords } = await supabase
+      .from("department_coordinators")
+      .select("coordinator_id")
+      .eq("department_id", shift.department_id);
+    for (const c of (coords || [])) {
+      if (c.coordinator_id !== inv.invited_by) {
+        notifs.push({
+          user_id: c.coordinator_id,
+          type: "shift_invitation",
+          title: `Volunteer accepted invitation — ${shift.title}`,
+          message: `${profile?.full_name} accepted an invitation to "${shift.title}" on ${shift.shift_date}.`,
+          data: { shift_id: shift.id, shift_title: shift.title, shift_date: shift.shift_date },
+        });
+      }
+    }
+    await supabase.from("notifications").insert(notifs);
+
+    setInvitationActioning(null);
+    setInviteConflict(null);
+    toast({ title: "Shift confirmed!", description: `You're booked for ${shift.title}.` });
+    fetchInvitations();
+    fetchBookings();
+  };
+
+  // Decline invitation
+  const handleInvitationDecline = async (inv: any, reason?: string) => {
+    setInvitationActioning(inv.id);
+
+    await supabase
+      .from("shift_invitations")
+      .update({ status: "declined" })
+      .eq("id", inv.id);
+
+    // Notify admin
+    const shift = inv.shifts;
+    await supabase.from("notifications").insert({
+      user_id: inv.invited_by,
+      type: "shift_invitation",
+      title: `Invitation declined — ${shift?.title || "shift"}`,
+      message: `${profile?.full_name} declined the invitation to "${shift?.title}" on ${shift?.shift_date}.${reason ? ` Reason: ${reason}` : ""}`,
+      data: { shift_id: shift?.id, shift_title: shift?.title, shift_date: shift?.shift_date },
+    });
+
+    setInvitationActioning(null);
+    setInviteConflict(null);
+    toast({ title: "Invitation declined" });
+    fetchInvitations();
+  };
 
   const handleWaitlistAccept = async (bookingId: string) => {
     const { error } = await (supabase as any).rpc("waitlist_accept", { p_booking_id: bookingId });
@@ -420,6 +651,67 @@ export default function VolunteerDashboard() {
         </Card>
       )}
 
+      {invitations.length > 0 && (
+        <Card className="border-primary/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mail className="h-4 w-4 text-primary" /> Shift Invitations
+            </CardTitle>
+            <CardDescription className="text-xs">
+              An admin has invited you to the following shift{invitations.length !== 1 ? "s" : ""}. Respond before the shift starts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {invitations.map((inv) => {
+              const s = inv.shifts;
+              if (!s) return null;
+              const isActioning = invitationActioning === inv.id;
+              return (
+                <div key={inv.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 px-3 rounded-md bg-primary/5 border border-primary/10">
+                  <div className="space-y-1 min-w-0">
+                    <p className="font-medium text-sm">{s.title}</p>
+                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {s.start_time?.slice(0, 5)} – {s.end_time?.slice(0, 5)}
+                      </span>
+                      {s.departments?.name && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {s.departments.name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isActioning}
+                      onClick={() => handleInvitationDecline(inv)}
+                    >
+                      Decline
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={isActioning}
+                      onClick={() => handleInvitationAccept(inv)}
+                    >
+                      {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+                      Accept
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="pt-6">
@@ -577,6 +869,55 @@ export default function VolunteerDashboard() {
           <VolunteerImpactCharts />
         </CollapsibleContent>
       </Collapsible>
+
+      {/* Invitation conflict resolution dialog */}
+      <AlertDialog open={!!inviteConflict} onOpenChange={(open) => { if (!open) setInviteConflict(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" /> Scheduling Conflict
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Accepting this shift will conflict with your existing booking:</p>
+                {inviteConflict?.conflictShift && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                    <strong>{inviteConflict.conflictShift.title}</strong> on{" "}
+                    {inviteConflict.conflictShift.shift_date} from{" "}
+                    {inviteConflict.conflictShift.start_time?.slice(0, 5)} to{" "}
+                    {inviteConflict.conflictShift.end_time?.slice(0, 5)}
+                  </div>
+                )}
+                <p>Would you like to cancel your existing booking and accept this invitation?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel
+              onClick={() => {
+                if (inviteConflict) {
+                  handleInvitationDecline(inviteConflict.invitation, "scheduling conflict");
+                }
+              }}
+            >
+              Keep My Existing Booking &amp; Decline
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (inviteConflict) {
+                  completeInvitationAccept(
+                    inviteConflict.invitation,
+                    inviteConflict.conflictBookingId,
+                    inviteConflict.conflictShift
+                  );
+                }
+              }}
+            >
+              Cancel Existing &amp; Accept Invitation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
