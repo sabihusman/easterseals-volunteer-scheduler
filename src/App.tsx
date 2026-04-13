@@ -37,6 +37,7 @@ import VolunteerDocuments from "./pages/VolunteerDocuments";
 import Messages from "./pages/Messages";
 import VolunteerUnactionedShifts from "./pages/VolunteerUnactionedShifts";
 import AdminDisputes from "./pages/AdminDisputes";
+import CheckIn from "./pages/CheckIn";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/mfa-verify" element={<MfaVerify />} />
+            <Route path="/checkin" element={<CheckIn />} />
 
             <Route path="/dashboard" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>} />
             <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,44 +57,80 @@ export default function CoordinatorDashboard() {
     fetchDepts();
   }, [user, role]);
 
-  useEffect(() => {
+  const fetchShiftsAndBookings = useCallback(async () => {
     if (!selectedDept) return;
-    const fetchShiftsAndBookings = async () => {
-      let query = supabase
-        .from("shifts")
-        .select("*")
-        // Exclude admin-cancelled shifts — they are considered deleted
-        // from everyone's view except the admin panel itself.
-        .neq("status", "cancelled")
-        .order("shift_date", { ascending: true });
+    let query = supabase
+      .from("shifts")
+      .select("*")
+      // Exclude admin-cancelled shifts — they are considered deleted
+      // from everyone's view except the admin panel itself.
+      .neq("status", "cancelled")
+      .order("shift_date", { ascending: true });
 
-      if (selectedDept === "all") {
-        // For coordinators, "all" means all of their assigned departments
-        // (not every department in the org). Admins see everything.
-        if (role !== "admin" && departments.length > 0) {
-          query = query.in("department_id", departments.map((d: any) => d.id));
-        }
-      } else {
-        query = query.eq("department_id", selectedDept);
+    if (selectedDept === "all") {
+      // For coordinators, "all" means all of their assigned departments
+      // (not every department in the org). Admins see everything.
+      if (role !== "admin" && departments.length > 0) {
+        query = query.in("department_id", departments.map((d: any) => d.id));
       }
+    } else {
+      query = query.eq("department_id", selectedDept);
+    }
 
-      const { data: shiftData } = await query;
-      setShifts(shiftData || []);
+    const { data: shiftData } = await query;
+    setShifts(shiftData || []);
 
-      const shiftIds = (shiftData || []).map((s: any) => s.id);
-      if (shiftIds.length > 0) {
-        const { data: bookingData } = await supabase
-          .from("shift_bookings")
-          .select("*, profiles!shift_bookings_volunteer_id_fkey(full_name, email, phone, emergency_contact)")
-          .in("shift_id", shiftIds)
-          .eq("booking_status", "confirmed");
-        setBookings(bookingData || []);
-      } else {
-        setBookings([]);
+    const shiftIds = (shiftData || []).map((s: any) => s.id);
+    if (shiftIds.length > 0) {
+      const { data: bookingData } = await supabase
+        .from("shift_bookings")
+        .select("*, profiles!shift_bookings_volunteer_id_fkey(full_name, email, phone, emergency_contact)")
+        .in("shift_id", shiftIds)
+        .eq("booking_status", "confirmed");
+      setBookings(bookingData || []);
+    } else {
+      setBookings([]);
+    }
+  }, [selectedDept, role, departments]);
+
+  useEffect(() => {
+    fetchShiftsAndBookings();
+  }, [fetchShiftsAndBookings]);
+
+  // ── Realtime: listen for check-in updates ──────────────────
+  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  useEffect(() => {
+    // Subscribe to shift_bookings changes to detect real-time check-ins
+    if (realtimeRef.current) {
+      supabase.removeChannel(realtimeRef.current);
+    }
+    const channel = supabase
+      .channel("coordinator-checkins")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "shift_bookings" },
+        (payload) => {
+          const updated = payload.new as any;
+          // Update the booking in local state if it's one we're tracking
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === updated.id
+                ? { ...b, checked_in: updated.checked_in, checked_in_at: updated.checked_in_at }
+                : b
+            )
+          );
+        }
+      )
+      .subscribe();
+    realtimeRef.current = channel;
+
+    return () => {
+      if (realtimeRef.current) {
+        supabase.removeChannel(realtimeRef.current);
+        realtimeRef.current = null;
       }
     };
-    fetchShiftsAndBookings();
-  }, [selectedDept, role, departments]);
+  }, [selectedDept]);
 
   const openHoursEditor = (booking: any, shift: any) => {
     setHoursEditTarget({ booking, shift });
@@ -320,7 +356,26 @@ export default function CoordinatorDashboard() {
                           {shiftBookings.map((b) => (
                             <div key={b.id} className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/50">
                               <div>
-                                <div className="text-sm font-medium">{b.profiles?.full_name}</div>
+                                <div className="text-sm font-medium flex items-center gap-1.5">
+                                  <span
+                                    className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${
+                                      b.checked_in || b.checked_in_at
+                                        ? "bg-green-500"
+                                        : "bg-gray-300"
+                                    }`}
+                                    title={
+                                      b.checked_in || b.checked_in_at
+                                        ? `Checked in${b.checked_in_at ? ` at ${new Date(b.checked_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}`
+                                        : "Not checked in"
+                                    }
+                                  />
+                                  {b.profiles?.full_name}
+                                  {(b.checked_in || b.checked_in_at) && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-green-50 text-green-700 border-green-200">
+                                      Checked in
+                                    </Badge>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground">{b.profiles?.email}</div>
                                 {b.profiles?.phone && <div className="text-xs text-muted-foreground">📞 {b.profiles.phone}</div>}
                                 {b.profiles?.emergency_contact && <div className="text-xs text-muted-foreground">🆘 {b.profiles.emergency_contact}</div>}

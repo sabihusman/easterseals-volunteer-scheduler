@@ -211,6 +211,33 @@ export type Database = {
           },
         ]
       }
+      checkin_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          rotation_mode: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rotation_mode?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rotation_mode?: string | null
+          token?: string
+        }
+        Relationships: []
+      }
       confirmation_reminders: {
         Row: {
           booking_id: string
@@ -1067,6 +1094,7 @@ export type Database = {
         Row: {
           booking_status: Database["public"]["Enums"]["booking_status"]
           cancelled_at: string | null
+          checked_in: boolean | null
           checked_in_at: string | null
           confirmation_status: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at: string | null
@@ -1095,6 +1123,7 @@ export type Database = {
         Insert: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
           cancelled_at?: string | null
+          checked_in?: boolean | null
           checked_in_at?: string | null
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
@@ -1123,6 +1152,7 @@ export type Database = {
         Update: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
           cancelled_at?: string | null
+          checked_in?: boolean | null
           checked_in_at?: string | null
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
@@ -2072,6 +2102,7 @@ export type Database = {
         Returns: undefined
       }
       username_available: { Args: { p_username: string }; Returns: boolean }
+      validate_checkin_token: { Args: { p_token: string }; Returns: boolean }
       waitlist_accept: { Args: { p_booking_id: string }; Returns: undefined }
       waitlist_decline: { Args: { p_booking_id: string }; Returns: undefined }
       warn_expiring_documents: { Args: never; Returns: undefined }
