@@ -1204,6 +1204,7 @@ export type Database = {
           shift_id: string
           status: string
           token: string
+          volunteer_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1215,6 +1216,7 @@ export type Database = {
           shift_id: string
           status?: string
           token?: string
+          volunteer_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1226,6 +1228,7 @@ export type Database = {
           shift_id?: string
           status?: string
           token?: string
+          volunteer_id?: string | null
         }
         Relationships: [
           {
@@ -1247,6 +1250,13 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_invitations_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2052,6 +2062,10 @@ export type Database = {
       transfer_admin_role: {
         Args: { from_admin_id: string; to_coordinator_id: string }
         Returns: undefined
+      }
+      transfer_coordinator_and_delete: {
+        Args: { p_admin_id: string; p_coordinator_id: string }
+        Returns: Json
       }
       update_volunteer_preferences: {
         Args: { p_volunteer_id: string }
