@@ -49,7 +49,9 @@ import {
   Trash2,
   StickyNote,
   AlertCircle,
+  UserPlus,
 } from "lucide-react";
+import { InviteVolunteerModal } from "@/components/InviteVolunteerModal";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -122,6 +124,7 @@ export default function ManageShifts() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ShiftForm>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; bookingCount: number } | null>(null);
+  const [inviteShift, setInviteShift] = useState<Shift | null>(null);
 
   /* ---------- Fetch ---------- */
 
@@ -398,6 +401,9 @@ export default function ManageShifts() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => setInviteShift(s)} title="Invite volunteer">
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -623,6 +629,15 @@ export default function ManageShifts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ---- Invite volunteer modal ---- */}
+      {inviteShift && (
+        <InviteVolunteerModal
+          shift={inviteShift}
+          open={!!inviteShift}
+          onOpenChange={(open) => { if (!open) setInviteShift(null); }}
+        />
+      )}
     </div>
   );
 }

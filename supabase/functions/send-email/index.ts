@@ -320,6 +320,20 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
         ),
       };
 
+    case "shift_invitation":
+      return {
+        subject: `You've been invited to: ${shiftTitle || "a shift"}`,
+        html: brandedHtml(
+          h2("You've Been Invited to a Shift") +
+          p(`An admin has invited you to volunteer for <strong>${shiftTitle || "a shift"}</strong>.`) +
+          (shiftDate ? detail("Date", shiftDate) : "") +
+          (shiftTime ? detail("Time", shiftTime) : "") +
+          (department ? detail("Department", department) : "") +
+          p("Log in to your dashboard to accept or decline this invitation. The invitation expires when the shift starts.") +
+          button("View Invitation", `${APP_URL}/dashboard`)
+        ),
+      };
+
     default:
       // Log the missing type so adding new notification types without
       // a corresponding template surfaces quickly instead of silently
