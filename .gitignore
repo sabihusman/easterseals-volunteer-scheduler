@@ -26,6 +26,13 @@ dist-ssr
 *.sln
 *.sw?
 
+# Claude Code local config — may contain MCP server secrets (e.g. Supabase service-role key)
+.claude/
+
+# Local-only docs / operator runbooks — not for the repo
+Easterseals_Tech_Spec.md
+break-glass.txt
+
 # Android signing key — never commit this
 android-release-key.jks
 android-release-key.jks.bak
