@@ -101,7 +101,7 @@ export default function Auth() {
     const result = registerSchema.safeParse({ name: regName, email: regEmail, username: regUsername, password: regPassword });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
-      result.error.errors.forEach((err) => { fieldErrors[err.path[0] as string] = err.message; });
+      result.error.issues.forEach((err) => { fieldErrors[err.path[0] as string] = err.message; });
       setRegErrors(fieldErrors);
       return;
     }

@@ -33,7 +33,7 @@ export function RestrictVolunteerModal({ volunteerId, volunteerName, departmentI
     if (!user) return;
     const result = restrictSchema.safeParse({ reason: reason.trim() || undefined });
     if (!result.success) {
-      setError(result.error.errors[0].message);
+      setError(result.error.issues[0].message);
       return;
     }
     setError("");
