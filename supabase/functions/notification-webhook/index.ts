@@ -189,7 +189,14 @@ Deno.serve(async (req) => {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    console.error("notification-webhook error:", e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    // Structured log so Supabase log search / Sentry log drains can
+    // filter by `fn` without regex spelunking through plain-text lines.
+    console.error(JSON.stringify({
+      fn: "notification-webhook",
+      level: "error",
+      error: { message, stack },
+    }));
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
