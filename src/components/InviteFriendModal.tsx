@@ -35,7 +35,7 @@ export function InviteFriendModal({ shiftId, shiftTitle, shiftDate, shiftTime }:
     const result = inviteSchema.safeParse({ name, email });
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
-      result.error.errors.forEach((e) => { fieldErrors[e.path[0] as string] = e.message; });
+      result.error.issues.forEach((e) => { fieldErrors[e.path[0] as string] = e.message; });
       setErrors(fieldErrors);
       return;
     }
