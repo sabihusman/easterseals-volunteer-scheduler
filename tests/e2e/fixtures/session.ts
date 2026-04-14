@@ -21,11 +21,6 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
  *   SUPABASE_URL
  *   SUPABASE_ANON_KEY
  *   TEST_VOLUNTEER_EMAIL,   TEST_PASSWORD
- *   TEST_VOLUNTEER_2_EMAIL  — a SECOND volunteer account, required by
- *     the waitlist test which needs two distinct volunteer
- *     identities. The DB enforces "Coordinators and admins cannot
- *     book shifts as volunteers", so the admin account cannot stand
- *     in for a second booker.
  *   TEST_COORDINATOR_EMAIL
  *   TEST_ADMIN_EMAIL
  */
@@ -42,14 +37,12 @@ export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 // applies normally.
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-export type TestRole = "volunteer" | "volunteer2" | "coordinator" | "admin";
+export type TestRole = "volunteer" | "coordinator" | "admin";
 
 function emailFor(role: TestRole): string {
   switch (role) {
     case "volunteer":
       return process.env.TEST_VOLUNTEER_EMAIL || "";
-    case "volunteer2":
-      return process.env.TEST_VOLUNTEER_2_EMAIL || "";
     case "coordinator":
       return process.env.TEST_COORDINATOR_EMAIL || "";
     case "admin":
