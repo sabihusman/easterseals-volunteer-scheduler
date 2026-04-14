@@ -152,6 +152,13 @@ Deno.serve(async (req) => {
     }
 
     // ── Send SMS ──
+    // SMS delivery is gated by a global feature flag. The Twilio sending
+    // number is currently not verified for our destination numbers, so
+    // messages are accepted by Twilio's API but silently dropped at the
+    // carrier. Set SMS_ENABLED=true in Supabase secrets to re-enable
+    // once the Twilio number/recipients are verified.
+    const smsEnabled = Deno.env.get("SMS_ENABLED") === "true";
+
     // Only send to the volunteer's own phone number. Previously this
     // fell back to emergency_contact_phone when profile.phone was null,
     // which was a privacy concern — the emergency contact (likely a
@@ -160,7 +167,7 @@ Deno.serve(async (req) => {
     // volunteer hasn't set a phone number, SMS is simply not sent.
     const smsTarget = profile.phone || null;
     // Urgent waitlist offers send SMS regardless of notif_sms pref.
-    if ((profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
+    if (smsEnabled && (profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
       // Build a concise SMS message from notification
       let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
 
