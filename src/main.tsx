@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
+import { Analytics } from "@vercel/analytics/react";
 import App from "./App.tsx";
 import { initSentry, Sentry } from "./lib/sentry";
 import "./index.css";
@@ -37,6 +38,7 @@ createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<ErrorFallback />}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <App />
+      <Analytics />
     </ThemeProvider>
   </Sentry.ErrorBoundary>
 );
