@@ -487,8 +487,15 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
-    // Log error but return 200 so callers never break
-    console.error("send-email error:", e);
+    // Structured log so Supabase log search / Sentry log drains can
+    // filter by `fn` and correlate by `to`/`type` without regex
+    // spelunking through plain-text error lines.
+    const err = e instanceof Error ? { message: e.message, stack: e.stack } : { message: String(e) };
+    console.error(JSON.stringify({
+      fn: "send-email",
+      level: "error",
+      error: err,
+    }));
     return new Response(JSON.stringify({ success: false, warning: "Email sending failed silently" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
