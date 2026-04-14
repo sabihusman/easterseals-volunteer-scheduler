@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { Sentry } from "@/lib/sentry";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -31,6 +32,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", userId)
       .single();
     setProfile(data);
+    if (data) {
+      // Tag every Sentry event with the signed-in user's id/email/role
+      // so errors can be filtered by who experienced them.
+      Sentry.setUser({
+        id: data.id,
+        email: data.email ?? undefined,
+        role: data.role ?? undefined,
+      });
+    }
   };
 
   const refreshProfile = async () => {
@@ -83,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    Sentry.setUser(null);
   };
 
   return (
