@@ -13,6 +13,7 @@ import { Calendar, Clock, Users, CheckCircle, XCircle, AlertTriangle, Download, 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
+import { isUpcoming } from "@/lib/shift-lifecycle";
 import { VolunteerActivityTab } from "@/components/VolunteerActivityTab";
 import { DepartmentVolunteersTab } from "@/components/DepartmentVolunteersTab";
 
@@ -226,7 +227,10 @@ export default function CoordinatorDashboard() {
     downloadCSV(data, `dept_hours_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
-  const upcomingShifts = shifts.filter((s) => s.shift_date >= new Date().toISOString().split("T")[0]);
+  // Canonical upcoming = end timestamp in the future (not just `date >= today`,
+  // which wrongly kept today's already-ended shifts in the list). Matches the
+  // shared rule in src/lib/shift-lifecycle.ts.
+  const upcomingShifts = shifts.filter((s) => isUpcoming(s));
   const lowCoverage = upcomingShifts.filter((s) => s.booked_slots < Math.ceil(s.total_slots * 0.5));
   const monthStart = startOfMonth(calMonth);
   const monthEnd = endOfMonth(calMonth);

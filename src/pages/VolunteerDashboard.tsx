@@ -11,6 +11,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { format, differenceInHours } from "date-fns";
+import { isUpcoming } from "@/lib/shift-lifecycle";
 import { useToast } from "@/hooks/use-toast";
 import { OnboardingChecklist } from "@/components/OnboardingChecklist";
 import { downloadICS, googleCalendarUrl, timeLabel, generateICS } from "@/lib/calendar-utils";
@@ -68,12 +69,16 @@ export default function VolunteerDashboard() {
       const all = (data as any[]) || [];
       const nowMs = Date.now();
 
-      // Upcoming (confirmed) shifts: today or future, not admin-cancelled
+      // Upcoming (confirmed) bookings: parent shift's end time is still
+      // in the future, and the shift is not admin-cancelled. `shift_date
+      // >= today` was too permissive — today's already-ended shifts
+      // stayed in the list until midnight. `isUpcoming()` is the shared
+      // definition used by admin/coordinator/calendar views.
       const upcoming = all.filter(
         (b) =>
           b.booking_status === "confirmed" &&
           b.shifts &&
-          b.shifts.shift_date >= today &&
+          isUpcoming(b.shifts) &&
           b.shifts.status !== "cancelled"
       );
 

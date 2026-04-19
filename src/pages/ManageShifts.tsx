@@ -404,7 +404,20 @@ export default function ManageShifts() {
                     <Button variant="ghost" size="icon" onClick={() => setInviteShift(s)} title="Invite volunteer">
                       <UserPlus className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                    {/*
+                     * Completed shifts are immutable (DB-enforced by
+                     * enforce_completed_shift_immutability +
+                     * prevent_delete_bookings_on_completed_shifts
+                     * triggers). We hide both actions here so coordinators
+                     * don't see a button that would only 500 on click.
+                     */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(s)}
+                      disabled={s.status === "completed"}
+                      title={s.status === "completed" ? "Completed shifts cannot be edited" : undefined}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
@@ -412,6 +425,8 @@ export default function ManageShifts() {
                       size="icon"
                       className="text-red-600 hover:text-red-700"
                       onClick={() => requestDelete(s.id)}
+                      disabled={s.status === "completed"}
+                      title={s.status === "completed" ? "Completed shifts cannot be deleted" : undefined}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

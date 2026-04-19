@@ -14,13 +14,13 @@ jobs:
     name: Lint + Vitest unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -38,7 +38,7 @@ jobs:
 
       - name: Upload Vitest output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vitest-output
           path: vitest-output.txt
@@ -77,13 +77,13 @@ jobs:
       TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload Playwright HTML report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
@@ -119,7 +119,7 @@ jobs:
 
       - name: Upload Playwright output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-output
           path: playwright-output.txt
@@ -140,21 +140,21 @@ jobs:
       issues: write
     steps:
       - name: Download Vitest output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: vitest-output
           path: ./vitest
         continue-on-error: true
 
       - name: Download Playwright output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: playwright-output
           path: ./playwright
         continue-on-error: true
 
       - name: Post combined comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
