@@ -170,6 +170,7 @@ For the detailed system map, see `docs/ARCHITECTURE_OVERVIEW.md` (planned for Sp
 - [`docs/play-store-listing.md`](./docs/play-store-listing.md) — Play Store launch checklist
 - [`docs/sprint4-android-setup.md`](./docs/sprint4-android-setup.md) — Android TWA build setup
 - [`docs/migration-history/`](./docs/migration-history/) — historical migration files (reference only; do not apply)
+- [`docs/archive/`](./docs/archive/) — historical tech-spec snapshots (v3–v8, March–April 2026)
 - **Planned (Sprint 2):** `docs/ARCHITECTURE_OVERVIEW.md`, `docs/RUNBOOK.md`, `docs/API_REFERENCE.md`, `docs/PRIVACY.md`
 
 ---
