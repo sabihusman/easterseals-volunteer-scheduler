@@ -48,7 +48,16 @@ export default function Settings() {
   const [phone, setPhone] = useState("");
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [isMinor, setIsMinor] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // Parental consent (for minors)
+  const [parentName, setParentName] = useState("");
+  const [parentEmail, setParentEmail] = useState("");
+  const [parentPhone, setParentPhone] = useState("");
+  const [consentStatus, setConsentStatus] = useState<"none" | "active" | "expiring">("none");
+  const [consentSaving, setConsentSaving] = useState(false);
 
   // Username
   const [currentUsername, setCurrentUsername] = useState<string | null>(null);
@@ -98,6 +107,34 @@ export default function Settings() {
       setPhone(profile.phone || "");
       setEmergencyName(profile.emergency_contact_name || "");
       setEmergencyPhone(profile.emergency_contact_phone || "");
+      setDateOfBirth((profile as any).date_of_birth || "");
+      setIsMinor((profile as any).is_minor === true);
+
+      // Load parental consent for minors
+      if ((profile as any).is_minor) {
+        supabase
+          .from("parental_consents")
+          .select("*")
+          .eq("volunteer_id", profile.id)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .then(({ data }) => {
+            if (data && data.length > 0) {
+              const c = data[0] as any;
+              setParentName(c.parent_name || "");
+              setParentEmail(c.parent_email || "");
+              setParentPhone(c.parent_phone || "");
+              const expires = c.expires_at ? new Date(c.expires_at) : null;
+              if (!expires || expires > new Date()) {
+                const daysLeft = expires ? Math.ceil((expires.getTime() - Date.now()) / 86400000) : 999;
+                setConsentStatus(daysLeft <= 30 ? "expiring" : "active");
+              } else {
+                setConsentStatus("none");
+              }
+            }
+          });
+      }
       setNotifEmail(profile.notif_email);
       setNotifInApp(profile.notif_in_app);
       setNotifSms(profile.notif_sms);
@@ -366,8 +403,9 @@ export default function Settings() {
         phone: phone || null,
         emergency_contact_name: emergencyName.trim() || null,
         emergency_contact_phone: emergencyPhone.trim() || null,
+        date_of_birth: dateOfBirth || null,
         updated_at: new Date().toISOString(),
-      })
+      } as any)
       .eq("id", user.id);
 
     if (profileError) {
@@ -510,11 +548,90 @@ export default function Settings() {
             <Label>Emergency Contact Phone</Label>
             <Input type="tel" placeholder="(XXX) XXX-XXXX" value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
           </div>
+          <Separator />
+          <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
+          <div className="space-y-2">
+            <Label>Date of Birth</Label>
+            <Input type="date" value={dateOfBirth} onChange={(e) => {
+              setDateOfBirth(e.target.value);
+              if (e.target.value) {
+                const age = (Date.now() - new Date(e.target.value).getTime()) / (365.25 * 86400000);
+                setIsMinor(age < 18);
+              } else {
+                setIsMinor(false);
+              }
+            }} max={new Date(Date.now() - 13 * 365.25 * 86400000).toISOString().slice(0, 10)} />
+            <p className="text-xs text-muted-foreground">Must be at least 13 years old to volunteer.</p>
+            {isMinor && (
+              <Badge className="bg-yellow-500 text-white">Under 18 — Parental consent required</Badge>
+            )}
+          </div>
           <Button onClick={handleSaveProfile} disabled={profileLoading}>
             {profileLoading ? "Saving..." : "Save Changes"}
           </Button>
         </CardContent>
       </Card>
+
+      {/* ── Parental Consent (minors only) ── */}
+      {isMinor && (
+        <Card className="border-warning/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-warning" /> Parental Consent
+              {consentStatus === "active" && <Badge className="ml-auto bg-primary text-primary-foreground text-xs">Consent on file</Badge>}
+              {consentStatus === "expiring" && <Badge className="ml-auto bg-yellow-500 text-white text-xs">Consent expiring</Badge>}
+              {consentStatus === "none" && <Badge variant="destructive" className="ml-auto text-xs">Consent required</Badge>}
+            </CardTitle>
+            <CardDescription>
+              Volunteers under 18 must have a parent or guardian consent on file before booking shifts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Parent/Guardian Full Name *</Label>
+              <Input placeholder="Jane Doe" value={parentName} onChange={(e) => setParentName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Parent/Guardian Email *</Label>
+              <Input type="email" placeholder="parent@example.com" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Parent/Guardian Phone</Label>
+              <Input type="tel" placeholder="(XXX) XXX-XXXX" value={parentPhone} onChange={(e) => setParentPhone(e.target.value)} />
+            </div>
+            <Button
+              onClick={async () => {
+                if (!user || !parentName.trim() || !parentEmail.trim()) {
+                  toast({ title: "Required", description: "Parent name and email are required.", variant: "destructive" });
+                  return;
+                }
+                setConsentSaving(true);
+                // Deactivate any existing consent
+                await (supabase as any).from("parental_consents").update({ is_active: false }).eq("volunteer_id", user.id);
+                // Insert new consent
+                const { error } = await (supabase as any).from("parental_consents").insert({
+                  volunteer_id: user.id,
+                  parent_name: parentName.trim(),
+                  parent_email: parentEmail.trim(),
+                  parent_phone: parentPhone.trim() || null,
+                  consent_method: "digital",
+                  expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
+                });
+                setConsentSaving(false);
+                if (error) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                } else {
+                  toast({ title: "Parental consent submitted", description: "Consent is now on file. Valid for 1 year." });
+                  setConsentStatus("active");
+                }
+              }}
+              disabled={consentSaving || !parentName.trim() || !parentEmail.trim()}
+            >
+              {consentSaving ? "Saving..." : consentStatus === "active" ? "Update Consent" : "Submit Consent"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Username ── */}
       <Card>

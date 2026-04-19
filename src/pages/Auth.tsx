@@ -45,6 +45,7 @@ export default function Auth() {
   const [regPassword, setRegPassword] = useState("");
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regDob, setRegDob] = useState("");
   const [tosAccepted, setTosAccepted] = useState(false);
   const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
@@ -144,11 +145,12 @@ export default function Auth() {
         username: result.data.username,
         full_name: result.data.name,
         phone: regPhone || null,
+        date_of_birth: regDob || null,
         role: "volunteer",
         is_active: false,
         onboarding_complete: false,
         tos_accepted_at: new Date().toISOString(),
-      });
+      } as any);
       if (profileError) {
         setLoading(false);
         toast({
@@ -353,6 +355,17 @@ export default function Auth() {
                       <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input id="reg-phone" type="tel" className="pl-10" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-dob">Date of Birth (optional)</Label>
+                    <Input
+                      id="reg-dob"
+                      type="date"
+                      value={regDob}
+                      onChange={(e) => setRegDob(e.target.value)}
+                      max={new Date(Date.now() - 13 * 365.25 * 86400000).toISOString().slice(0, 10)}
+                    />
+                    <p className="text-xs text-muted-foreground">Must be at least 13 years old. Volunteers under 18 will need parental consent.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-password">Password</Label>
