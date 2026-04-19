@@ -81,6 +81,163 @@ export type Database = {
           },
         ]
       }
+      admin_mfa_resets: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          reset_by: string
+          reset_method: string
+          target_email: string
+          target_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reset_by: string
+          reset_method?: string
+          target_email: string
+          target_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          reset_by?: string
+          reset_method?: string
+          target_email?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
+      attendance_disputes: {
+        Row: {
+          admin_decided_at: string | null
+          admin_decided_by: string | null
+          admin_decision: string | null
+          admin_notes: string | null
+          booking_id: string
+          coordinator_id: string
+          coordinator_status: string
+          created_at: string
+          expires_at: string
+          final_hours_awarded: number | null
+          id: string
+          resolved_by: string | null
+          shift_id: string
+          volunteer_id: string
+          volunteer_reported_hours: number | null
+          volunteer_status: string
+        }
+        Insert: {
+          admin_decided_at?: string | null
+          admin_decided_by?: string | null
+          admin_decision?: string | null
+          admin_notes?: string | null
+          booking_id: string
+          coordinator_id: string
+          coordinator_status: string
+          created_at?: string
+          expires_at?: string
+          final_hours_awarded?: number | null
+          id?: string
+          resolved_by?: string | null
+          shift_id: string
+          volunteer_id: string
+          volunteer_reported_hours?: number | null
+          volunteer_status: string
+        }
+        Update: {
+          admin_decided_at?: string | null
+          admin_decided_by?: string | null
+          admin_decision?: string | null
+          admin_notes?: string | null
+          booking_id?: string
+          coordinator_id?: string
+          coordinator_status?: string
+          created_at?: string
+          expires_at?: string
+          final_hours_awarded?: number | null
+          id?: string
+          resolved_by?: string | null
+          shift_id?: string
+          volunteer_id?: string
+          volunteer_reported_hours?: number | null
+          volunteer_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_disputes_admin_decided_by_fkey"
+            columns: ["admin_decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_disputes_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "shift_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_disputes_coordinator_id_fkey"
+            columns: ["coordinator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_disputes_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shift_fill_rates"
+            referencedColumns: ["shift_id"]
+          },
+          {
+            foreignKeyName: "attendance_disputes_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_disputes_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checkin_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          rotation_mode: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rotation_mode?: string | null
+          token: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rotation_mode?: string | null
+          token?: string
+        }
+        Relationships: []
+      }
       confirmation_reminders: {
         Row: {
           booking_id: string
@@ -125,6 +282,7 @@ export type Database = {
       }
       conversation_participants: {
         Row: {
+          cleared_at: string | null
           conversation_id: string
           id: string
           is_archived: boolean
@@ -133,6 +291,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cleared_at?: string | null
           conversation_id: string
           id?: string
           is_archived?: boolean
@@ -141,6 +300,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cleared_at?: string | null
           conversation_id?: string
           id?: string
           is_archived?: boolean
@@ -547,6 +707,38 @@ export type Database = {
           },
         ]
       }
+      mfa_backup_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mfa_backup_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -591,6 +783,98 @@ export type Database = {
           },
         ]
       }
+      parental_consents: {
+        Row: {
+          consent_given_at: string | null
+          consent_method: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          parent_email: string
+          parent_name: string
+          parent_phone: string | null
+          updated_at: string
+          volunteer_id: string
+        }
+        Insert: {
+          consent_given_at?: string | null
+          consent_method?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          parent_email: string
+          parent_name: string
+          parent_phone?: string | null
+          updated_at?: string
+          volunteer_id: string
+        }
+        Update: {
+          consent_given_at?: string | null
+          consent_method?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          parent_email?: string
+          parent_name?: string
+          parent_phone?: string | null
+          updated_at?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parental_consents_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      private_note_access_log: {
+        Row: {
+          access_reason: string
+          accessed_at: string
+          admin_user_id: string
+          id: string
+          note_id: string
+          volunteer_id: string
+        }
+        Insert: {
+          access_reason: string
+          accessed_at?: string
+          admin_user_id: string
+          id?: string
+          note_id: string
+          volunteer_id: string
+        }
+        Update: {
+          access_reason?: string
+          accessed_at?: string
+          admin_user_id?: string
+          id?: string
+          note_id?: string
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_note_access_log_admin_user_id_fkey"
+            columns: ["admin_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "private_note_access_log_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -599,8 +883,9 @@ export type Database = {
           bg_check_updated_at: string | null
           booking_privileges: boolean
           calendar_token: string | null
-          consistency_score: number
+          consistency_score: number | null
           created_at: string
+          date_of_birth: string | null
           email: string
           emergency_contact: string | null
           emergency_contact_name: string | null
@@ -609,7 +894,9 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean
+          is_minor: boolean
           location_id: string | null
+          messaging_blocked: boolean
           notif_booking_changes: boolean | null
           notif_document_expiry: boolean | null
           notif_email: boolean
@@ -622,6 +909,7 @@ export type Database = {
           phone: string | null
           phone_verified: boolean
           role: Database["public"]["Enums"]["user_role"]
+          signin_count: number
           tos_accepted_at: string | null
           total_hours: number
           updated_at: string
@@ -635,8 +923,9 @@ export type Database = {
           bg_check_updated_at?: string | null
           booking_privileges?: boolean
           calendar_token?: string | null
-          consistency_score?: number
+          consistency_score?: number | null
           created_at?: string
+          date_of_birth?: string | null
           email: string
           emergency_contact?: string | null
           emergency_contact_name?: string | null
@@ -645,7 +934,9 @@ export type Database = {
           full_name: string
           id: string
           is_active?: boolean
+          is_minor?: boolean
           location_id?: string | null
+          messaging_blocked?: boolean
           notif_booking_changes?: boolean | null
           notif_document_expiry?: boolean | null
           notif_email?: boolean
@@ -658,6 +949,7 @@ export type Database = {
           phone?: string | null
           phone_verified?: boolean
           role?: Database["public"]["Enums"]["user_role"]
+          signin_count?: number
           tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
@@ -671,8 +963,9 @@ export type Database = {
           bg_check_updated_at?: string | null
           booking_privileges?: boolean
           calendar_token?: string | null
-          consistency_score?: number
+          consistency_score?: number | null
           created_at?: string
+          date_of_birth?: string | null
           email?: string
           emergency_contact?: string | null
           emergency_contact_name?: string | null
@@ -681,7 +974,9 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean
+          is_minor?: boolean
           location_id?: string | null
+          messaging_blocked?: boolean
           notif_booking_changes?: boolean | null
           notif_document_expiry?: boolean | null
           notif_email?: boolean
@@ -694,6 +989,7 @@ export type Database = {
           phone?: string | null
           phone_verified?: boolean
           role?: Database["public"]["Enums"]["user_role"]
+          signin_count?: number
           tos_accepted_at?: string | null
           total_hours?: number
           updated_at?: string
@@ -798,11 +1094,15 @@ export type Database = {
         Row: {
           booking_status: Database["public"]["Enums"]["booking_status"]
           cancelled_at: string | null
+          checked_in: boolean | null
           checked_in_at: string | null
           confirmation_status: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at: string | null
           confirmed_by: string | null
+          coordinator_actioned_at: string | null
+          coordinator_actioned_by: string | null
           coordinator_reported_hours: number | null
+          coordinator_status: string | null
           counted_in_consistency: boolean
           created_at: string
           final_hours: number | null
@@ -814,18 +1114,24 @@ export type Database = {
           late_cancel_notified: boolean
           promoted_at: string | null
           shift_id: string
+          time_slot_id: string | null
           updated_at: string
           volunteer_id: string
           volunteer_reported_hours: number | null
+          waitlist_offer_expires_at: string | null
         }
         Insert: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
           cancelled_at?: string | null
+          checked_in?: boolean | null
           checked_in_at?: string | null
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
           confirmed_by?: string | null
+          coordinator_actioned_at?: string | null
+          coordinator_actioned_by?: string | null
           coordinator_reported_hours?: number | null
+          coordinator_status?: string | null
           counted_in_consistency?: boolean
           created_at?: string
           final_hours?: number | null
@@ -837,18 +1143,24 @@ export type Database = {
           late_cancel_notified?: boolean
           promoted_at?: string | null
           shift_id: string
+          time_slot_id?: string | null
           updated_at?: string
           volunteer_id: string
           volunteer_reported_hours?: number | null
+          waitlist_offer_expires_at?: string | null
         }
         Update: {
           booking_status?: Database["public"]["Enums"]["booking_status"]
           cancelled_at?: string | null
+          checked_in?: boolean | null
           checked_in_at?: string | null
           confirmation_status?: Database["public"]["Enums"]["confirmation_status"]
           confirmed_at?: string | null
           confirmed_by?: string | null
+          coordinator_actioned_at?: string | null
+          coordinator_actioned_by?: string | null
           coordinator_reported_hours?: number | null
+          coordinator_status?: string | null
           counted_in_consistency?: boolean
           created_at?: string
           final_hours?: number | null
@@ -860,14 +1172,23 @@ export type Database = {
           late_cancel_notified?: boolean
           promoted_at?: string | null
           shift_id?: string
+          time_slot_id?: string | null
           updated_at?: string
           volunteer_id?: string
           volunteer_reported_hours?: number | null
+          waitlist_offer_expires_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "shift_bookings_confirmed_by_fkey"
             columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_bookings_coordinator_actioned_by_fkey"
+            columns: ["coordinator_actioned_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -884,6 +1205,13 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_bookings_time_slot_id_fkey"
+            columns: ["time_slot_id"]
+            isOneToOne: false
+            referencedRelation: "shift_time_slots"
             referencedColumns: ["id"]
           },
           {
@@ -906,6 +1234,7 @@ export type Database = {
           shift_id: string
           status: string
           token: string
+          volunteer_id: string | null
         }
         Insert: {
           created_at?: string
@@ -917,6 +1246,7 @@ export type Database = {
           shift_id: string
           status?: string
           token?: string
+          volunteer_id?: string | null
         }
         Update: {
           created_at?: string
@@ -928,6 +1258,7 @@ export type Database = {
           shift_id?: string
           status?: string
           token?: string
+          volunteer_id?: string | null
         }
         Relationships: [
           {
@@ -949,6 +1280,13 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shift_invitations_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1591,6 +1929,26 @@ export type Database = {
       }
     }
     Functions: {
+      admin_action_off_shift: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
+      admin_break_glass_read_notes: {
+        Args: { reason: string; target_volunteer_id: string }
+        Returns: Json
+      }
+      admin_delete_unactioned_shift: {
+        Args: { p_booking_id: string }
+        Returns: undefined
+      }
+      admin_emergency_mfa_reset: {
+        Args: { target_email: string }
+        Returns: Json
+      }
+      admin_update_shift_hours: {
+        Args: { p_booking_id: string; p_hours: number }
+        Returns: undefined
+      }
       export_critical_data: { Args: never; Returns: Json }
       get_department_report: {
         Args: { date_from: string; date_to: string; dept_uuids: string[] }
@@ -1639,13 +1997,50 @@ export type Database = {
           shift_id: string
         }[]
       }
+      get_unactioned_shifts: {
+        Args: never
+        Returns: {
+          actioned_off: boolean
+          booking_id: string
+          checked_in: boolean
+          department_name: string
+          hours_since_end: number
+          shift_date: string
+          shift_end: string
+          shift_id: string
+          shift_title: string
+          volunteer_email: string
+          volunteer_id: string
+          volunteer_name: string
+        }[]
+      }
+      get_unread_conversation_count: { Args: never; Returns: number }
+      has_active_booking_on: { Args: { p_shift_id: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
+      is_coordinator_for_my_dept: {
+        Args: { p_coordinator_id: string }
+        Returns: boolean
+      }
       is_coordinator_or_admin: { Args: never; Returns: boolean }
+      log_mfa_reset: { Args: { target_email: string }; Returns: undefined }
+      mfa_consume_backup_code: { Args: { p_code: string }; Returns: boolean }
+      mfa_generate_backup_codes: { Args: never; Returns: string[] }
+      mfa_unused_backup_code_count: { Args: never; Returns: number }
       my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
+      notification_link_booking_id: {
+        Args: { p_link: string }
+        Returns: string
+      }
       process_confirmation_reminders: { Args: never; Returns: undefined }
+      promote_next_waitlist:
+        | { Args: { p_shift_id: string }; Returns: string }
+        | {
+            Args: { p_shift_id: string; p_time_slot_id?: string }
+            Returns: string
+          }
       recalculate_consistency: {
         Args: { p_volunteer_id: string }
         Returns: undefined
@@ -1654,6 +2049,7 @@ export type Database = {
         Args: { volunteer_uuid: string }
         Returns: undefined
       }
+      reconcile_shift_counters: { Args: never; Returns: undefined }
       resolve_hours_discrepancy: {
         Args: { p_booking_id: string }
         Returns: undefined
@@ -1681,16 +2077,35 @@ export type Database = {
         }[]
       }
       send_self_confirmation_reminders: { Args: never; Returns: undefined }
-      send_shift_reminders: { Args: never; Returns: undefined }
+      shift_end_at: {
+        Args: { p_end_time: string; p_shift_date: string; p_time_type: string }
+        Returns: string
+      }
+      shift_start_at: {
+        Args: {
+          p_shift_date: string
+          p_start_time: string
+          p_time_type: string
+        }
+        Returns: string
+      }
       transfer_admin_role: {
         Args: { from_admin_id: string; to_coordinator_id: string }
         Returns: undefined
+      }
+      transfer_coordinator_and_delete: {
+        Args: { p_admin_id: string; p_coordinator_id: string }
+        Returns: Json
       }
       update_volunteer_preferences: {
         Args: { p_volunteer_id: string }
         Returns: undefined
       }
       username_available: { Args: { p_username: string }; Returns: boolean }
+      validate_checkin_token: { Args: { p_token: string }; Returns: boolean }
+      waitlist_accept: { Args: { p_booking_id: string }; Returns: undefined }
+      waitlist_decline: { Args: { p_booking_id: string }; Returns: undefined }
+      warn_expiring_documents: { Args: never; Returns: undefined }
     }
     Enums: {
       bg_check_status: "pending" | "cleared" | "failed" | "expired"

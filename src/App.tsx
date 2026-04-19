@@ -36,6 +36,8 @@ import DocumentCompliance from "./pages/DocumentCompliance";
 import VolunteerDocuments from "./pages/VolunteerDocuments";
 import Messages from "./pages/Messages";
 import VolunteerUnactionedShifts from "./pages/VolunteerUnactionedShifts";
+import AdminDisputes from "./pages/AdminDisputes";
+import CheckIn from "./pages/CheckIn";
 
 const queryClient = new QueryClient();
 
@@ -76,6 +78,7 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
             <Route path="/mfa-verify" element={<MfaVerify />} />
+            <Route path="/checkin" element={<CheckIn />} />
 
             <Route path="/dashboard" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDashboard /></ProtectedRoute>} />
             <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />
@@ -98,6 +101,7 @@ const App = () => (
             <Route path="/admin/events" element={<ProtectedRoute requiredRole={["admin"]}><AdminEvents /></ProtectedRoute>} />
             <Route path="/admin/documents" element={<ProtectedRoute requiredRole={["admin"]}><AdminDocumentTypes /></ProtectedRoute>} />
             <Route path="/admin/compliance" element={<ProtectedRoute requiredRole={["admin"]}><DocumentCompliance /></ProtectedRoute>} />
+            <Route path="/admin/disputes" element={<ProtectedRoute requiredRole={["admin"]}><AdminDisputes /></ProtectedRoute>} />
             <Route path="/events" element={<ProtectedRoute><VolunteerEvents /></ProtectedRoute>} />
 
             <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />

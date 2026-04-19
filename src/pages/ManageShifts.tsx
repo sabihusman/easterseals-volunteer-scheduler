@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { previewSlots, formatSlotRange } from "@/lib/slot-utils";
 import {
   Loader2,
   Plus,
@@ -48,7 +49,9 @@ import {
   Trash2,
   StickyNote,
   AlertCircle,
+  UserPlus,
 } from "lucide-react";
+import { InviteVolunteerModal } from "@/components/InviteVolunteerModal";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -121,6 +124,7 @@ export default function ManageShifts() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ShiftForm>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; bookingCount: number } | null>(null);
+  const [inviteShift, setInviteShift] = useState<Shift | null>(null);
 
   /* ---------- Fetch ---------- */
 
@@ -397,7 +401,23 @@ export default function ManageShifts() {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
+                    <Button variant="ghost" size="icon" onClick={() => setInviteShift(s)} title="Invite volunteer">
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                    {/*
+                     * Completed shifts are immutable (DB-enforced by
+                     * enforce_completed_shift_immutability +
+                     * prevent_delete_bookings_on_completed_shifts
+                     * triggers). We hide both actions here so coordinators
+                     * don't see a button that would only 500 on click.
+                     */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(s)}
+                      disabled={s.status === "completed"}
+                      title={s.status === "completed" ? "Completed shifts cannot be edited" : undefined}
+                    >
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
@@ -405,6 +425,8 @@ export default function ManageShifts() {
                       size="icon"
                       className="text-red-600 hover:text-red-700"
                       onClick={() => requestDelete(s.id)}
+                      disabled={s.status === "completed"}
+                      title={s.status === "completed" ? "Completed shifts cannot be deleted" : undefined}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -561,6 +583,29 @@ export default function ManageShifts() {
             </div>
           </div>
 
+          {/* Slot preview */}
+          {form.start_time && form.end_time && form.end_time > form.start_time && (() => {
+            const slots = previewSlots(form.start_time, form.end_time);
+            if (slots.length === 0) return null;
+            return (
+              <div className="rounded-md border border-muted bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  This shift will be split into {slots.length} × 2-hour slot{slots.length !== 1 ? "s" : ""}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {slots.map((slot, i) => (
+                    <span key={i} className="inline-block text-xs bg-background border rounded px-2 py-0.5">
+                      {formatSlotRange(slot.start, slot.end)}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Each slot has capacity for {form.total_slots} volunteer{form.total_slots !== 1 ? "s" : ""}. Slots are generated automatically.
+                </p>
+              </div>
+            );
+          })()}
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
@@ -599,6 +644,15 @@ export default function ManageShifts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ---- Invite volunteer modal ---- */}
+      {inviteShift && (
+        <InviteVolunteerModal
+          shift={inviteShift}
+          open={!!inviteShift}
+          onOpenChange={(open) => { if (!open) setInviteShift(null); }}
+        />
+      )}
     </div>
   );
 }

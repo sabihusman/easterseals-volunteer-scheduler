@@ -320,6 +320,20 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
         ),
       };
 
+    case "shift_invitation":
+      return {
+        subject: `You've been invited to: ${shiftTitle || "a shift"}`,
+        html: brandedHtml(
+          h2("You've Been Invited to a Shift") +
+          p(`An admin has invited you to volunteer for <strong>${shiftTitle || "a shift"}</strong>.`) +
+          (shiftDate ? detail("Date", shiftDate) : "") +
+          (shiftTime ? detail("Time", shiftTime) : "") +
+          (department ? detail("Department", department) : "") +
+          p("Log in to your dashboard to accept or decline this invitation. The invitation expires when the shift starts.") +
+          button("View Invitation", `${APP_URL}/dashboard`)
+        ),
+      };
+
     default:
       // Log the missing type so adding new notification types without
       // a corresponding template surfaces quickly instead of silently
@@ -473,8 +487,15 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
-    // Log error but return 200 so callers never break
-    console.error("send-email error:", e);
+    // Structured log so Supabase log search / Sentry log drains can
+    // filter by `fn` and correlate by `to`/`type` without regex
+    // spelunking through plain-text error lines.
+    const err = e instanceof Error ? { message: e.message, stack: e.stack } : { message: String(e) };
+    console.error(JSON.stringify({
+      fn: "send-email",
+      level: "error",
+      error: err,
+    }));
     return new Response(JSON.stringify({ success: false, warning: "Email sending failed silently" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

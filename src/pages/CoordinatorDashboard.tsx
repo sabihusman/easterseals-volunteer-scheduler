@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Calendar, Clock, Users, CheckCircle, XCircle, AlertTriangle, Download, 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
+import { isUpcoming } from "@/lib/shift-lifecycle";
 import { VolunteerActivityTab } from "@/components/VolunteerActivityTab";
 import { DepartmentVolunteersTab } from "@/components/DepartmentVolunteersTab";
 
@@ -57,44 +58,80 @@ export default function CoordinatorDashboard() {
     fetchDepts();
   }, [user, role]);
 
-  useEffect(() => {
+  const fetchShiftsAndBookings = useCallback(async () => {
     if (!selectedDept) return;
-    const fetchShiftsAndBookings = async () => {
-      let query = supabase
-        .from("shifts")
-        .select("*")
-        // Exclude admin-cancelled shifts — they are considered deleted
-        // from everyone's view except the admin panel itself.
-        .neq("status", "cancelled")
-        .order("shift_date", { ascending: true });
+    let query = supabase
+      .from("shifts")
+      .select("*")
+      // Exclude admin-cancelled shifts — they are considered deleted
+      // from everyone's view except the admin panel itself.
+      .neq("status", "cancelled")
+      .order("shift_date", { ascending: true });
 
-      if (selectedDept === "all") {
-        // For coordinators, "all" means all of their assigned departments
-        // (not every department in the org). Admins see everything.
-        if (role !== "admin" && departments.length > 0) {
-          query = query.in("department_id", departments.map((d: any) => d.id));
-        }
-      } else {
-        query = query.eq("department_id", selectedDept);
+    if (selectedDept === "all") {
+      // For coordinators, "all" means all of their assigned departments
+      // (not every department in the org). Admins see everything.
+      if (role !== "admin" && departments.length > 0) {
+        query = query.in("department_id", departments.map((d: any) => d.id));
       }
+    } else {
+      query = query.eq("department_id", selectedDept);
+    }
 
-      const { data: shiftData } = await query;
-      setShifts(shiftData || []);
+    const { data: shiftData } = await query;
+    setShifts(shiftData || []);
 
-      const shiftIds = (shiftData || []).map((s: any) => s.id);
-      if (shiftIds.length > 0) {
-        const { data: bookingData } = await supabase
-          .from("shift_bookings")
-          .select("*, profiles!shift_bookings_volunteer_id_fkey(full_name, email, phone, emergency_contact)")
-          .in("shift_id", shiftIds)
-          .eq("booking_status", "confirmed");
-        setBookings(bookingData || []);
-      } else {
-        setBookings([]);
+    const shiftIds = (shiftData || []).map((s: any) => s.id);
+    if (shiftIds.length > 0) {
+      const { data: bookingData } = await supabase
+        .from("shift_bookings")
+        .select("*, profiles!shift_bookings_volunteer_id_fkey(full_name, email, phone, emergency_contact)")
+        .in("shift_id", shiftIds)
+        .eq("booking_status", "confirmed");
+      setBookings(bookingData || []);
+    } else {
+      setBookings([]);
+    }
+  }, [selectedDept, role, departments]);
+
+  useEffect(() => {
+    fetchShiftsAndBookings();
+  }, [fetchShiftsAndBookings]);
+
+  // ── Realtime: listen for check-in updates ──────────────────
+  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  useEffect(() => {
+    // Subscribe to shift_bookings changes to detect real-time check-ins
+    if (realtimeRef.current) {
+      supabase.removeChannel(realtimeRef.current);
+    }
+    const channel = supabase
+      .channel("coordinator-checkins")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "shift_bookings" },
+        (payload) => {
+          const updated = payload.new as any;
+          // Update the booking in local state if it's one we're tracking
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === updated.id
+                ? { ...b, checked_in: updated.checked_in, checked_in_at: updated.checked_in_at }
+                : b
+            )
+          );
+        }
+      )
+      .subscribe();
+    realtimeRef.current = channel;
+
+    return () => {
+      if (realtimeRef.current) {
+        supabase.removeChannel(realtimeRef.current);
+        realtimeRef.current = null;
       }
     };
-    fetchShiftsAndBookings();
-  }, [selectedDept, role, departments]);
+  }, [selectedDept]);
 
   const openHoursEditor = (booking: any, shift: any) => {
     setHoursEditTarget({ booking, shift });
@@ -134,16 +171,43 @@ export default function CoordinatorDashboard() {
     toast({ title: "Hours updated", description: `Set to ${parsed}h and volunteer total recalculated.` });
   };
 
-  const handleConfirm = async (bookingId: string, status: "confirmed" | "no_show") => {
+  const handleAttendance = async (bookingId: string, status: "attended" | "absent") => {
+    if (status === "absent") {
+      const ok = window.confirm(
+        "This will mark the volunteer as absent. If the volunteer has reported attending this shift, the matter will be escalated to an admin for review."
+      );
+      if (!ok) return;
+    }
     const { error } = await supabase
       .from("shift_bookings")
-      .update({ confirmation_status: status, confirmed_by: user!.id, confirmed_at: new Date().toISOString() })
+      .update({
+        coordinator_status: status,
+        coordinator_actioned_by: user!.id,
+      })
       .eq("id", bookingId);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, confirmation_status: status } : b));
-      toast({ title: `Marked as ${status.replace("_", " ")}` });
+      // Re-fetch to get the trigger's side effects (confirmation_status, final_hours, dispute)
+      const { data: updated } = await supabase
+        .from("shift_bookings")
+        .select("id, confirmation_status, coordinator_status, coordinator_actioned_at, final_hours, hours_source")
+        .eq("id", bookingId)
+        .single();
+      if (updated) {
+        setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, ...updated } : b));
+      }
+      // Check if dispute was created
+      const { data: dispute } = await supabase
+        .from("attendance_disputes")
+        .select("id")
+        .eq("booking_id", bookingId)
+        .maybeSingle();
+      if (dispute) {
+        toast({ title: "Dispute created", description: "The volunteer reported attending. An admin will review this dispute.", variant: "default" });
+      } else {
+        toast({ title: `Marked as ${status}` });
+      }
     }
   };
 
@@ -163,7 +227,10 @@ export default function CoordinatorDashboard() {
     downloadCSV(data, `dept_hours_${format(new Date(), "yyyy-MM-dd")}.csv`);
   };
 
-  const upcomingShifts = shifts.filter((s) => s.shift_date >= new Date().toISOString().split("T")[0]);
+  // Canonical upcoming = end timestamp in the future (not just `date >= today`,
+  // which wrongly kept today's already-ended shifts in the list). Matches the
+  // shared rule in src/lib/shift-lifecycle.ts.
+  const upcomingShifts = shifts.filter((s) => isUpcoming(s));
   const lowCoverage = upcomingShifts.filter((s) => s.booked_slots < Math.ceil(s.total_slots * 0.5));
   const monthStart = startOfMonth(calMonth);
   const monthEnd = endOfMonth(calMonth);
@@ -293,46 +360,75 @@ export default function CoordinatorDashboard() {
                           {shiftBookings.map((b) => (
                             <div key={b.id} className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/50">
                               <div>
-                                <div className="text-sm font-medium">{b.profiles?.full_name}</div>
+                                <div className="text-sm font-medium flex items-center gap-1.5">
+                                  <span
+                                    className={`inline-block h-2.5 w-2.5 rounded-full flex-shrink-0 ${
+                                      b.checked_in || b.checked_in_at
+                                        ? "bg-green-500"
+                                        : "bg-gray-300"
+                                    }`}
+                                    title={
+                                      b.checked_in || b.checked_in_at
+                                        ? `Checked in${b.checked_in_at ? ` at ${new Date(b.checked_in_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}`
+                                        : "Not checked in"
+                                    }
+                                  />
+                                  {b.profiles?.full_name}
+                                  {(b.checked_in || b.checked_in_at) && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-green-50 text-green-700 border-green-200">
+                                      Checked in
+                                    </Badge>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground">{b.profiles?.email}</div>
                                 {b.profiles?.phone && <div className="text-xs text-muted-foreground">📞 {b.profiles.phone}</div>}
                                 {b.profiles?.emergency_contact && <div className="text-xs text-muted-foreground">🆘 {b.profiles.emergency_contact}</div>}
                               </div>
-                              <div className="flex items-center gap-2">
-                                {b.confirmation_status === "pending_confirmation" ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {!b.coordinator_status && b.confirmation_status === "pending_confirmation" ? (
                                   <>
-                                    <Button size="sm" variant="outline" onClick={() => handleConfirm(b.id, "confirmed")}>
-                                      <CheckCircle className="h-3 w-3 mr-1" />Confirm
+                                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => handleAttendance(b.id, "attended")}>
+                                      <CheckCircle className="h-3 w-3 mr-1" />Mark Attended
                                     </Button>
-                                    <Button size="sm" variant="outline" onClick={() => handleConfirm(b.id, "no_show")}>
-                                      <XCircle className="h-3 w-3 mr-1" />No Show
+                                    <Button size="sm" variant="destructive" onClick={() => handleAttendance(b.id, "absent")}>
+                                      <XCircle className="h-3 w-3 mr-1" />Mark Absent
                                     </Button>
                                   </>
-                                ) : (
+                                ) : b.coordinator_status ? (
                                   <>
-                                    <Badge variant={b.confirmation_status === "confirmed" ? "default" : "destructive"} className="text-xs">
-                                      {b.confirmation_status.replace("_", " ")}
+                                    <Badge variant={b.coordinator_status === "attended" ? "default" : "destructive"} className="text-xs">
+                                      {b.coordinator_status === "attended" ? "Attended" : "Absent"}
                                     </Badge>
+                                    {b.coordinator_actioned_at && (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {format(new Date(b.coordinator_actioned_at), "MMM d, h:mm a")}
+                                      </span>
+                                    )}
+                                    {/* Dispute badge — show if confirmation is still pending after absent marking */}
+                                    {b.coordinator_status === "absent" && b.confirmation_status === "pending_confirmation" && (
+                                      <Badge className="text-[10px] bg-amber-500/20 text-amber-700 border-amber-500/40">
+                                        <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Disputed — Pending Admin Review
+                                      </Badge>
+                                    )}
                                     {b.confirmation_status === "confirmed" && (
                                       <>
                                         {b.final_hours != null && (
-                                          <Badge variant="secondary" className="text-xs">
-                                            {b.final_hours}h
-                                          </Badge>
+                                          <Badge variant="secondary" className="text-xs">{b.final_hours}h</Badge>
                                         )}
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="h-7 px-2"
-                                          onClick={() => openHoursEditor(b, s)}
-                                          title="Edit recorded hours"
-                                        >
-                                          <Pencil className="h-3 w-3 mr-1" />
-                                          Edit Hours
+                                        <Button size="sm" variant="ghost" className="h-7 px-2"
+                                          onClick={() => openHoursEditor(b, s)} title="Edit recorded hours">
+                                          <Pencil className="h-3 w-3 mr-1" />Edit Hours
                                         </Button>
                                       </>
                                     )}
+                                    {b.confirmation_status === "no_show" && (
+                                      <Badge variant="destructive" className="text-xs">No Show</Badge>
+                                    )}
                                   </>
+                                ) : (
+                                  <Badge variant={b.confirmation_status === "confirmed" ? "default" : "destructive"} className="text-xs">
+                                    {b.confirmation_status.replace("_", " ")}
+                                  </Badge>
                                 )}
                               </div>
                             </div>

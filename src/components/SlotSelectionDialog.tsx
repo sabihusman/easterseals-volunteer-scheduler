@@ -37,10 +37,12 @@ interface SlotSelectionDialogProps {
     start_time?: string | null;
     end_time?: string | null;
   };
+  /** Slot IDs already booked by the current volunteer (pre-disabled) */
+  bookedSlotIds?: Set<string>;
   onBooked: () => void;
 }
 
-export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: SlotSelectionDialogProps) {
+export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, onBooked }: SlotSelectionDialogProps) {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -64,16 +66,17 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       });
   }, [open, shift.id]);
 
-  const hasSlots = slots.length > 0;
-  const availableSlots = slots.filter(s => s.booked_slots < s.total_slots);
-  const allSlotsFull = hasSlots && availableSlots.length === 0;
+  // Slots that are selectable (not already booked by this volunteer)
+  const selectableSlots = slots.filter(s => !bookedSlotIds?.has(s.id));
+  const availableSlots = selectableSlots.filter(s => s.booked_slots < s.total_slots);
   const allSelected = availableSlots.length > 0 && availableSlots.every(s => selected.has(s.id));
 
   const toggleAll = () => {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(availableSlots.map(s => s.id)));
+      // Select all selectable slots (including full ones for waitlist)
+      setSelected(new Set(selectableSlots.map(s => s.id)));
     }
   };
 
@@ -110,7 +113,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
 
   const handleConfirm = async () => {
     if (!user || !profile) return;
-    if (hasSlots && selected.size === 0) return;
+    if (selected.size === 0) return;
 
     if (missingEmergencyContact) {
       toast({
@@ -150,8 +153,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       return;
     }
 
-    // Check booking window — compare calendar days, not ms deltas, so a
-    // shift exactly N days from today isn't rejected due to hours-of-day.
+    // Booking window check
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const shiftDate = new Date(shift.shift_date + "T00:00:00");
@@ -164,35 +166,30 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
 
     setSubmitting(true);
 
-    // Check for existing booking
-    const { data: existingBookings } = await supabase
-      .from("shift_bookings")
-      .select("id, booking_status")
-      .eq("shift_id", shift.id)
-      .eq("volunteer_id", user.id);
+    // Fresh per-slot capacity check
+    const { data: freshSlots } = await supabase
+      .from("shift_time_slots")
+      .select("id, total_slots, booked_slots")
+      .in("id", Array.from(selected));
 
-    const existing = existingBookings?.[0];
+    const slotMap = new Map((freshSlots || []).map(s => [s.id, s]));
 
-    if (existing && (existing.booking_status === "confirmed" || existing.booking_status === "waitlisted")) {
-      toast({ title: "Already booked", description: "You have already booked this shift.", variant: "destructive" });
-      setSubmitting(false);
-      onOpenChange(false);
-      return;
+    // Separate selected slots into available vs full
+    const confirmedSlotIds: string[] = [];
+    const waitlistedSlotIds: string[] = [];
+    for (const slotId of selected) {
+      const s = slotMap.get(slotId);
+      if (s && s.booked_slots >= s.total_slots) {
+        waitlistedSlotIds.push(slotId);
+      } else {
+        confirmedSlotIds.push(slotId);
+      }
     }
 
-    // Fresh capacity check: the cached shift.booked_slots is stale if
-    // another volunteer booked between fetch and click. Confirm with the
-    // DB directly. If full, ask the user if they want to join the waitlist.
-    const { count: freshConfirmed } = await supabase
-      .from("shift_bookings")
-      .select("*", { count: "exact", head: true })
-      .eq("shift_id", shift.id)
-      .eq("booking_status", "confirmed");
-    const currentlyFull = (freshConfirmed ?? 0) >= shift.total_slots;
-
-    if (currentlyFull) {
+    // If ALL selected slots are full, ask user to confirm waitlist
+    if (confirmedSlotIds.length === 0 && waitlistedSlotIds.length > 0) {
       const ok = window.confirm(
-        "This shift is now full. Would you like to join the waitlist? You'll be notified if a spot opens up."
+        "All selected slots are full. Would you like to join the waitlist? You'll be notified if a spot opens up."
       );
       if (!ok) {
         setSubmitting(false);
@@ -200,80 +197,76 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
       }
     }
 
-    let bookingId: string;
-    const requestedStatus: "confirmed" | "waitlisted" = currentlyFull ? "waitlisted" : "confirmed";
+    // Insert one shift_bookings row per selected slot
+    let successCount = 0;
+    let errorMsg = "";
+    for (const slotId of [...confirmedSlotIds, ...waitlistedSlotIds]) {
+      const isFull = waitlistedSlotIds.includes(slotId);
 
-    if (existing && existing.booking_status === "cancelled") {
-      // Delete old slot selections first
-      await supabase.from("shift_booking_slots").delete().eq("booking_id", existing.id);
-
-      // Re-activate cancelled booking. DB trigger will demote to waitlist
-      // if the shift fills between our check and the write.
-      const { error } = await supabase
+      // Check for existing cancelled booking on this slot to reactivate
+      const { data: existing } = await supabase
         .from("shift_bookings")
-        .update({
-          booking_status: requestedStatus,
-          confirmation_status: "pending_confirmation" as const,
-          cancelled_at: null,
-        })
-        .eq("id", existing.id);
+        .select("id, booking_status")
+        .eq("shift_id", shift.id)
+        .eq("volunteer_id", user.id)
+        .eq("time_slot_id", slotId)
+        .maybeSingle();
 
-      if (error) {
-        handleBookingError(error.message);
-        setSubmitting(false);
-        return;
+      if (existing && (existing.booking_status === "confirmed" || existing.booking_status === "waitlisted")) {
+        // Already booked this slot — skip
+        continue;
       }
-      bookingId = existing.id;
-    } else {
-      // Insert new booking. DB trigger enforces capacity atomically.
-      const { data: booking, error } = await supabase
-        .from("shift_bookings")
-        .insert({
-          shift_id: shift.id,
-          volunteer_id: user.id,
-          booking_status: requestedStatus,
-        })
-        .select("id")
-        .single();
 
-      if (error || !booking) {
-        handleBookingError(error?.message || "Failed to book");
-        setSubmitting(false);
-        return;
+      if (existing && existing.booking_status === "cancelled") {
+        // Reactivate cancelled booking
+        const { error } = await supabase
+          .from("shift_bookings")
+          .update({
+            booking_status: isFull ? "waitlisted" : "confirmed",
+            confirmation_status: "pending_confirmation" as const,
+            cancelled_at: null,
+          })
+          .eq("id", existing.id);
+        if (error) {
+          errorMsg = error.message;
+          continue;
+        }
+      } else {
+        // Insert new booking
+        const { error } = await supabase
+          .from("shift_bookings")
+          .insert({
+            shift_id: shift.id,
+            volunteer_id: user.id,
+            booking_status: isFull ? "waitlisted" : "confirmed",
+            time_slot_id: slotId,
+          });
+        if (error) {
+          errorMsg = error.message;
+          continue;
+        }
       }
-      bookingId = booking.id;
+      successCount++;
     }
 
-    // Read back the actual stored status — the BEFORE INSERT trigger may
-    // have demoted us to waitlisted if the shift filled during the race.
-    const { data: finalBooking } = await supabase
-      .from("shift_bookings")
-      .select("booking_status")
-      .eq("id", bookingId)
-      .maybeSingle();
-    const actualStatus = finalBooking?.booking_status ?? requestedStatus;
-    const endedUpWaitlisted = actualStatus === "waitlisted";
-
-    // Insert slot selections if slots exist
-    if (hasSlots && selected.size > 0) {
-      const slotRows = Array.from(selected).map(slotId => ({
-        booking_id: bookingId,
-        slot_id: slotId,
-      }));
-      const { error: slotError } = await supabase.from("shift_booking_slots").insert(slotRows);
-
-      if (slotError) {
-        toast({ title: "Error saving slot selections", description: slotError.message, variant: "destructive" });
-        setSubmitting(false);
-        return;
-      }
+    if (successCount === 0 && errorMsg) {
+      handleBookingError(errorMsg);
+      setSubmitting(false);
+      return;
     }
 
+    const anyWaitlisted = waitlistedSlotIds.length > 0;
     toast({
-      title: endedUpWaitlisted ? "Added to waitlist" : "Shift booked!",
-      description: endedUpWaitlisted
-        ? "The shift was full. You'll be notified if a spot opens up."
-        : (hasSlots ? `${totalHours} hours selected` : "Booking confirmed"),
+      title: anyWaitlisted && confirmedSlotIds.length === 0
+        ? "Added to waitlist"
+        : anyWaitlisted
+        ? "Partially booked"
+        : "Shift booked!",
+      description: anyWaitlisted && confirmedSlotIds.length === 0
+        ? "All selected slots are full. You'll be notified if a spot opens up."
+        : anyWaitlisted
+        ? `${confirmedSlotIds.length} slot(s) confirmed, ${waitlistedSlotIds.length} waitlisted.`
+        : `${totalHours} hours selected`,
     });
 
     // Fire and forget booking confirmation email
@@ -349,31 +342,19 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading time slots...</p>
-        ) : !hasSlots ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">This shift has no individual time slots. You'll be booked for the full shift.</p>
-            <Button onClick={handleConfirm} disabled={submitting} className="w-full">
-              {submitting ? "Booking..." : "Confirm Booking"}
-            </Button>
-          </div>
+        ) : slots.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No time slots available for this shift.</p>
         ) : (
           <div className="space-y-4">
             <div>
               <h4 className="text-sm font-medium mb-2">Select Your Hours</h4>
 
-              {/* Full shift option */}
-              {availableSlots.length > 1 && (
+              {/* Full shift option — only show if more than 1 selectable slot */}
+              {selectableSlots.length > 1 && (
                 <div
                   className={`flex items-center gap-3 p-3 rounded-md border mb-2 cursor-pointer transition-colors ${allSelected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
                   onClick={toggleAll}
                 >
-                  {/*
-                    The Checkbox is visual-only. We intentionally do NOT pass
-                    onCheckedChange — the parent div already handles the toggle.
-                    Passing both caused a double-toggle that cancelled itself
-                    out (clicking the checkbox region registered zero state
-                    change from the user's perspective).
-                  */}
                   <Checkbox checked={allSelected} tabIndex={-1} aria-hidden="true" />
                   <div className="flex-1">
                     <div className="text-sm font-medium">Full Shift</div>
@@ -384,10 +365,11 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                 </div>
               )}
 
-              {/* Individual slots — full slots ARE selectable for waitlist */}
+              {/* Individual slots */}
               <div className="space-y-1.5">
                 {slots.map(slot => {
                   const isFull = slot.booked_slots >= slot.total_slots;
+                  const isBooked = bookedSlotIds?.has(slot.id) ?? false;
                   const isSelected = selected.has(slot.id);
                   const remaining = slot.total_slots - slot.booked_slots;
                   return (
@@ -395,33 +377,38 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, onBooked }: Slo
                       key={slot.id}
                       role="checkbox"
                       aria-checked={isSelected}
-                      tabIndex={0}
-                      className={`flex items-center gap-3 p-3 rounded-md border transition-colors cursor-pointer ${
-                        isSelected
+                      aria-disabled={isBooked}
+                      tabIndex={isBooked ? -1 : 0}
+                      className={`flex items-center gap-3 p-3 rounded-md border transition-colors ${
+                        isBooked
+                          ? "opacity-50 cursor-not-allowed bg-muted/30"
+                          : isSelected
                           ? isFull
-                            ? "border-warning bg-warning/5"
-                            : "border-primary bg-primary/5"
-                          : "hover:bg-muted/50"
+                            ? "border-warning bg-warning/5 cursor-pointer"
+                            : "border-primary bg-primary/5 cursor-pointer"
+                          : "hover:bg-muted/50 cursor-pointer"
                       }`}
-                      onClick={() => toggleSlot(slot.id)}
+                      onClick={() => !isBooked && toggleSlot(slot.id)}
                       onKeyDown={(e) => {
-                        if (e.key === " " || e.key === "Enter") {
+                        if (!isBooked && (e.key === " " || e.key === "Enter")) {
                           e.preventDefault();
                           toggleSlot(slot.id);
                         }
                       }}
                     >
-                      <Checkbox checked={isSelected} tabIndex={-1} aria-hidden="true" />
+                      <Checkbox checked={isSelected || isBooked} disabled={isBooked} tabIndex={-1} aria-hidden="true" />
                       <div className="flex-1">
                         <div className="text-sm">{formatSlotRange(slot.slot_start, slot.slot_end)}</div>
                         <div className="text-xs text-muted-foreground">{slotHours(slot.slot_start, slot.slot_end)} hours</div>
                       </div>
                       <div className="text-xs">
-                        {isFull ? (
+                        {isBooked ? (
+                          <Badge variant="secondary" className="text-[10px]">Booked</Badge>
+                        ) : isFull ? (
                           <Badge variant="outline" className="text-[10px] border-warning text-warning">Full — Waitlist</Badge>
                         ) : (
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <Users className="h-3 w-3" />{remaining} left
+                            <Users className="h-3 w-3" />{remaining}/{slot.total_slots}
                           </span>
                         )}
                       </div>

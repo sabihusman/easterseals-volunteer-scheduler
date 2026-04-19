@@ -9,8 +9,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar, Users, Download, Trash2, XCircle, Search } from "lucide-react";
 import { format } from "date-fns";
 import { downloadCSV, timeLabel, parseShiftDate } from "@/lib/calendar-utils";
+import { isUpcoming, isPast } from "@/lib/shift-lifecycle";
 import { DepartmentCoordinatorManager } from "@/components/DepartmentCoordinatorManager";
 import { VolunteerLeaderboard } from "@/components/VolunteerLeaderboard";
+import { AdminQRCheckIn } from "@/components/AdminQRCheckIn";
 import { useToast } from "@/hooks/use-toast";
 
 const DEPT_COLORS: Record<string, string> = {
@@ -83,10 +85,17 @@ export default function AdminDashboard() {
   }, []);
 
   const filtered = useMemo(() => {
+    // Canonical "Upcoming" = end timestamp >= NOW() (matches the DB-side
+    // invariant in shift_lifecycle_rules.sql). Status filters are layered
+    // on top of the date filter, not a substitute for it — that was the
+    // root cause of past shifts leaking into the Upcoming list.
+    const now = new Date();
     let result = shifts;
     if (selectedDept !== "all") result = result.filter((s) => s.department_id === selectedDept);
     if (selectedStatus === "upcoming") {
-      result = result.filter((s) => s.status === "open" || s.status === "full");
+      result = result.filter((s) => isUpcoming(s, now));
+    } else if (selectedStatus === "past") {
+      result = result.filter((s) => isPast(s, now));
     } else if (selectedStatus !== "all") {
       result = result.filter((s) => s.status === selectedStatus);
     }
@@ -216,6 +225,9 @@ export default function AdminDashboard() {
       {/* Top Volunteers Leaderboard */}
       <VolunteerLeaderboard />
 
+      {/* QR Code Check-In */}
+      <AdminQRCheckIn />
+
       {/* Filters */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">All Shifts</h3>
@@ -240,6 +252,7 @@ export default function AdminDashboard() {
             <SelectTrigger className="w-full sm:w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="past">Past</SelectItem>
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="open">Open</SelectItem>
               <SelectItem value="full">Full</SelectItem>

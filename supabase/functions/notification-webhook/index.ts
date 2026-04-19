@@ -24,7 +24,11 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      global: {
+        headers: { Authorization: `Bearer ${serviceRoleKey}` },
+      },
+    });
 
     // Get the user's email, phone, and notification preferences
     const { data: profile } = await supabase
@@ -148,6 +152,13 @@ Deno.serve(async (req) => {
     }
 
     // ── Send SMS ──
+    // SMS delivery is gated by a global feature flag. The Twilio sending
+    // number is currently not verified for our destination numbers, so
+    // messages are accepted by Twilio's API but silently dropped at the
+    // carrier. Set SMS_ENABLED=true in Supabase secrets to re-enable
+    // once the Twilio number/recipients are verified.
+    const smsEnabled = Deno.env.get("SMS_ENABLED") === "true";
+
     // Only send to the volunteer's own phone number. Previously this
     // fell back to emergency_contact_phone when profile.phone was null,
     // which was a privacy concern — the emergency contact (likely a
@@ -156,7 +167,7 @@ Deno.serve(async (req) => {
     // volunteer hasn't set a phone number, SMS is simply not sent.
     const smsTarget = profile.phone || null;
     // Urgent waitlist offers send SMS regardless of notif_sms pref.
-    if ((profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
+    if (smsEnabled && (profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
       // Build a concise SMS message from notification
       let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
 
@@ -178,7 +189,14 @@ Deno.serve(async (req) => {
     });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
-    console.error("notification-webhook error:", e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    // Structured log so Supabase log search / Sentry log drains can
+    // filter by `fn` without regex spelunking through plain-text lines.
+    console.error(JSON.stringify({
+      fn: "notification-webhook",
+      level: "error",
+      error: { message, stack },
+    }));
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

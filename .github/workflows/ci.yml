@@ -14,13 +14,13 @@ jobs:
     name: Lint + Vitest unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -38,7 +38,7 @@ jobs:
 
       - name: Upload Vitest output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vitest-output
           path: vitest-output.txt
@@ -48,6 +48,11 @@ jobs:
     name: Playwright E2E
     runs-on: ubuntu-latest
     needs: lint-and-unit
+    # Skip on Dependabot PRs: they run without access to repo secrets
+    # (secrets must be duplicated into the Dependabot namespace), so
+    # SUPABASE_ANON_KEY and other E2E creds come through empty. Unit
+    # tests and lint still run on these PRs.
+    if: github.actor != 'dependabot[bot]'
     # Only one E2E suite at a time — tests create/delete shifts on a
     # shared production DB. Parallel runs (push + PR sync events)
     # delete each other's test shifts mid-test, causing FK errors.
@@ -68,18 +73,17 @@ jobs:
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       TEST_VOLUNTEER_EMAIL: ${{ secrets.TEST_VOLUNTEER_EMAIL }}
-      TEST_VOLUNTEER_2_EMAIL: ${{ secrets.TEST_VOLUNTEER_2_EMAIL }}
       TEST_COORDINATOR_EMAIL: ${{ secrets.TEST_COORDINATOR_EMAIL }}
       TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -107,7 +111,7 @@ jobs:
 
       - name: Upload Playwright HTML report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
@@ -115,7 +119,7 @@ jobs:
 
       - name: Upload Playwright output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-output
           path: playwright-output.txt
@@ -136,21 +140,21 @@ jobs:
       issues: write
     steps:
       - name: Download Vitest output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: vitest-output
           path: ./vitest
         continue-on-error: true
 
       - name: Download Playwright output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: playwright-output
           path: ./playwright
         continue-on-error: true
 
       - name: Post combined comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
