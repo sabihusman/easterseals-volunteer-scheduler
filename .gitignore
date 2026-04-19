@@ -33,9 +33,19 @@ dist-ssr
 Easterseals_Tech_Spec.md
 break-glass.txt
 
-# Android signing key — never commit this
+# Android signing key — never commit this.
+# The historical paths below were previously committed to git history in
+# commit e66d0b3 (Apr 7, 2026) and purged via history rewrite. Keeping them
+# ignored here prevents a re-accident if the same filenames are regenerated.
 android-release-key.jks
 android-release-key.jks.bak
+android/android.keystore
+android/*.jks
+android/*.keystore
+android/app-release*.apk
+android/app-release*.aab
+android/app-release-signed.apk.idsig
+android/app-release-unsigned-aligned.apk
 android/build/
 android/app/build/
 android/.gradle/
