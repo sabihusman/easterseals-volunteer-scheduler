@@ -126,5 +126,5 @@ Declare the following data collection:
 - [ ] Feature graphic uploaded
 - [ ] Content rating questionnaire completed
 - [ ] Tested on a physical Android device (no address bar = TWA verified)
-- [ ] Email notifications working from app (Resend domain verified)
+- [ ] Email notifications working from app (MailerSend domain verified)
 - [ ] SMS notifications working (Twilio account upgraded from trial)

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "gen:types": "node scripts/gen-types.mjs",
+    "prebuild": "npm run gen:types",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint . --max-warnings=100",

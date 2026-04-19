@@ -57,7 +57,7 @@ export default function PrivacyPolicy() {
               <h2 className="text-xl font-semibold mt-4 mb-2">Where Your Data Is Stored</h2>
               <p>
                 Your data is stored on Supabase servers located in the United States. Email delivery
-                is handled by Resend and SMS by Twilio. We never sell your personal information to
+                is handled by MailerSend and SMS by Twilio. We never sell your personal information to
                 third parties.
               </p>
             </section>
@@ -67,7 +67,7 @@ export default function PrivacyPolicy() {
               <p>We share your information only with:</p>
               <ul className="list-disc pl-6 space-y-1">
                 <li><strong>Coordinators and administrators</strong> within Easterseals Iowa who manage your volunteer activities</li>
-                <li><strong>Service providers</strong> (Supabase, Resend, Twilio) that help us operate the Service under strict confidentiality agreements</li>
+                <li><strong>Service providers</strong> (Supabase, MailerSend, Twilio) that help us operate the Service under strict confidentiality agreements</li>
                 <li><strong>Law enforcement</strong> when required by law or to protect our legal rights</li>
               </ul>
             </section>

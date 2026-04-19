@@ -349,24 +349,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // ============================================================
-    // Provider selection (feature flag)
-    //   EMAIL_PROVIDER=mailersend (default) -> MailerSend (no click wrapping)
-    //   EMAIL_PROVIDER=resend                -> Resend (legacy, has click wrapping)
-    // ============================================================
-    const EMAIL_PROVIDER = (Deno.env.get("EMAIL_PROVIDER") || "mailersend").toLowerCase();
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    // MailerSend-only. The earlier dual-provider path was removed after
+    // the org standardized on MailerSend in April 2026 — the previous
+    // provider's free tier wrapped every outbound link with a click-
+    // tracking proxy we couldn't disable. See git history for the old
+    // code path if you need it.
     const MAILERSEND_API_KEY = Deno.env.get("MAILERSEND_API_KEY");
     const MAILERSEND_FROM_EMAIL =
       Deno.env.get("MAILERSEND_FROM_EMAIL") || "noreply@test-pzkmgq70q2vl059v.mlsender.net";
 
-    if (EMAIL_PROVIDER === "resend" && !RESEND_API_KEY) {
-      return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (EMAIL_PROVIDER === "mailersend" && !MAILERSEND_API_KEY) {
+    if (!MAILERSEND_API_KEY) {
       return new Response(JSON.stringify({ error: "MAILERSEND_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -410,65 +402,38 @@ Deno.serve(async (req) => {
     let providerResponseId: string | undefined;
     let providerError: unknown = null;
 
-    if (EMAIL_PROVIDER === "mailersend") {
-      // MailerSend API: https://developers.mailersend.com/api/v1/email.html
-      // Free tier does NOT wrap links with a tracking proxy.
-      const msRes = await fetch("https://api.mailersend.com/v1/email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
-          Authorization: `Bearer ${MAILERSEND_API_KEY}`,
+    // MailerSend API: https://developers.mailersend.com/api/v1/email.html
+    // Free tier does NOT wrap links with a tracking proxy.
+    const msRes = await fetch("https://api.mailersend.com/v1/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+        Authorization: `Bearer ${MAILERSEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: { email: MAILERSEND_FROM_EMAIL, name: APP_NAME },
+        to: [{ email: actualTo }],
+        subject: actualSubject,
+        html,
+        // Disable both tracking modes explicitly so they can never bite us
+        // even if MailerSend defaults change.
+        settings: {
+          track_clicks: false,
+          track_opens: false,
+          track_content: false,
         },
-        body: JSON.stringify({
-          from: { email: MAILERSEND_FROM_EMAIL, name: APP_NAME },
-          to: [{ email: actualTo }],
-          subject: actualSubject,
-          html,
-          // Disable both tracking modes explicitly so they can never bite us
-          // even if MailerSend defaults change.
-          settings: {
-            track_clicks: false,
-            track_opens: false,
-            track_content: false,
-          },
-        }),
-      });
-      // MailerSend returns 202 Accepted with empty body on success.
-      // Message ID is in the X-Message-Id response header.
-      if (!msRes.ok) {
-        let errBody: unknown = null;
-        try { errBody = await msRes.json(); } catch { errBody = await msRes.text(); }
-        providerError = { status: msRes.status, body: errBody };
-        console.error("MailerSend API error:", providerError);
-      } else {
-        providerResponseId = msRes.headers.get("X-Message-Id") || undefined;
-      }
+      }),
+    });
+    // MailerSend returns 202 Accepted with empty body on success.
+    // Message ID is in the X-Message-Id response header.
+    if (!msRes.ok) {
+      let errBody: unknown = null;
+      try { errBody = await msRes.json(); } catch { errBody = await msRes.text(); }
+      providerError = { status: msRes.status, body: errBody };
+      console.error("MailerSend API error:", providerError);
     } else {
-      // ===== Resend (legacy path) =====
-      // NOTE: Resend wraps every email link with us-east-1.resend-clicks.com
-      // for click tracking. Free-tier accounts cannot disable it.
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: `${APP_NAME} <onboarding@resend.dev>`,
-          to: [actualTo],
-          subject: actualSubject,
-          html,
-          tags: [{ name: "click_tracking", value: "off" }],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        providerError = data;
-        console.error("Resend API error:", data);
-      } else {
-        providerResponseId = data?.id;
-      }
+      providerResponseId = msRes.headers.get("X-Message-Id") || undefined;
     }
 
     if (providerError) {
@@ -476,14 +441,14 @@ Deno.serve(async (req) => {
         JSON.stringify({
           success: false,
           warning: "Email sending failed silently",
-          provider: EMAIL_PROVIDER,
+          provider: "mailersend",
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: true, id: providerResponseId, provider: EMAIL_PROVIDER }),
+      JSON.stringify({ success: true, id: providerResponseId, provider: "mailersend" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
