@@ -149,7 +149,13 @@ test.describe("Past shift placement in admin list", () => {
       created_by: admin.user.id,
       total_slots: 1,
       title: originalTitle,
-      description: "original description",
+      // Note: the `createShift` fixture doesn't forward a `description`
+      // override at time of writing, so description will be whatever
+      // default (NULL) the REST insert produces. That's fine — the
+      // trigger fires on ANY distinct change (including NULL → text),
+      // so PATCH'ing description will still be rejected. We capture the
+      // pre-PATCH value via getShift below and compare post-PATCH to
+      // that, rather than to a hardcoded string.
       shift_date: pastDate,
       start_time: "09:00:00",
       end_time: "10:00:00",
@@ -164,6 +170,9 @@ test.describe("Past shift placement in admin list", () => {
     await expectOk(rpcRes, "transition_past_shifts_to_completed");
     const locked = await getShift(request, adminAccess, shiftId);
     expect(locked?.status).toBe("completed");
+    // Whatever description value the REST insert produced — null, "", or
+    // a server default. The post-PATCH assertion checks this is unchanged.
+    const originalDescription = locked?.description ?? null;
 
     // --- title edit MUST fail ---
     const titleRes = await request.patch(
@@ -208,7 +217,10 @@ test.describe("Past shift placement in admin list", () => {
     // --- verify the original title + description are unchanged ---
     const after = await getShift(request, adminAccess, shiftId);
     expect(after?.title).toBe(originalTitle);
-    expect(after?.description).toBe("original description");
+    expect(after?.description ?? null).toBe(originalDescription);
+    // Belt-and-braces: the attempted new value must NOT be present,
+    // regardless of what the pre-PATCH value was.
+    expect(after?.description).not.toBe("different description");
 
     await request.dispose();
   });
