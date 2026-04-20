@@ -34,12 +34,11 @@ import {
 
 const PAST_OFFSET_DAYS = 30;
 
-// Skipped until migration 20260415000000_shift_lifecycle_rules.sql is
-// applied to production. The Playwright suite runs against the
-// production URL (see ci.yml PLAYWRIGHT_BASE_URL), so the RPC
-// transition_past_shifts_to_completed doesn't exist there yet. Unskip
-// in a follow-up PR once `supabase db push --linked` has been run.
-test.describe.skip("Past shift placement in admin list", () => {
+// Unskipped 2026-04-20 after the shift-lifecycle migrations (20260415...
+// and 20260420...) were applied to production. The RPC
+// transition_past_shifts_to_completed and the immutability trigger are
+// both live on prod, so these assertions now run against the real DB.
+test.describe("Past shift placement in admin list", () => {
   let shiftId: string | null = null;
   let adminAccess: string;
 
