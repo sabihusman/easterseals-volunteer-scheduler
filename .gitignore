@@ -28,24 +28,43 @@ dist-ssr
 
 # Claude Code local config — may contain MCP server secrets (e.g. Supabase service-role key)
 .claude/
+.mcp.json
 
 # Local-only docs / operator runbooks — not for the repo
 Easterseals_Tech_Spec.md
 break-glass.txt
 
+# Binary design/planning docs produced by external tools — keep the
+# markdown version canonical. Scoped to the repo root so docs/archive
+# can still contain real .docx references if needed.
+/*.docx
+
+# Supabase CLI local state — per-clone, should never be committed.
+supabase/.branches/
+supabase/.temp/
+
+# Database dumps — never commit
+supabase/*.sql.bak
+supabase/dump.sql
+supabase/*prod-dump*
+
 # Android signing key — never commit this.
 # The historical paths below were previously committed to git history in
-# commit e66d0b3 (Apr 7, 2026) and purged via history rewrite. Keeping them
-# ignored here prevents a re-accident if the same filenames are regenerated.
+# commit e66d0b3 (Apr 7, 2026) and purged via history rewrite (494 commits
+# rewritten, force-push to main). Keeping them ignored here prevents a
+# re-accident if the same filenames are regenerated.
+*.jks
 android-release-key.jks
 android-release-key.jks.bak
 android/android.keystore
 android/*.jks
 android/*.keystore
-android/app-release*.apk
-android/app-release*.aab
+android/app-release-bundle.aab
+android/app-release-signed.apk
 android/app-release-signed.apk.idsig
 android/app-release-unsigned-aligned.apk
+android/app-release*.apk
+android/app-release*.aab
 android/build/
 android/app/build/
 android/.gradle/
