@@ -67,8 +67,3 @@ android/app-release*.aab
 android/build/
 android/app/build/
 android/.gradle/
-
-# Database dumps — never commit
-supabase/*.sql.bak
-supabase/dump.sql
-supabase/*prod-dump*
