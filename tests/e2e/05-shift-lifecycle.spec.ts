@@ -127,4 +127,90 @@ test.describe.skip("Past shift placement in admin list", () => {
     await context.close();
     await request.dispose();
   });
+
+  test("completed shift rejects title/description edits, allows coordinator_note", async ({
+    playwright,
+  }) => {
+    // Covers the extended immutability trigger (migration
+    // 20260420000000_extend_shift_immutability_title_description.sql)
+    // which adds `title` and `description` to the block-list alongside
+    // the scheduling fields already enforced by PR #62. Also verifies
+    // a non-blocked field (coordinator_note) still flows through, so
+    // a regression that accidentally widens the block-list gets caught.
+    const request = await playwright.request.newContext();
+
+    const admin = await signInAsRole(request, "admin");
+    adminAccess = admin.access_token;
+    await cleanupStaleE2EShifts(request, adminAccess);
+    const departmentId = await getTestDepartmentId(request, adminAccess);
+    const pastDate = uniquePastShiftDate(PAST_OFFSET_DAYS);
+    const originalTitle = `E2E-Immutability-${Date.now()}`;
+    const shift = await createShift(request, adminAccess, {
+      department_id: departmentId,
+      created_by: admin.user.id,
+      total_slots: 1,
+      title: originalTitle,
+      description: "original description",
+      shift_date: pastDate,
+      start_time: "09:00:00",
+      end_time: "10:00:00",
+    });
+    shiftId = shift.id;
+
+    // Flip to completed via the RPC.
+    const rpcRes = await request.post(
+      `${SUPABASE_URL}/rest/v1/rpc/transition_past_shifts_to_completed`,
+      { headers: authHeaders(adminAccess), data: {} }
+    );
+    await expectOk(rpcRes, "transition_past_shifts_to_completed");
+    const locked = await getShift(request, adminAccess, shiftId);
+    expect(locked?.status).toBe("completed");
+
+    // --- title edit MUST fail ---
+    const titleRes = await request.patch(
+      `${SUPABASE_URL}/rest/v1/shifts?id=eq.${shiftId}`,
+      {
+        headers: authHeaders(adminAccess),
+        data: { title: "DIFFERENT TITLE" },
+      }
+    );
+    expect(
+      titleRes.ok(),
+      "title edit should be rejected by the immutability trigger"
+    ).toBe(false);
+    expect(await titleRes.text()).toContain("Cannot edit title on a completed shift");
+
+    // --- description edit MUST fail ---
+    const descRes = await request.patch(
+      `${SUPABASE_URL}/rest/v1/shifts?id=eq.${shiftId}`,
+      {
+        headers: authHeaders(adminAccess),
+        data: { description: "different description" },
+      }
+    );
+    expect(
+      descRes.ok(),
+      "description edit should be rejected by the immutability trigger"
+    ).toBe(false);
+    expect(await descRes.text()).toContain(
+      "Cannot edit description on a completed shift"
+    );
+
+    // --- coordinator_note edit MUST succeed (allow-listed) ---
+    const noteRes = await request.patch(
+      `${SUPABASE_URL}/rest/v1/shifts?id=eq.${shiftId}`,
+      {
+        headers: authHeaders(adminAccess),
+        data: { coordinator_note: "note added after completion" },
+      }
+    );
+    await expectOk(noteRes, "coordinator_note should be mutable on completed shift");
+
+    // --- verify the original title + description are unchanged ---
+    const after = await getShift(request, adminAccess, shiftId);
+    expect(after?.title).toBe(originalTitle);
+    expect(after?.description).toBe("original description");
+
+    await request.dispose();
+  });
 });
