@@ -47,7 +47,6 @@ supabase/.temp/
 supabase/*.sql.bak
 supabase/dump.sql
 supabase/*prod-dump*
-
 # Android signing key — never commit this.
 # The historical paths below were previously committed to git history in
 # commit e66d0b3 (Apr 7, 2026) and purged via history rewrite (494 commits
@@ -68,3 +67,8 @@ android/app-release*.aab
 android/build/
 android/app/build/
 android/.gradle/
+
+# Database dumps — never commit
+supabase/*.sql.bak
+supabase/dump.sql
+supabase/*prod-dump*
