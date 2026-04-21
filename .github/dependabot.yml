@@ -8,6 +8,18 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    # ESLint's split-package model (eslint core + @eslint/js + plugins)
+    # means a major-version bump requires a coordinated upgrade across
+    # multiple packages in the same PR. Dependabot bumps one package
+    # per PR, which produces half-migrated states (e.g. PR #73: bumped
+    # @eslint/js 9→10 but left eslint at 9 → preserve-caught-error rule
+    # crash at lint time). Ignore majors here; a full ESLint 10 migration
+    # will be done by hand in its own PR. Patch + minor bumps still flow.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"
