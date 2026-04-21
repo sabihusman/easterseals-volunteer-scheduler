@@ -8,17 +8,37 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
-    # ESLint's split-package model (eslint core + @eslint/js + plugins)
-    # means a major-version bump requires a coordinated upgrade across
-    # multiple packages in the same PR. Dependabot bumps one package
-    # per PR, which produces half-migrated states (e.g. PR #73: bumped
-    # @eslint/js 9→10 but left eslint at 9 → preserve-caught-error rule
-    # crash at lint time). Ignore majors here; a full ESLint 10 migration
-    # will be done by hand in its own PR. Patch + minor bumps still flow.
+    # Split-package majors Dependabot can't coordinate correctly — it
+    # bumps one package per PR (or an incomplete group) and leaves
+    # siblings on the older major, producing half-migrated states that
+    # crash at install or test time. Majors on these packages are done
+    # by hand in a single coordinated PR; patch + minor bumps still
+    # flow through normally.
+    #
+    # Real incidents behind each entry:
+    #   - PR #73: @eslint/js 9→10 alone → preserve-caught-error rule
+    #     crashes ESLint 9 core at lint time (peerOptional didn't block
+    #     install). Full ESLint 10 migration deferred.
+    #   - PR #79: react + @types/react bumped to 19 but react-dom and
+    #     @types/react-dom stayed at 18 → npm peer-dep conflict on
+    #     install AND `ReactCurrentDispatcher undefined` crash in
+    #     Vitest when react-dom 18 loads against react 19. React 19
+    #     migration also needs app-level work (render API changes,
+    #     Suspense semantics, etc.) — a Sprint-scheduled effort.
     ignore:
+      # ESLint ecosystem
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      # React ecosystem — all four must move together
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
