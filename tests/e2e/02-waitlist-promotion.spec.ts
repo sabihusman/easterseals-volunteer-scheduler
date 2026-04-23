@@ -71,7 +71,7 @@ test.describe.skip("Waitlist promotion lifecycle", () => {
     // Clean up orphaned E2E shifts using ADMIN token
     const adminForCleanup = await signInAsRole(request, "admin");
     await cleanupStaleE2EShifts(request, adminForCleanup.access_token);
-    const departmentId = await getTestDepartmentId(request, coordAccess);
+    const departmentId = await getTestDepartmentId(request, coordAccess, coord.user.id);
     const shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {
       department_id: departmentId,

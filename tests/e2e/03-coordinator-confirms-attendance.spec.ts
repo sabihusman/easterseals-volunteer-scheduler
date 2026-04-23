@@ -60,7 +60,7 @@ test.describe("Coordinator confirms attendance", () => {
     // Clean up orphaned E2E shifts using ADMIN token
     const adminForCleanup = await signInAsRole(request, "admin");
     await cleanupStaleE2EShifts(request, adminForCleanup.access_token);
-    const departmentId = await getTestDepartmentId(request, coordAccess);
+    const departmentId = await getTestDepartmentId(request, coordAccess, coord.user.id);
     const pastDate = uniquePastShiftDate(PAST_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coordAccess, {
       department_id: departmentId,

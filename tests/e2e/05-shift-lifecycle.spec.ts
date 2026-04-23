@@ -63,7 +63,7 @@ test.describe("Past shift placement in admin list", () => {
     const admin = await signInAsRole(request, "admin");
     adminAccess = admin.access_token;
     await cleanupStaleE2EShifts(request, adminAccess);
-    const departmentId = await getTestDepartmentId(request, adminAccess);
+    const departmentId = await getTestDepartmentId(request, adminAccess, admin.user.id);
     const pastDate = uniquePastShiftDate(PAST_OFFSET_DAYS);
     const uniqueTitle = `E2E-Lifecycle-${Date.now()}`;
     const shift = await createShift(request, adminAccess, {
@@ -141,7 +141,7 @@ test.describe("Past shift placement in admin list", () => {
     const admin = await signInAsRole(request, "admin");
     adminAccess = admin.access_token;
     await cleanupStaleE2EShifts(request, adminAccess);
-    const departmentId = await getTestDepartmentId(request, adminAccess);
+    const departmentId = await getTestDepartmentId(request, adminAccess, admin.user.id);
     const pastDate = uniquePastShiftDate(PAST_OFFSET_DAYS);
     const originalTitle = `E2E-Immutability-${Date.now()}`;
     const shift = await createShift(request, adminAccess, {
