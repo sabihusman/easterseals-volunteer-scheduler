@@ -281,29 +281,54 @@ export async function countBy(
 }
 
 /**
- * Pick a department the test coordinator is assigned to. In the
- * production DB this is the "Adult Day Program (Life Club)"
- * department. Falls back to the first department visible to the
- * coordinator if that name changes.
+ * Pick a department the caller is authorized to create shifts in.
+ *
+ * For coordinators: returns one of their `department_coordinators`
+ * assignments. For admins (who typically have no row in that table):
+ * falls back to any active department, since `shifts` RLS lets admins
+ * insert regardless of department assignment.
+ *
+ * Why the `callerUserId` arg matters:
+ *   The `dept_coords: coord read` RLS policy lets ANY coordinator or
+ *   admin SELECT ALL rows in `department_coordinators`. An earlier
+ *   version of this helper queried with `limit=1` and no filter, so
+ *   PostgREST returned an arbitrary row — in multi-coordinator DBs,
+ *   often some OTHER coordinator's assignment. Passing that unrelated
+ *   `department_id` into `createShift` then triggered the 403 on
+ *   `shifts` INSERT (the `EXISTS` check in the shifts policy requires
+ *   `coordinator_id = auth.uid()`). Filtering by `callerUserId`
+ *   guarantees we pick one of the caller's own departments.
  */
 export async function getTestDepartmentId(
   request: APIRequestContext,
-  accessToken: string
+  accessToken: string,
+  callerUserId: string
 ): Promise<string> {
-  const res = await request.get(
-    `${SUPABASE_URL}/rest/v1/department_coordinators?select=department_id,departments(name)&limit=1`,
+  // Coordinator path: filter to the caller's own assignments.
+  const mine = await request.get(
+    `${SUPABASE_URL}/rest/v1/department_coordinators?select=department_id&coordinator_id=eq.${callerUserId}&limit=1`,
     { headers: headers(accessToken) }
   );
-  if (!res.ok()) {
-    throw new Error(`getTestDepartmentId: ${res.status()} ${await res.text()}`);
+  if (mine.ok()) {
+    const rows = await mine.json();
+    if (rows && rows.length > 0) return rows[0].department_id;
   }
-  const rows = await res.json();
+
+  // Admin fallback: admins typically have no department_coordinators
+  // row. They can insert shifts into any department per RLS, so any
+  // active department works.
+  const any = await request.get(
+    `${SUPABASE_URL}/rest/v1/departments?select=id&is_active=eq.true&limit=1`,
+    { headers: headers(accessToken) }
+  );
+  if (!any.ok()) {
+    throw new Error(`getTestDepartmentId: ${any.status()} ${await any.text()}`);
+  }
+  const rows = await any.json();
   if (!rows || rows.length === 0) {
-    throw new Error(
-      "No department_coordinators row found for test coordinator"
-    );
+    throw new Error("No active departments available for test");
   }
-  return rows[0].department_id;
+  return rows[0].id;
 }
 
 /**

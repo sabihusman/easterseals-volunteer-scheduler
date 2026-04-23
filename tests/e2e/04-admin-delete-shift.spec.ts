@@ -52,7 +52,8 @@ test.describe("Admin hard-deletes shift with bookings", () => {
     await cleanupStaleE2EShifts(request, adminForCleanup.access_token);
     const departmentId = await getTestDepartmentId(
       request,
-      coord.access_token
+      coord.access_token,
+      coord.user.id
     );
     const shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     const shift = await createShift(request, coord.access_token, {
