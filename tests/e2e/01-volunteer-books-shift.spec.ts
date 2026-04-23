@@ -58,7 +58,7 @@ test.describe("Volunteer books a shift", () => {
     // RLS can't delete shifts in other departments)
     const admin = await signInAsRole(request, "admin");
     await cleanupStaleE2EShifts(request, admin.access_token);
-    const departmentId = await getTestDepartmentId(request, coordAccess);
+    const departmentId = await getTestDepartmentId(request, coordAccess, coord.user.id);
     shiftDate = uniqueShiftDate(SHIFT_DATE_OFFSET_DAYS);
     uniqueTitle = `E2E-BookFlow-${Date.now()}`;
     const shift = await createShift(request, coordAccess, {
