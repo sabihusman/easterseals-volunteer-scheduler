@@ -53,7 +53,7 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
       return;
     }
 
-    const convoIds = myParts.map((p) => p.conversation_id);
+    const convoIds = myParts.map((p: { conversation_id: string }) => p.conversation_id);
 
     // Get conversations
     const { data: convos } = await (supabase as any)
@@ -89,18 +89,23 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
       }
     });
 
+    type ProfileLite = { id: string; full_name: string | null; email: string | null };
     const { data: profiles } = otherUserIds.length > 0
       ? await supabase.from("profiles").select("id, full_name, email").in("id", otherUserIds)
-      : { data: [] };
+      : { data: [] as ProfileLite[] };
 
     const profileMap: Record<string, string> = {};
-    (profiles || []).forEach((p) => { profileMap[p.id] = p.full_name || p.email || "Unknown"; });
+    (profiles || []).forEach((p: ProfileLite) => {
+      profileMap[p.id] = p.full_name || p.email || "Unknown";
+    });
 
     // Get latest message per conversation
     const items: ConversationItem[] = [];
 
     for (const convo of convos) {
-      const myPart = myParts.find((p) => p.conversation_id === convo.id);
+      const myPart = myParts.find(
+        (p: { conversation_id: string; cleared_at?: string | null }) => p.conversation_id === convo.id
+      );
       const clearedAt = myPart?.cleared_at as string | null | undefined;
 
       // Only fetch messages that are newer than the user's local cleared_at cutoff

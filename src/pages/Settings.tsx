@@ -830,7 +830,7 @@ export default function Settings() {
                 <Checkbox
                   id="backup-ack"
                   checked={backupCodesAcknowledged}
-                  onCheckedChange={(c) => setBackupCodesAcknowledged(c === true)}
+                  onCheckedChange={(c: boolean | "indeterminate") => setBackupCodesAcknowledged(c === true)}
                 />
                 <Label htmlFor="backup-ack" className="text-sm font-normal cursor-pointer">
                   I have saved these codes in a safe place
