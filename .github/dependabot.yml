@@ -25,6 +25,13 @@ updates:
     #     Vitest when react-dom 18 loads against react 19. React 19
     #     migration also needs app-level work (render API changes,
     #     Suspense semantics, etc.) — a Sprint-scheduled effort.
+    #   - PRs #81/#86/#88: react-resizable-panels 2→4, react-day-picker
+    #     8→9, and recharts 2→3 all merged auto-green because tsc wasn't
+    #     running in CI at the time. Each broke the call-sites in
+    #     shadcn-generated UI components (calendar.tsx, resizable.tsx,
+    #     chart.tsx) via breaking API changes. Discovered + rolled back
+    #     in PR #99 once tsc-in-CI started enforcing. Each needs its
+    #     own migration PR.
     ignore:
       # ESLint ecosystem
       - dependency-name: "eslint"
@@ -39,6 +46,14 @@ updates:
       - dependency-name: "@types/react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      # Shadcn-consumed UI libraries — each major bump requires hand-
+      # migrating the generated UI components and is non-trivial
+      - dependency-name: "recharts"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-day-picker"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-resizable-panels"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
