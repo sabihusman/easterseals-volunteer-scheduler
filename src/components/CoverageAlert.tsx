@@ -33,8 +33,11 @@ import {
 interface LowCoverageShift {
   id: string;
   shift_date: string;
-  start_time: string;
-  end_time: string;
+  // start_time / end_time are nullable in the schema (time_type=morning/afternoon/all_day
+  // rows default times via the shift_end_at() helper instead of explicit columns).
+  // The render path below already uses optional chaining.
+  start_time: string | null;
+  end_time: string | null;
   total_slots: number;
   booked_count: number;
   department_name: string;
