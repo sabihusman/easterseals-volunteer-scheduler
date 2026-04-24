@@ -217,7 +217,9 @@ export default function CoordinatorDashboard() {
       .map((b) => {
         const shift = shifts.find((s) => s.id === b.shift_id);
         return {
-          Volunteer: b.profiles?.full_name || "",
+          // See note in AdminDashboard's handleExportAll — profiles() is
+          // null for deleted users thanks to the SET NULL FK cascade.
+          Volunteer: b.profiles?.full_name || "[deleted user]",
           Email: b.profiles?.email || "",
           "Shift Date": shift?.shift_date || "",
           Shift: shift?.title || "",
