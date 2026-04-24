@@ -196,7 +196,10 @@ export default function AdminDashboard() {
       .limit(1000);
     if (!allBookings) return;
     const csvData = allBookings.map((b: any) => ({
-      Volunteer: b.profiles?.full_name || "",
+      // Deleted users leave their booking history intact via the SET NULL FK
+      // cascade; the embedded profiles() returns null for those rows. Use a
+      // clear sentinel so the CSV is readable rather than silently blank.
+      Volunteer: b.profiles?.full_name || "[deleted user]",
       Email: b.profiles?.email || "",
       Shift: b.shifts?.title || "",
       Date: b.shifts?.shift_date || "",
@@ -289,7 +292,7 @@ export default function AdminDashboard() {
                         {s.booked_slots}/{s.total_slots}
                       </span>
                       {s.profiles?.full_name && (
-                        <span className="text-xs">by {s.profiles.full_name}</span>
+                        <span className="text-xs">by {s.profiles?.full_name}</span>
                       )}
                     </div>
                   </div>
