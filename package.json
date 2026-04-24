@@ -10,6 +10,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint . --max-warnings=100",
+    "typecheck": "tsc --build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

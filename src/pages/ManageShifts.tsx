@@ -70,6 +70,10 @@ interface Shift {
   start_time: string;
   end_time: string;
   total_slots: number;
+  // Sprint 1 shift-lifecycle work added status-aware UI (Edit/Delete disabled
+  // on completed shifts). The field comes from `select("*")` on shifts; the
+  // union matches the public.shift_status enum in the DB.
+  status: "open" | "full" | "cancelled" | "completed";
   coordinator_note: string | null;
   departments?: { name: string };
 }

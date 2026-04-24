@@ -148,6 +148,9 @@ export default function AdminDepartments() {
 
     const { error } = editingId
       ? await supabase.from("departments").update(payload).eq("id", editingId)
+      // @ts-expect-error TODO(#95): insert payload missing required location_id.
+      // Department creation via this form is broken until fixed. See
+      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/95
       : await supabase.from("departments").insert(payload);
 
     setSaving(false);

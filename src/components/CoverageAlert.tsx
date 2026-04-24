@@ -195,6 +195,9 @@ export default function CoverageAlert() {
       read: false,
     }));
 
+    // @ts-expect-error TODO(#94): notifications insert uses wrong column names
+    // (body/read instead of message/is_read). Latent runtime failure — see
+    // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/94
     const { error } = await supabase.from("notifications").insert(notifications);
 
     setSending(false);

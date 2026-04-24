@@ -67,3 +67,5 @@ android/app-release*.aab
 android/build/
 android/app/build/
 android/.gradle/
+tsconfig.app.tsbuildinfo
+tsconfig.node.tsbuildinfo

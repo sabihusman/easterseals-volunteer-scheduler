@@ -11,7 +11,7 @@ env:
 
 jobs:
   lint-and-unit:
-    name: Lint + Vitest unit tests
+    name: Lint + Typecheck + Vitest unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -29,6 +29,15 @@ jobs:
 
       - name: Run ESLint
         run: bun run lint
+
+      # tsc --build against the project references (tsconfig.app.json +
+      # tsconfig.node.json). This is the first time the repo enforces
+      # type-checking in CI — before this PR, `npm run build` was just
+      # `vite build` (transpile-only, no type check), so type errors
+      # accumulated silently. Runs early so a bad typing regression
+      # fails fast before the longer Vitest step.
+      - name: Run tsc --build (typecheck)
+        run: bun run typecheck
 
       - name: Run Vitest (unit + integration)
         shell: bash

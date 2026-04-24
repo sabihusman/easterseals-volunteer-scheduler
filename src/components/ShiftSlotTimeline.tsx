@@ -46,6 +46,10 @@ export function ShiftSlotTimeline({ shiftId, totalSlots }: Props) {
         .in("booking_status", ["confirmed", "waitlisted"]),
     ]).then(([{ data: slotData }, { data: bookingData }]) => {
       setSlots((slotData || []) as SlotInfo[]);
+      // @ts-expect-error TODO(#97): profiles join is ambiguous — shift_bookings
+      // has multiple FKs to profiles. Query returns SelectQueryError at runtime
+      // instead of profile rows. See
+      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/97
       setBookings((bookingData || []) as BookingInfo[]);
       setLoading(false);
     });
