@@ -87,7 +87,6 @@ test.describe.skip("Waitlist promotion lifecycle", () => {
     // --- 2. Pre-cleanup: clear any leftover bookings the test users
     //    have on this date so the overlap trigger can't fire. ---
     const volA = await signInAsRole(request, "volunteer");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const volB = await signInAsRole(request, "volunteer" as any);
     await ensureEmergencyContact(request, volA.access_token, volA.user.id);
     await ensureEmergencyContact(request, volB.access_token, volB.user.id);

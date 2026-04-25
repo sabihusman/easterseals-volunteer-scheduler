@@ -56,7 +56,7 @@ export default function ShiftConfirmation() {
       setLoading(false);
     };
     load();
-  }, [bookingId, user]);
+  }, [bookingId, user, navigate, toast]);
 
   const maxHours = (() => {
     if (!booking?.shifts) return 8;

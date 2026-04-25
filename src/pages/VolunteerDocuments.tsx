@@ -51,6 +51,9 @@ export default function VolunteerDocuments() {
     setLoading(false);
   };
 
+  // fetchData is not useCallback-wrapped; adding it to deps causes infinite
+  // re-render. user in deps covers all staleness.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [user]);
 
   const getDocForType = (typeId: string): VolunteerDoc | undefined => {

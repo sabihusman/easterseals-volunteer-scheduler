@@ -119,6 +119,10 @@ export function ConversationThread({ conversationId, participantNames: externalN
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
+  // fetchMessages, fetchParticipantNames, markRead are not useCallback-wrapped;
+  // adding them to deps causes infinite re-render. conversationId in deps is the
+  // correct trigger; user change causes a full app remount in practice.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   // Auto-scroll to bottom on new messages. Uses a sentinel div
