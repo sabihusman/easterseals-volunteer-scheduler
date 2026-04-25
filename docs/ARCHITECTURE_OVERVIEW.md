@@ -65,7 +65,7 @@ Routes are organized by role (`/dashboard`, `/coordinator`, `/admin/*`) plus sha
 
 **Postgres** is the source of truth for all data. **33 tables** are grouped into 8 domains (Identity, Departments, Shifts, Bookings, Attendance, Communication, Volunteer Attributes, Auditing, Events) — see [SCHEMA_REFERENCE.md](./SCHEMA_REFERENCE.md) for the per-table reference.
 
-**PostgREST** (built into Supabase) is the primary API. The frontend talks directly to Postgres via the Supabase JS client, with **all authorization enforced by RLS** — over 60 effective policies across the 33 tables, drawing on three SQL helper functions (`is_admin()`, `is_coordinator_or_admin()`, `is_coordinator_for_my_dept(uuid)`). See [RLS_REFERENCE.md](./RLS_REFERENCE.md) for the complete per-table policy list.
+**PostgREST** (built into Supabase) is the primary API. The frontend talks directly to Postgres via the Supabase JS client, with **all authorization enforced by RLS** — ~105 effective policies across the 33 tables, drawing on three SQL helper functions (`is_admin()`, `is_coordinator_or_admin()`, `is_coordinator_for_my_dept(uuid)`). See [RLS_REFERENCE.md](./RLS_REFERENCE.md) for the complete per-table policy list.
 
 **Triggers** (40+, defined in `supabase/migrations/20260101000000_baseline.sql`) enforce the invariants RLS can't express: prevent overlapping bookings, demote a coordinator/admin who tries to book to waitlisted, auto-promote the next waitlist volunteer when a confirmed booking cancels, sync `shifts.booked_slots` from `shift_bookings` row counts, generate `shift_time_slots` rows when a shift is created, and recalculate `profiles.consistency_score` and `profiles.volunteer_points` whenever a booking transitions. Full list in [SCHEMA_REFERENCE.md](./SCHEMA_REFERENCE.md#triggers-and-jobs).
 
@@ -107,7 +107,7 @@ Routes are organized by role (`/dashboard`, `/coordinator`, `/admin/*`) plus sha
 
 **CI checks** that gate PR merges:
 
-- `Lint + Vitest unit tests` — `bun run lint` (ESLint, max-warnings=100) → `bun run typecheck` (`tsc --build`) → `bunx vitest run`
+- `Lint + Vitest unit tests` — `bun run lint` (ESLint, `--max-warnings=0`) → `bun run typecheck` (`tsc --build`) → `bunx vitest run`
 - `Playwright E2E` — runs against the **production URL** (not a preview). See [DECISION_LOG.md § E2E against production](./DECISION_LOG.md#e2e-tests-run-against-production-temporarily) for why and the planned fix.
 - `Comment test results on PR` — combines the two above into a single PR comment with the test output tail.
 
