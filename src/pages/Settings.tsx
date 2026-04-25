@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -824,9 +825,6 @@ export default function Settings() {
                 print them, or store them in a secure location.
               </div>
               <div className="flex items-center gap-2">
-                {/* TODO(#96): Checkbox not imported; renders crash at runtime.
-                    See https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/96 */}
-                {/* @ts-expect-error see TODO(#96) above — Checkbox is not imported in this file */}
                 <Checkbox
                   id="backup-ack"
                   checked={backupCodesAcknowledged}

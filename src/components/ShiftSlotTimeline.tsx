@@ -41,15 +41,11 @@ export function ShiftSlotTimeline({ shiftId, totalSlots }: Props) {
         .order("slot_start"),
       supabase
         .from("shift_bookings")
-        .select("id, time_slot_id, booking_status, volunteer_id, profiles(full_name)")
+        .select("id, time_slot_id, booking_status, volunteer_id, profiles!shift_bookings_volunteer_id_fkey(full_name)")
         .eq("shift_id", shiftId)
         .in("booking_status", ["confirmed", "waitlisted"]),
     ]).then(([{ data: slotData }, { data: bookingData }]) => {
       setSlots((slotData || []) as SlotInfo[]);
-      // @ts-expect-error TODO(#97): profiles join is ambiguous — shift_bookings
-      // has multiple FKs to profiles. Query returns SelectQueryError at runtime
-      // instead of profile rows. See
-      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/97
       setBookings((bookingData || []) as BookingInfo[]);
       setLoading(false);
     });
