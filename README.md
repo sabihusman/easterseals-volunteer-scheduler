@@ -165,13 +165,22 @@ For the detailed system map, see `docs/ARCHITECTURE_OVERVIEW.md` (planned for Sp
 
 ## Documentation
 
+**Start with the [docs/ index](./docs/README.md)** — the six-doc handoff package covers architecture, onboarding, operations, schema, RLS, and the decision log.
+
+Other references:
+
 - [`.env.example`](./.env.example) — environment variable reference
+- [`docs/ARCHITECTURE_OVERVIEW.md`](./docs/ARCHITECTURE_OVERVIEW.md) — how the system fits together
+- [`docs/ONBOARDING.md`](./docs/ONBOARDING.md) — day-one setup for new contributors
+- [`docs/OPERATIONS_RUNBOOK.md`](./docs/OPERATIONS_RUNBOOK.md) — deploy, rollback, secrets, cron, incidents
+- [`docs/SCHEMA_REFERENCE.md`](./docs/SCHEMA_REFERENCE.md) — every table, trigger, and cron job
+- [`docs/RLS_REFERENCE.md`](./docs/RLS_REFERENCE.md) — every Row Level Security policy
+- [`docs/DECISION_LOG.md`](./docs/DECISION_LOG.md) — architectural decisions and rationale
 - [`docs/SHIFT_LIFECYCLE.md`](./docs/SHIFT_LIFECYCLE.md) — how shifts move through status; the 10 completed-shift invariants and their enforcement layers
 - [`docs/play-store-listing.md`](./docs/play-store-listing.md) — Play Store launch checklist
 - [`docs/sprint4-android-setup.md`](./docs/sprint4-android-setup.md) — Android TWA build setup
 - [`docs/migration-history/`](./docs/migration-history/) — historical migration files (reference only; do not apply)
 - [`docs/archive/`](./docs/archive/) — historical tech-spec snapshots (v3–v8, March–April 2026)
-- **Planned (Sprint 2):** `docs/ARCHITECTURE_OVERVIEW.md`, `docs/RUNBOOK.md`, `docs/API_REFERENCE.md`, `docs/PRIVACY.md`
 
 ---
 
