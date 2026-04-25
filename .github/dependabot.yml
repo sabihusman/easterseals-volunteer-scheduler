@@ -32,6 +32,13 @@ updates:
     #     chart.tsx) via breaking API changes. Discovered + rolled back
     #     in PR #99 once tsc-in-CI started enforcing. Each needs its
     #     own migration PR.
+    #   - PR #101: vite 5→8 alone → npm install fails with peer-dep
+    #     conflict because @vitejs/plugin-react-swc@3 caps its vite peer
+    #     at ^7. The plugin is what gives us React fast-refresh + JSX
+    #     transform; both must move in lockstep. Vite 8 also generally
+    #     comes with config schema and plugin-API tweaks that need
+    #     hands-on migration. Closed; ignoring majors here until the
+    #     plugin ecosystem catches up.
     ignore:
       # ESLint ecosystem
       - dependency-name: "eslint"
@@ -54,6 +61,12 @@ updates:
       - dependency-name: "react-day-picker"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-resizable-panels"
+        update-types: ["version-update:semver-major"]
+      # Vite + its React plugin must move together; @vitejs/plugin-react-swc
+      # caps its vite peer at ^7 today, so vite 8 alone breaks `npm install`.
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react-swc"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
