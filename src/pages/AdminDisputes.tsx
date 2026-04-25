@@ -126,19 +126,15 @@ export default function AdminDisputes() {
           confirmation_status: "confirmed",
           final_hours: resolveTarget.volunteer_reported_hours || 0,
           hours_source: "dispute_admin_resolved",
-        }
+        } as const
       : {
           confirmation_status: "no_show",
           final_hours: 0,
           hours_source: "dispute_admin_resolved",
-        };
+        } as const;
 
     await supabase
       .from("shift_bookings")
-      // @ts-expect-error TODO(#98): bookingUpdate's confirmation_status widens to
-      // string — schema wants a restricted union. Today's code is correct; fix
-      // to prevent future regressions. See
-      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/98
       .update(bookingUpdate)
       .eq("id", resolveTarget.booking_id);
 

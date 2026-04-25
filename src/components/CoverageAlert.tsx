@@ -193,14 +193,11 @@ export default function CoverageAlert() {
       user_id: volId,
       type: "shift_invitation",
       title: "You're invited to volunteer!",
-      body: `A shift on ${inviteShift.shift_date} (${inviteShift.start_time?.slice(0, 5)}–${inviteShift.end_time?.slice(0, 5)}) in ${inviteShift.department_name} needs coverage.`,
+      message: `A shift on ${inviteShift.shift_date} (${inviteShift.start_time?.slice(0, 5)}–${inviteShift.end_time?.slice(0, 5)}) in ${inviteShift.department_name} needs coverage.`,
       link: `/shifts?book=${inviteShift.id}`,
-      read: false,
+      is_read: false,
     }));
 
-    // @ts-expect-error TODO(#94): notifications insert uses wrong column names
-    // (body/read instead of message/is_read). Latent runtime failure — see
-    // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/94
     const { error } = await supabase.from("notifications").insert(notifications);
 
     setSending(false);
