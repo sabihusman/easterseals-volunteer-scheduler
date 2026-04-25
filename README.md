@@ -93,7 +93,7 @@ The first `bun run build` regenerates `src/integrations/supabase/types.ts` via t
 bun run test          # Vitest — unit + integration tests
 bun run test:watch    # Vitest in watch mode
 bun run test:e2e      # Playwright — runs against PLAYWRIGHT_BASE_URL (defaults to prod in CI; override to http://localhost:8080 for local)
-bun run lint          # ESLint with 100-warning ceiling
+bun run lint          # ESLint, --max-warnings=0 (zero-warning ceiling)
 ```
 
 ### Contributing

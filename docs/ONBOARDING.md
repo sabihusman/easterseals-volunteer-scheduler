@@ -71,7 +71,7 @@ bun run test:watch      # interactive
 bun run typecheck       # tsc --build
 
 # Lint (matches CI)
-bun run lint            # eslint . --max-warnings=100
+bun run lint            # eslint . --max-warnings=0
 
 # E2E (Playwright)
 bun run test:e2e        # runs against PLAYWRIGHT_BASE_URL or production by default
@@ -129,14 +129,12 @@ You'll also need to set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_R
 
 **5. The `(supabase as any).rpc(...)` pattern.** Some RPCs (waitlist_accept, MFA recovery, calendar feed) aren't covered by the type generator. Casting to `any` is the canonical workaround documented in [eslint.config.js](../eslint.config.js); `@typescript-eslint/no-explicit-any` is intentionally off.
 
-**6. `--max-warnings=100` masks new warnings.** The lint ceiling means CI won't fail until the warning count crosses 100. Sprint 2 Phase 2 introduces a follow-up to tighten this to 0; until then, treat new warnings as bugs even if CI is green.
+**6. Migrations are forward-only.** Don't try to write a "rollback" SQL file — Supabase doesn't replay a `down` migration. To undo, write a new forward migration that reverses the change. See [OPERATIONS_RUNBOOK.md § Applying a migration](./OPERATIONS_RUNBOOK.md#applying-a-database-migration).
 
-**7. Migrations are forward-only.** Don't try to write a "rollback" SQL file — Supabase doesn't replay a `down` migration. To undo, write a new forward migration that reverses the change. See [OPERATIONS_RUNBOOK.md § Applying a migration](./OPERATIONS_RUNBOOK.md#applying-a-database-migration).
+**7. Edge functions run Deno, not Node.** No `process.env`; use `Deno.env.get(...)`. URL imports work (e.g. `import { createClient } from "https://esm.sh/@supabase/supabase-js@2"`). Ed25519/JWT helpers are `https://deno.land/x/...`. They are linted with their own ESLint block (see [eslint.config.js](../eslint.config.js)) using `globals.denoBuiltin`.
 
-**8. Edge functions run Deno, not Node.** No `process.env`; use `Deno.env.get(...)`. URL imports work (e.g. `import { createClient } from "https://esm.sh/@supabase/supabase-js@2"`). Ed25519/JWT helpers are `https://deno.land/x/...`. They are linted with their own ESLint block (see [eslint.config.js](../eslint.config.js)) using `globals.denoBuiltin`.
+**8. `bun run` vs `npm run` matters.** Bun's package runner skips lifecycle hooks differently than npm in some cases. CI uses bun; if a script "works locally on npm but fails on CI," check whether it relies on a `pre*`/`post*` hook order.
 
-**9. `bun run` vs `npm run` matters.** Bun's package runner skips lifecycle hooks differently than npm in some cases. CI uses bun; if a script "works locally on npm but fails on CI," check whether it relies on a `pre*`/`post*` hook order.
-
-**10. Branch protection requires the check name to match exactly.** The CI job displays as "Lint + Vitest unit tests" even though it now also runs `tsc --build`. Renaming the job display name without updating branch-protection settings will break merges. There's a comment in [ci.yml](../.github/workflows/ci.yml) explaining this — read it before renaming.
+**9. Branch protection requires the check name to match exactly.** The CI job displays as "Lint + Vitest unit tests" even though it now also runs `tsc --build`. Renaming the job display name without updating branch-protection settings will break merges. There's a comment in [ci.yml](../.github/workflows/ci.yml) explaining this — read it before renaming.
 
 For deploy, rollback, secret rotation, and incident response, see [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md).

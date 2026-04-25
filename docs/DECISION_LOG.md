@@ -102,7 +102,7 @@ Architectural decisions and the reasoning behind them. Each entry: date, decisio
 - Test every component with React Testing Library: rejected — high mock surface, low signal, brittle.
 - Skip unit tests entirely, lean only on E2E: rejected — `src/lib/booking-rules.ts` has subtle off-by-one bugs that would be a nightmare to surface through E2E.
 - Snapshot test pages: rejected — adds churn without catching real bugs.
-**Consequences:** Vitest suite is small and fast (~30 tests, runs in <2s). Pages without unit tests rely on Playwright; gaps in Playwright coverage = real coverage gaps. Acceptable so far given small page count and high E2E coverage of the critical flows.
+**Consequences:** Vitest suite is fast (103 tests across 8 files, runs in ~2s — booking-rules, slot-utils, calendar-utils, consistency-score, shift-lifecycle, booking-transitions, useUnreadCount, plus a smoke test). Pages without unit tests rely on Playwright; gaps in Playwright coverage = real coverage gaps. Acceptable so far given small page count and high E2E coverage of the critical flows.
 
 ---
 

@@ -3,6 +3,15 @@
 Everything the code can automate is already done. This guide walks you through the manual steps
 that require interactive input (keystore creation, Play Console setup).
 
+> **Security history (Sprint 1):** An earlier version of the keystore was committed to the repo
+> under `./android-release-key.jks` and later purged from git history. The current keystore
+> lives **outside the repo** (recommended path: `~/.android-signing/easterseals/`) and the
+> only copy of the secret material is in the maintainer's password manager + the GitHub
+> Actions secret namespace. Do not commit the keystore again under any circumstances —
+> if you lose the local copy, retrieve it from your password manager or have an admin
+> rotate the GitHub secret. See [OPERATIONS_RUNBOOK.md § Rotating a secret](./OPERATIONS_RUNBOOK.md#rotating-a-secret)
+> for the rotation procedure if a leak is suspected.
+
 ## Prerequisites (already installed)
 
 - ✅ JDK 17 (Microsoft Build of OpenJDK) — installed via winget
@@ -19,7 +28,7 @@ that require interactive input (keystore creation, Play Console setup).
 | `src/main.tsx` | Detects TWA context via `document.referrer` |
 | `src/pages/PrivacyPolicy.tsx` | Privacy policy at `/privacy` |
 | `.github/workflows/android.yml` | CI builds on `android-v*` tag push |
-| `.gitignore` | Excludes `android-release-key.jks` |
+| `.gitignore` | Excludes `android-release-key.jks` (defense-in-depth — the keystore should live outside the repo entirely; see security note above) |
 | `vite.config.ts` | Manifest configured with `short_name: "ES Volunteers"`, `orientation: "portrait"`, maskable icons |
 | `docs/play-store-listing.md` | Listing copy + checklist |
 
@@ -59,7 +68,7 @@ bubblewrap init --manifest https://easterseals-volunteer-scheduler.vercel.app/ma
 | Start URL | `/` |
 | Display mode | `standalone` |
 | Orientation | `portrait` |
-| Key store path | `./android-release-key.jks` |
+| Key store path | `~/.android-signing/easterseals/release-key.jks` (create the directory first: `mkdir -p ~/.android-signing/easterseals`). **Do not place the keystore inside this repo.** |
 | Key store password | **Choose a strong password — SAVE IT SECURELY (1Password, Bitwarden)** |
 | Key alias | `easterseals-volunteer` |
 | Key password | Same as keystore password is fine |
@@ -125,16 +134,22 @@ add these secrets at **GitHub repo → Settings → Secrets and variables → Ac
 
 | Secret name | Value |
 |-------------|-------|
-| `ANDROID_KEYSTORE_BASE64` | Output of `base64 -w0 android-release-key.jks` (single line) |
+| `ANDROID_KEYSTORE_BASE64` | Output of `base64 -w0 ~/.android-signing/easterseals/release-key.jks` (single line) |
 | `ANDROID_KEYSTORE_PASSWORD` | The keystore password you chose in Step 2 |
 | `ANDROID_KEY_PASSWORD` | The key password you chose in Step 2 |
 
-To generate the base64 keystore on Windows:
-```bash
-cd "C:\Users\sabih\OneDrive\Desktop\VSCode\easterseals-volunteer-scheduler"
-certutil -encode android-release-key.jks keystore.b64 && type keystore.b64
+To generate the base64 keystore on Windows (PowerShell):
+```powershell
+cd ~\.android-signing\easterseals
+certutil -encode release-key.jks keystore.b64 ; type keystore.b64
 ```
 Copy the content (excluding the `BEGIN/END CERTIFICATE` lines) and paste into the GitHub secret.
+
+**Never paste the base64 anywhere outside the GitHub secrets UI** — it's the full signing key. If
+you suspect a leak, treat it as a credential incident: see
+[OPERATIONS_RUNBOOK.md § Rotating a secret](./OPERATIONS_RUNBOOK.md#rotating-a-secret).
+Rotating an Android keystore is **not possible** without publishing under a new package name —
+back up the keystore in a password manager and treat it like a master key.
 
 Then trigger a build with:
 ```bash
