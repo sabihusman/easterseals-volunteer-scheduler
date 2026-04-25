@@ -68,7 +68,12 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitejs/plugin-react-swc"
         update-types: ["version-update:semver-major"]
-
+      # TypeScript major bumps are coordinated migrations — the type
+      # checker, tsconfig schema, and downstream type packages all
+      # need to move together. PR (closed): typescript 5→6 alone broke
+      # CI after Vite-style peer/install issues surfaced.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
