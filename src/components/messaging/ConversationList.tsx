@@ -147,6 +147,9 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
     setLoading(false);
   };
 
+  // fetchConversations is not useCallback-wrapped; adding it to deps causes
+  // infinite re-render. user + refreshTrigger in deps cover all staleness.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchConversations(); }, [user, refreshTrigger]);
 
   const filtered = conversations.filter((c) =>
