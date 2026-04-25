@@ -11,7 +11,13 @@ env:
 
 jobs:
   lint-and-unit:
-    name: Lint + Typecheck + Vitest unit tests
+    # Display name kept as the original "Lint + Vitest unit tests" so the
+    # branch protection rule on main (which requires a check by that name)
+    # still matches. The job actually runs lint + typecheck + vitest now —
+    # see the steps below. When you next update branch protection, feel
+    # free to rename to "Lint + Typecheck + Vitest unit tests" and update
+    # the required-check setting in tandem.
+    name: Lint + Vitest unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
