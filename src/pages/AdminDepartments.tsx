@@ -147,7 +147,13 @@ export default function AdminDepartments() {
     };
 
     const { error } = editingId
+      // @ts-expect-error TODO(#95): payload has min_age: null but the generated
+      // Update type declares `min_age?: number | undefined`. Same root cause
+      // as the INSERT branch below (see issue).
       ? await supabase.from("departments").update(payload).eq("id", editingId)
+      // @ts-expect-error TODO(#95): insert payload missing required location_id.
+      // Department creation via this form is broken until fixed. See
+      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/95
       : await supabase.from("departments").insert(payload);
 
     setSaving(false);

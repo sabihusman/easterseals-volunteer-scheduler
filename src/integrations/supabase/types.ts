@@ -42,27 +42,27 @@ export type Database = {
       admin_action_log: {
         Row: {
           action: string
-          admin_id: string
+          admin_id: string | null
           created_at: string | null
           id: string
           payload: Json | null
-          volunteer_id: string
+          volunteer_id: string | null
         }
         Insert: {
           action: string
-          admin_id: string
+          admin_id?: string | null
           created_at?: string | null
           id?: string
           payload?: Json | null
-          volunteer_id: string
+          volunteer_id?: string | null
         }
         Update: {
           action?: string
-          admin_id?: string
+          admin_id?: string | null
           created_at?: string | null
           id?: string
           payload?: Json | null
-          volunteer_id?: string
+          volunteer_id?: string | null
         }
         Relationships: [
           {
@@ -118,7 +118,7 @@ export type Database = {
           admin_decision: string | null
           admin_notes: string | null
           booking_id: string
-          coordinator_id: string
+          coordinator_id: string | null
           coordinator_status: string
           created_at: string
           expires_at: string
@@ -126,7 +126,7 @@ export type Database = {
           id: string
           resolved_by: string | null
           shift_id: string
-          volunteer_id: string
+          volunteer_id: string | null
           volunteer_reported_hours: number | null
           volunteer_status: string
         }
@@ -136,7 +136,7 @@ export type Database = {
           admin_decision?: string | null
           admin_notes?: string | null
           booking_id: string
-          coordinator_id: string
+          coordinator_id?: string | null
           coordinator_status: string
           created_at?: string
           expires_at?: string
@@ -144,7 +144,7 @@ export type Database = {
           id?: string
           resolved_by?: string | null
           shift_id: string
-          volunteer_id: string
+          volunteer_id?: string | null
           volunteer_reported_hours?: number | null
           volunteer_status: string
         }
@@ -154,7 +154,7 @@ export type Database = {
           admin_decision?: string | null
           admin_notes?: string | null
           booking_id?: string
-          coordinator_id?: string
+          coordinator_id?: string | null
           coordinator_status?: string
           created_at?: string
           expires_at?: string
@@ -162,7 +162,7 @@ export type Database = {
           id?: string
           resolved_by?: string | null
           shift_id?: string
-          volunteer_id?: string
+          volunteer_id?: string | null
           volunteer_reported_hours?: number | null
           volunteer_status?: string
         }
@@ -329,7 +329,7 @@ export type Database = {
         Row: {
           conversation_type: string
           created_at: string
-          created_by: string
+          created_by: string | null
           department_id: string | null
           id: string
           subject: string | null
@@ -338,7 +338,7 @@ export type Database = {
         Insert: {
           conversation_type?: string
           created_at?: string
-          created_by: string
+          created_by?: string | null
           department_id?: string | null
           id?: string
           subject?: string | null
@@ -347,7 +347,7 @@ export type Database = {
         Update: {
           conversation_type?: string
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           department_id?: string | null
           id?: string
           subject?: string | null
@@ -409,7 +409,7 @@ export type Database = {
           department_id: string
           id: string
           reason: string | null
-          restricted_by: string
+          restricted_by: string | null
           volunteer_id: string
         }
         Insert: {
@@ -417,7 +417,7 @@ export type Database = {
           department_id: string
           id?: string
           reason?: string | null
-          restricted_by: string
+          restricted_by?: string | null
           volunteer_id: string
         }
         Update: {
@@ -425,7 +425,7 @@ export type Database = {
           department_id?: string
           id?: string
           reason?: string | null
-          restricted_by?: string
+          restricted_by?: string | null
           volunteer_id?: string
         }
         Relationships: [
@@ -499,7 +499,7 @@ export type Database = {
       document_types: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           expiry_days: number | null
           has_expiry: boolean
@@ -511,7 +511,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           description?: string | null
           expiry_days?: number | null
           has_expiry?: boolean
@@ -523,7 +523,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           expiry_days?: number | null
           has_expiry?: boolean
@@ -548,19 +548,19 @@ export type Database = {
           event_id: string
           id: string
           registered_at: string
-          volunteer_id: string
+          volunteer_id: string | null
         }
         Insert: {
           event_id: string
           id?: string
           registered_at?: string
-          volunteer_id: string
+          volunteer_id?: string | null
         }
         Update: {
           event_id?: string
           id?: string
           registered_at?: string
-          volunteer_id?: string
+          volunteer_id?: string | null
         }
         Relationships: [
           {
@@ -582,7 +582,7 @@ export type Database = {
       events: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           description: string | null
           end_time: string | null
           event_date: string
@@ -597,7 +597,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           description?: string | null
           end_time?: string | null
           event_date: string
@@ -612,7 +612,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           description?: string | null
           end_time?: string | null
           event_date?: string
@@ -674,21 +674,21 @@ export type Database = {
           conversation_id: string
           created_at: string
           id: string
-          sender_id: string
+          sender_id: string | null
         }
         Insert: {
           content: string
           conversation_id: string
           created_at?: string
           id?: string
-          sender_id: string
+          sender_id?: string | null
         }
         Update: {
           content?: string
           conversation_id?: string
           created_at?: string
           id?: string
-          sender_id?: string
+          sender_id?: string | null
         }
         Relationships: [
           {
@@ -837,26 +837,26 @@ export type Database = {
         Row: {
           access_reason: string
           accessed_at: string
-          admin_user_id: string
+          admin_user_id: string | null
           id: string
           note_id: string
-          volunteer_id: string
+          volunteer_id: string | null
         }
         Insert: {
           access_reason: string
           accessed_at?: string
-          admin_user_id: string
+          admin_user_id?: string | null
           id?: string
           note_id: string
-          volunteer_id: string
+          volunteer_id?: string | null
         }
         Update: {
           access_reason?: string
           accessed_at?: string
-          admin_user_id?: string
+          admin_user_id?: string | null
           id?: string
           note_id?: string
-          volunteer_id?: string
+          volunteer_id?: string | null
         }
         Relationships: [
           {
@@ -1015,7 +1015,7 @@ export type Database = {
           id: string
           note_id: string
           storage_path: string
-          uploader_id: string
+          uploader_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1025,7 +1025,7 @@ export type Database = {
           id?: string
           note_id: string
           storage_path: string
-          uploader_id: string
+          uploader_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1035,7 +1035,7 @@ export type Database = {
           id?: string
           note_id?: string
           storage_path?: string
-          uploader_id?: string
+          uploader_id?: string | null
         }
         Relationships: [
           {
@@ -1116,7 +1116,7 @@ export type Database = {
           shift_id: string
           time_slot_id: string | null
           updated_at: string
-          volunteer_id: string
+          volunteer_id: string | null
           volunteer_reported_hours: number | null
           waitlist_offer_expires_at: string | null
         }
@@ -1145,7 +1145,7 @@ export type Database = {
           shift_id: string
           time_slot_id?: string | null
           updated_at?: string
-          volunteer_id: string
+          volunteer_id?: string | null
           volunteer_reported_hours?: number | null
           waitlist_offer_expires_at?: string | null
         }
@@ -1174,7 +1174,7 @@ export type Database = {
           shift_id?: string
           time_slot_id?: string | null
           updated_at?: string
-          volunteer_id?: string
+          volunteer_id?: string | null
           volunteer_reported_hours?: number | null
           waitlist_offer_expires_at?: string | null
         }
@@ -1230,7 +1230,7 @@ export type Database = {
           id: string
           invite_email: string
           invite_name: string | null
-          invited_by: string
+          invited_by: string | null
           shift_id: string
           status: string
           token: string
@@ -1242,7 +1242,7 @@ export type Database = {
           id?: string
           invite_email: string
           invite_name?: string | null
-          invited_by: string
+          invited_by?: string | null
           shift_id: string
           status?: string
           token?: string
@@ -1254,7 +1254,7 @@ export type Database = {
           id?: string
           invite_email?: string
           invite_name?: string | null
-          invited_by?: string
+          invited_by?: string | null
           shift_id?: string
           status?: string
           token?: string
@@ -1293,7 +1293,7 @@ export type Database = {
       }
       shift_notes: {
         Row: {
-          author_id: string
+          author_id: string | null
           booking_id: string
           content: string
           created_at: string
@@ -1302,7 +1302,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          author_id: string
+          author_id?: string | null
           booking_id: string
           content: string
           created_at?: string
@@ -1311,7 +1311,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          author_id?: string
+          author_id?: string | null
           booking_id?: string
           content?: string
           created_at?: string
@@ -1340,7 +1340,7 @@ export type Database = {
         Row: {
           allows_group: boolean
           created_at: string
-          created_by: string
+          created_by: string | null
           department_id: string
           description: string | null
           end_date: string
@@ -1358,7 +1358,7 @@ export type Database = {
         Insert: {
           allows_group?: boolean
           created_at?: string
-          created_by: string
+          created_by?: string | null
           department_id: string
           description?: string | null
           end_date: string
@@ -1376,7 +1376,7 @@ export type Database = {
         Update: {
           allows_group?: boolean
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           department_id?: string
           description?: string | null
           end_date?: string
@@ -1459,7 +1459,7 @@ export type Database = {
           booked_slots: number
           coordinator_note: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           department_id: string
           description: string | null
           end_time: string | null
@@ -1483,7 +1483,7 @@ export type Database = {
           booked_slots?: number
           coordinator_note?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           department_id: string
           description?: string | null
           end_time?: string | null
@@ -1507,7 +1507,7 @@ export type Database = {
           booked_slots?: number
           coordinator_note?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           department_id?: string
           description?: string | null
           end_time?: string | null
@@ -1782,7 +1782,7 @@ export type Database = {
           star_rating: number | null
           submitted_at: string | null
           updated_at: string
-          volunteer_id: string
+          volunteer_id: string | null
         }
         Insert: {
           booking_id: string
@@ -1795,7 +1795,7 @@ export type Database = {
           star_rating?: number | null
           submitted_at?: string | null
           updated_at?: string
-          volunteer_id: string
+          volunteer_id?: string | null
         }
         Update: {
           booking_id?: string
@@ -1808,7 +1808,7 @@ export type Database = {
           star_rating?: number | null
           submitted_at?: string | null
           updated_at?: string
-          volunteer_id?: string
+          volunteer_id?: string | null
         }
         Relationships: [
           {
@@ -2097,6 +2097,7 @@ export type Database = {
         Args: { p_admin_id: string; p_coordinator_id: string }
         Returns: Json
       }
+      transition_past_shifts_to_completed: { Args: never; Returns: number }
       update_volunteer_preferences: {
         Args: { p_volunteer_id: string }
         Returns: undefined

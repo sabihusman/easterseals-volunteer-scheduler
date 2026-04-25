@@ -135,6 +135,10 @@ export default function AdminDisputes() {
 
     await supabase
       .from("shift_bookings")
+      // @ts-expect-error TODO(#98): bookingUpdate's confirmation_status widens to
+      // string — schema wants a restricted union. Today's code is correct; fix
+      // to prevent future regressions. See
+      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/98
       .update(bookingUpdate)
       .eq("id", resolveTarget.booking_id);
 

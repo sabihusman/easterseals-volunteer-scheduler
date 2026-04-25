@@ -46,6 +46,10 @@ export function DepartmentVolunteersTab({ departmentIds, departments }: Props) {
     const result: VolunteerEntry[] = [];
     for (const b of (bookings || [])) {
       if (!b.shifts || (role !== "admin" && !departmentIds.includes(b.shifts.department_id))) continue;
+      // Skip orphan bookings from deleted volunteers (volunteer_id is SET NULL
+      // by the profile-FK cascade in migration 20260423000002). Those rows
+      // survive for reporting but have no active volunteer to show here.
+      if (!b.volunteer_id) continue;
       const key = `${b.volunteer_id}-${b.shifts.department_id}`;
       if (seen.has(key)) continue;
       seen.add(key);

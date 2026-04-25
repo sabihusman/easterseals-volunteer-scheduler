@@ -71,8 +71,12 @@ export function ComposeMessage({ open, onOpenChange, onSent }: ComposeMessagePro
       .select("conversation_id")
       .eq("user_id", selectedUserId);
 
-    const myIds = new Set((myConvos || []).map((c) => c.conversation_id));
-    const sharedIds = (theirConvos || []).filter((c) => myIds.has(c.conversation_id)).map((c) => c.conversation_id);
+    const myIds = new Set<string>(
+      (myConvos || []).map((c: { conversation_id: string }) => c.conversation_id)
+    );
+    const sharedIds = (theirConvos || [])
+      .filter((c: { conversation_id: string }) => myIds.has(c.conversation_id))
+      .map((c: { conversation_id: string }) => c.conversation_id);
 
     let conversationId: string | null = null;
 

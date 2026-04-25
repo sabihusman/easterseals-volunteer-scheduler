@@ -11,6 +11,12 @@ env:
 
 jobs:
   lint-and-unit:
+    # Display name kept as the original "Lint + Vitest unit tests" so the
+    # branch protection rule on main (which requires a check by that name)
+    # still matches. The job actually runs lint + typecheck + vitest now —
+    # see the steps below. When you next update branch protection, feel
+    # free to rename to "Lint + Typecheck + Vitest unit tests" and update
+    # the required-check setting in tandem.
     name: Lint + Vitest unit tests
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +35,15 @@ jobs:
 
       - name: Run ESLint
         run: bun run lint
+
+      # tsc --build against the project references (tsconfig.app.json +
+      # tsconfig.node.json). This is the first time the repo enforces
+      # type-checking in CI — before this PR, `npm run build` was just
+      # `vite build` (transpile-only, no type check), so type errors
+      # accumulated silently. Runs early so a bad typing regression
+      # fails fast before the longer Vitest step.
+      - name: Run tsc --build (typecheck)
+        run: bun run typecheck
 
       - name: Run Vitest (unit + integration)
         shell: bash

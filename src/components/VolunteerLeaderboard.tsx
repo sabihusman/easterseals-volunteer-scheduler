@@ -60,7 +60,7 @@ export function VolunteerLeaderboard() {
             .eq("id", user.id)
             .single();
 
-          if (userProfile && userProfile.volunteer_points > 0) {
+          if (userProfile && userProfile.volunteer_points != null && userProfile.volunteer_points > 0) {
             const { count: aboveCount } = await supabase
               .from("profiles")
               .select("*", { count: "exact", head: true })

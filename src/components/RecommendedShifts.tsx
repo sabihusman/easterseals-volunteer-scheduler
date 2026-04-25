@@ -126,7 +126,7 @@ export function RecommendedShifts({ onBookShift, refreshKey = 0 }: RecommendedSh
               total_score: 0,
               organizational_need: 0,
               requires_bg_check: s.requires_bg_check,
-              score_breakdown: null,
+              score_breakdown: null as unknown,
             }));
             setShifts(filterRelevant(mapped).slice(0, 6));
           }
