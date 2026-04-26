@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/DatePicker";
+import { DatePicker } from "@/components/shared/DatePicker";
 import {
   TrendingUp, Star, Users, Calendar, Download, BarChart3,
   CheckCircle2, XCircle, Flame, AlertCircle,

@@ -11,9 +11,9 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { timeLabel } from "@/lib/calendar-utils";
-import { InviteFriendModal } from "@/components/InviteFriendModal";
-import { SlotSelectionDialog } from "@/components/SlotSelectionDialog";
-import { RecommendedShifts } from "@/components/RecommendedShifts";
+import { InviteFriendModal } from "@/components/volunteer/InviteFriendModal";
+import { SlotSelectionDialog } from "@/components/volunteer/SlotSelectionDialog";
+import { RecommendedShifts } from "@/components/volunteer/RecommendedShifts";
 import { useInteractionTracking } from "@/hooks/useInteractionTracking";
 
 interface ShiftRow {

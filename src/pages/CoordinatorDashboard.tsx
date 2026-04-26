@@ -14,8 +14,8 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOf
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
 import { isUpcoming } from "@/lib/shift-lifecycle";
-import { VolunteerActivityTab } from "@/components/VolunteerActivityTab";
-import { DepartmentVolunteersTab } from "@/components/DepartmentVolunteersTab";
+import { VolunteerActivityTab } from "@/components/coordinator/VolunteerActivityTab";
+import { DepartmentVolunteersTab } from "@/components/coordinator/DepartmentVolunteersTab";
 
 export default function CoordinatorDashboard() {
   const { user, role } = useAuth();

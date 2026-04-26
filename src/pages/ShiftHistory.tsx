@@ -12,8 +12,8 @@ import { Calendar, Clock, FileText, Upload, Download, Award, UserPlus, CheckCirc
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
-import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
-import { VolunteerHoursLetter } from "@/components/VolunteerHoursLetter";
+import { BookedSlotsDisplay } from "@/components/volunteer/BookedSlotsDisplay";
+import { VolunteerHoursLetter } from "@/components/volunteer/VolunteerHoursLetter";
 
 export default function ShiftHistory() {
   const { user, profile } = useAuth();

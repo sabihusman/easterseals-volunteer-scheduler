@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Upload, X } from "lucide-react";
-import Avatar from "@/components/Avatar";
+import Avatar from "@/components/shared/Avatar";
 import { useToast } from "@/hooks/use-toast";
 
 interface Props {

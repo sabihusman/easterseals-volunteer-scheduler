@@ -19,8 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DatePicker } from "@/components/DatePicker";
-import { TimePicker } from "@/components/TimePicker";
+import { DatePicker } from "@/components/shared/DatePicker";
+import { TimePicker } from "@/components/shared/TimePicker";
 import { Loader2, StickyNote, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { previewSlots, formatSlotRange } from "@/lib/slot-utils";

@@ -10,9 +10,9 @@ import { Calendar, Users, Download, Trash2, XCircle, Search } from "lucide-react
 import { format } from "date-fns";
 import { downloadCSV, timeLabel, parseShiftDate } from "@/lib/calendar-utils";
 import { isUpcoming, isPast } from "@/lib/shift-lifecycle";
-import { DepartmentCoordinatorManager } from "@/components/DepartmentCoordinatorManager";
-import { VolunteerLeaderboard } from "@/components/VolunteerLeaderboard";
-import { AdminQRCheckIn } from "@/components/AdminQRCheckIn";
+import { DepartmentCoordinatorManager } from "@/components/admin/DepartmentCoordinatorManager";
+import { VolunteerLeaderboard } from "@/components/admin/VolunteerLeaderboard";
+import { AdminQRCheckIn } from "@/components/admin/AdminQRCheckIn";
 import { useToast } from "@/hooks/use-toast";
 
 const DEPT_COLORS: Record<string, string> = {
