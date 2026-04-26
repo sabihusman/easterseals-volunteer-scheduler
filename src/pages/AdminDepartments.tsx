@@ -32,6 +32,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2,
@@ -55,6 +62,12 @@ interface Department {
   min_age: number | null;
   allows_groups: boolean;
   is_active: boolean;
+  location_id: string;
+}
+
+interface LocationOption {
+  id: string;
+  name: string;
 }
 
 interface DeptForm {
@@ -63,6 +76,7 @@ interface DeptForm {
   requires_bg_check: boolean;
   min_age: string; // string for input, cast on save
   allows_groups: boolean;
+  location_id: string;
 }
 
 const EMPTY_FORM: DeptForm = {
@@ -71,6 +85,7 @@ const EMPTY_FORM: DeptForm = {
   requires_bg_check: false,
   min_age: "",
   allows_groups: false,
+  location_id: "",
 };
 
 /* ------------------------------------------------------------------ */
@@ -81,6 +96,7 @@ export default function AdminDepartments() {
   const { toast } = useToast();
 
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -107,9 +123,18 @@ export default function AdminDepartments() {
     if (data) setDepartments(data as Department[]);
   }, []);
 
+  const fetchLocations = useCallback(async () => {
+    const { data } = await supabase
+      .from("locations")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name");
+    if (data) setLocations(data as LocationOption[]);
+  }, []);
+
   useEffect(() => {
-    fetchDepartments().then(() => setLoading(false));
-  }, [fetchDepartments]);
+    Promise.all([fetchDepartments(), fetchLocations()]).then(() => setLoading(false));
+  }, [fetchDepartments, fetchLocations]);
 
   /* ---------- Create / Edit Dialog ---------- */
 
@@ -127,6 +152,7 @@ export default function AdminDepartments() {
       requires_bg_check: dept.requires_bg_check,
       min_age: dept.min_age?.toString() ?? "",
       allows_groups: dept.allows_groups,
+      location_id: dept.location_id,
     });
     setDialogOpen(true);
   }
@@ -136,25 +162,31 @@ export default function AdminDepartments() {
       toast({ variant: "destructive", title: "Name is required." });
       return;
     }
+    if (!form.location_id) {
+      toast({ variant: "destructive", title: "Location is required." });
+      return;
+    }
 
     setSaving(true);
-    const payload = {
+    // Schema: `min_age` is NOT NULL with a default of 18 — omit when blank
+    // so the DB default applies. `location_id` is NOT NULL — always include
+    // it. Both pieces fix the broken create/edit paths from issue #119.
+    const basePayload: Record<string, unknown> = {
       name: form.name.trim(),
       description: form.description.trim() || null,
       requires_bg_check: form.requires_bg_check,
-      min_age: form.min_age ? Number(form.min_age) : null,
       allows_groups: form.allows_groups,
+      location_id: form.location_id,
     };
+    if (form.min_age) basePayload.min_age = Number(form.min_age);
+
+    // Boundary cast — Supabase's typed insert/update interface doesn't
+    // expose the dynamic shape we build here. Pattern documented in
+    // eslint.config.js.
+    const payload = basePayload as never;
 
     const { error } = editingId
-      // @ts-expect-error TODO(#119): payload has min_age: null but the schema is
-      // NOT NULL with a default; clearing the field via the dialog 500s. Fix
-      // tracked alongside the INSERT bug below — see issue.
       ? await supabase.from("departments").update(payload).eq("id", editingId)
-      // @ts-expect-error TODO(#119): insert payload missing required location_id.
-      // Department creation via this form has never worked — needs a location
-      // dropdown before it can succeed. See
-      // https://github.com/sabihusman/easterseals-volunteer-scheduler/issues/119
       : await supabase.from("departments").insert(payload);
 
     setSaving(false);
@@ -385,6 +417,25 @@ export default function AdminDepartments() {
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Therapeutic Recreation"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Location *</Label>
+              <Select
+                value={form.location_id}
+                onValueChange={(v) => setForm((f) => ({ ...f, location_id: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">

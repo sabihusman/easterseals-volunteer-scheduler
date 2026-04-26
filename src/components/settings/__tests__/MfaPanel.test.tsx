@@ -177,6 +177,29 @@ describe("MfaPanel", () => {
     expect(screen.getByText("NEW-2")).toBeInTheDocument();
   });
 
+  it("refetches the backup count on window focus (issue #126: count stale after recovery code consumption)", async () => {
+    listFactorsMock.mockResolvedValue({
+      data: { totp: [{ id: "factor-1", status: "verified" }] },
+      error: null,
+    });
+    // First mount-time call returns 10; after a code is consumed elsewhere
+    // and the window regains focus, the next call returns 9.
+    rpcMock
+      .mockResolvedValueOnce({ data: 10, error: null })
+      .mockResolvedValueOnce({ data: 9, error: null });
+
+    render(<MfaPanel />);
+    await screen.findByText(/10 of 10 codes remaining/i);
+
+    // Simulate a backup code being consumed in another tab during recovery
+    // login, then this tab regaining focus.
+    window.dispatchEvent(new Event("focus"));
+
+    await screen.findByText(/9 of 10 codes remaining/i);
+    expect(rpcMock).toHaveBeenCalledWith("mfa_unused_backup_code_count");
+    expect(rpcMock.mock.calls.filter((c) => c[0] === "mfa_unused_backup_code_count").length).toBeGreaterThanOrEqual(2);
+  });
+
   it("shows '0 of 10 codes remaining' messaging when the count RPC returns 0", async () => {
     listFactorsMock.mockResolvedValue({
       data: { totp: [{ id: "factor-1", status: "verified" }] },

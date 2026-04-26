@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,14 +46,24 @@ export function MfaPanel() {
     checkMfa();
   }, []);
 
-  // When MFA is enrolled, fetch how many backup codes the user has left.
+  // Fetch how many backup codes the user has left. Extracted as a callback
+  // so we can invoke it from multiple triggers (mount, focus, post-regen).
+  const refreshBackupCount = useCallback(async () => {
+    const { data, error } = await (supabase as any).rpc("mfa_unused_backup_code_count");
+    if (!error && typeof data === "number") setUnusedBackupCount(data);
+  }, []);
+
+  // When MFA is enrolled, fetch the count. Also refetch when the window
+  // regains focus — issue #126: a backup code consumed during a recovery
+  // login (often in another tab) wouldn't otherwise update the displayed
+  // count, since `enrolled` never flips and the panel stays mounted.
   useEffect(() => {
     if (!enrolled) { setUnusedBackupCount(null); return; }
-    (async () => {
-      const { data, error } = await (supabase as any).rpc("mfa_unused_backup_code_count");
-      if (!error && typeof data === "number") setUnusedBackupCount(data);
-    })();
-  }, [enrolled]);
+    refreshBackupCount();
+    const onFocus = () => { refreshBackupCount(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [enrolled, refreshBackupCount]);
 
   const handleEnable = async () => {
     setLoading(true);

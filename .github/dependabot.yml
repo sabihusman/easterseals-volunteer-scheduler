@@ -45,6 +45,15 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
+      # eslint-plugin-react-hooks + typescript-eslint must move with
+      # eslint core. PR #114 (this migration): react-hooks v7 is a
+      # near-rewrite implementing React Compiler rules; typescript-eslint
+      # majors track the eslint peer range. Bumped piecemeal they
+      # produce half-migrated states or peer-dep install failures.
+      - dependency-name: "eslint-plugin-react-hooks"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript-eslint"
+        update-types: ["version-update:semver-major"]
       # React ecosystem — all four must move together
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
