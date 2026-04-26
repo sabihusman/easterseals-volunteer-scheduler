@@ -57,3 +57,27 @@ export function minutesUntilStart(shift: ShiftTimeInput, now: Date = new Date())
   const { start } = getEffectiveTimes(shift);
   return (start.getTime() - now.getTime()) / 60000;
 }
+
+/**
+ * QR check-in post-shift grace window. Operates on time-of-day strings
+ * (HH:MM:SS), distinct from `isCheckInOpen` which is a pre-shift gate
+ * on Date objects:
+ *
+ *   isCheckInOpen  : window is [start − 30min, end] — Dashboard "Check In"
+ *                    button (no late check-in past end).
+ *   isWithinPostShiftGrace : window is [..., end + grace] — QR check-in
+ *                            page (allows late check-in for `grace` minutes
+ *                            past the shift end; no pre-shift gate because
+ *                            the QR is given out at the venue).
+ *
+ * Returns true if check-in is still allowed at `currentTime`.
+ */
+export function isWithinPostShiftGrace(endTime: string, currentTime: string, graceMinutes: number): boolean {
+  // Lex compare works because times are HH:MM:SS sortable.
+  if (endTime >= currentTime) return true; // shift hasn't ended yet
+  const [h, m] = endTime.split(":").map(Number);
+  const endMins = h * 60 + m + graceMinutes;
+  const [ch, cm] = currentTime.split(":").map(Number);
+  const currentMins = ch * 60 + cm;
+  return currentMins <= endMins;
+}
