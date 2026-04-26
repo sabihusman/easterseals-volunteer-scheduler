@@ -99,7 +99,16 @@ export function useShiftsList(user: User | null, role: string | null): UseShifts
   }, [user, role]);
 
   useEffect(() => {
-    if (!user || !role) return;
+    // Wait for the auth user to resolve. Once it has, even if `role` is
+    // still null (fresh account, race during sign-up), we must clear
+    // `loading` so the page doesn't hang on its spinner. Issue #128:
+    // ProtectedRoute already gates the route on role, so an empty
+    // shifts/departments render here is the correct fallback.
+    if (!user) return;
+    if (!role) {
+      setLoading(false);
+      return;
+    }
     refresh().then(() => setLoading(false));
   }, [user, role, refresh]);
 
