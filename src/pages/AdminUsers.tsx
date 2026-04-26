@@ -1,154 +1,103 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Lock, Unlock, UserPlus, Copy, AlertTriangle, Trash2, Building2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
-} from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
-import { VolunteerReliabilityBadge } from "@/components/VolunteerReliabilityBadge";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { UserPlus } from "lucide-react";
+import { useAdminUsers, type AdminUserRole } from "@/hooks/useAdminUsers";
+import { UserListFilters } from "@/components/admin/UserListFilters";
+import { UserCard, type UserCardActions } from "@/components/admin/UserCard";
+import { RoleChangeDialog, type RoleChangeTarget } from "@/components/admin/RoleChangeDialog";
+import { DeleteUserDialog, type DeleteUserTarget } from "@/components/admin/DeleteUserDialog";
+import { DeptAssignmentDialog, type DeptAssignTarget } from "@/components/admin/DeptAssignmentDialog";
+import { AddUserDialog } from "@/components/admin/AddUserDialog";
 
-
-type UserRole = "volunteer" | "coordinator" | "admin";
-
-const roleBadgeClass: Record<UserRole, string> = {
-  admin: "bg-[hsl(153,100%,21%)] text-white",
-  coordinator: "bg-[hsl(221,100%,27%)] text-white",
-  volunteer: "bg-muted text-muted-foreground",
-};
-
-function generatePassword(length = 14): string {
-  const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%";
-  return Array.from(crypto.getRandomValues(new Uint8Array(length)))
-    .map((b) => chars[b % chars.length])
-    .join("");
-}
-
+/**
+ * AdminUsers orchestrator.
+ *
+ * Handler ownership split:
+ *   - Page handlers: 4 toggles + role-change confirm (audit-affecting +
+ *     post-success chain) + delete confirm (audit-affecting + optimistic
+ *     remove) + manage-minor-consent. These need toast plumbing and
+ *     orchestration.
+ *   - Dialog-owned: DeptAssignmentDialog (self-contained delete+insert),
+ *     AddUserDialog (self-contained signUp + profile insert + credentials).
+ */
 export default function AdminUsers() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const { profiles, departments, loading, refresh, optimisticUpdate, optimisticRemove } = useAdminUsers();
+
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [loading, setLoading] = useState(true);
 
-  // Role change confirmation
-  const [roleChange, setRoleChange] = useState<{ id: string; name: string; from: UserRole; to: UserRole } | null>(null);
+  // Dialog targets — page tracks "what's open + with what context"
+  const [roleChange, setRoleChange] = useState<RoleChangeTarget | null>(null);
   const [roleChanging, setRoleChanging] = useState(false);
-
-  // Delete user
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; role: UserRole } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteUserTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  // Department assignment
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
-  const [deptAssign, setDeptAssign] = useState<{
-    userId: string;
-    name: string;
-    selectedDepts: Set<string>;
-  } | null>(null);
-  const [deptAssignSaving, setDeptAssignSaving] = useState(false);
-
-  // Add user modal
+  const [deptAssignTarget, setDeptAssignTarget] = useState<DeptAssignTarget | null>(null);
   const [addUserOpen, setAddUserOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState<"coordinator" | "admin">("coordinator");
-  const [addingUser, setAddingUser] = useState(false);
-  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
-  const [newNameError, setNewNameError] = useState("");
-  const [newEmailError, setNewEmailError] = useState("");
-
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      const { data } = await supabase.from("profiles").select("*").order("full_name");
-      setProfiles(data || []);
-      setLoading(false);
-    };
-    const fetchDepartments = async () => {
-      const { data } = await supabase
-        .from("departments")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (data) setDepartments(data);
-    };
-    fetchProfiles();
-    fetchDepartments();
-  }, []);
 
   const adminCount = profiles.filter((p) => p.role === "admin").length;
 
-  const handleToggleActive = async (id: string, current: boolean) => {
+  // ── Toggle handlers ──
+  async function handleToggleActive(id: string, current: boolean) {
     const { error } = await supabase.from("profiles").update({ is_active: !current }).eq("id", id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    setProfiles((prev) => prev.map((p) => p.id === id ? { ...p, is_active: !current } : p));
+    optimisticUpdate(id, { is_active: !current });
     toast({ title: `User ${!current ? "activated" : "deactivated"}` });
-  };
+  }
 
-  const handleToggleBooking = async (id: string, current: boolean) => {
+  async function handleToggleBooking(id: string, current: boolean) {
     const { error } = await supabase.from("profiles").update({ booking_privileges: !current }).eq("id", id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    setProfiles((prev) => prev.map((p) => p.id === id ? { ...p, booking_privileges: !current } : p));
+    optimisticUpdate(id, { booking_privileges: !current });
     toast({ title: `Booking privileges ${!current ? "granted" : "revoked"}` });
-  };
+  }
 
-  const handleToggleMessaging = async (id: string, current: boolean) => {
+  async function handleToggleMessaging(id: string, current: boolean) {
     const { error } = await (supabase as any)
       .from("profiles")
       .update({ messaging_blocked: !current })
       .eq("id", id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    setProfiles((prev) => prev.map((p) => p.id === id ? { ...p, messaging_blocked: !current } as any : p));
+    optimisticUpdate(id, { messaging_blocked: !current });
     toast({ title: `Messaging ${!current ? "blocked" : "unblocked"}` });
-  };
+  }
 
-  const handleBgCheck = async (id: string, status: "cleared" | "pending" | "failed" | "expired") => {
+  async function handleBgCheck(id: string, status: "cleared" | "pending" | "failed" | "expired") {
     const { error } = await supabase.from("profiles").update({
       bg_check_status: status,
       bg_check_updated_at: new Date().toISOString(),
       bg_check_expires_at: status === "cleared" ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() : null,
     }).eq("id", id);
     if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-    setProfiles((prev) => prev.map((p) => p.id === id ? { ...p, bg_check_status: status } : p));
+    optimisticUpdate(id, { bg_check_status: status });
     toast({ title: `Background check: ${status}` });
-  };
+  }
 
-  // Role change intent
-  const initiateRoleChange = (profileId: string, name: string, currentRole: UserRole, newRole: UserRole) => {
+  // ── Role change ──
+  function initiateRoleChange(profileId: string, name: string, currentRole: AdminUserRole, newRole: AdminUserRole) {
     if (newRole === currentRole) return;
-
     if (profileId === user?.id) {
       toast({ title: "Not allowed", description: "You cannot change your own role. Ask the other admin to do this.", variant: "destructive" });
       return;
     }
-
     if (newRole === "admin" && adminCount >= 2) {
       toast({ title: "Admin limit reached", description: "Maximum of 2 admins allowed. Transfer an existing admin role first.", variant: "destructive" });
       return;
     }
-
     setRoleChange({ id: profileId, name, from: currentRole, to: newRole });
-  };
+  }
 
-  const confirmRoleChange = async () => {
+  async function confirmRoleChange() {
     if (!roleChange) return;
     setRoleChanging(true);
 
-    // Use .select() so PostgREST returns the updated row — without it
-    // a silent RLS filter (0 rows affected) returns 204 with no error
-    // and the UI thinks the update succeeded when it didn't.
+    // Use .select() so PostgREST returns the updated row — without it a
+    // silent RLS filter (0 rows affected) returns 204 with no error and
+    // the UI thinks the update succeeded when it didn't.
     const { data, error } = await supabase
       .from("profiles")
       .update({ role: roleChange.to })
@@ -168,7 +117,8 @@ export default function AdminUsers() {
       return;
     }
 
-    // Verify the returned role matches what we requested
+    // Verify the returned role matches what we requested — a DB trigger
+    // (e.g. enforce_admin_cap) might have intervened.
     if (data.role !== roleChange.to) {
       toast({
         title: "Warning",
@@ -177,81 +127,21 @@ export default function AdminUsers() {
       });
     }
 
-    setProfiles((prev) =>
-      prev.map((p) => (p.id === roleChange.id ? { ...p, role: data.role } : p))
-    );
+    optimisticUpdate(roleChange.id, { role: data.role as AdminUserRole });
     toast({ title: `${roleChange.name}'s role updated to ${data.role}` });
 
-    // If promoted to coordinator, open department assignment immediately
-    // so the admin can assign them to departments in the same flow.
-    if (roleChange.to === "coordinator") {
-      openDeptAssignment(roleChange.id, roleChange.name);
-    }
-
+    // If promoted to coordinator, open department assignment in the same flow.
+    const promotedName = roleChange.name;
+    const promotedId = roleChange.id;
+    const promotedTo = roleChange.to;
     setRoleChange(null);
-  };
-
-  const roleChangeDescription = () => {
-    if (!roleChange) return "";
-    const { to } = roleChange;
-    if (to === "coordinator") return "This volunteer will gain access to the coordinator dashboard for their assigned department.";
-    if (to === "admin") return "Admins have full access to all data. There can only be 2 admins at any time.";
-    return "";
-  };
-
-  // Department assignment helpers
-  const openDeptAssignment = async (userId: string, name: string) => {
-    // Fetch current assignments for this coordinator
-    const { data } = await supabase
-      .from("department_coordinators")
-      .select("department_id")
-      .eq("coordinator_id", userId);
-    const current = new Set((data || []).map((r: { department_id: string }) => r.department_id));
-    setDeptAssign({ userId, name, selectedDepts: current });
-  };
-
-  const toggleDept = (deptId: string) => {
-    if (!deptAssign) return;
-    const next = new Set(deptAssign.selectedDepts);
-    if (next.has(deptId)) next.delete(deptId);
-    else next.add(deptId);
-    setDeptAssign({ ...deptAssign, selectedDepts: next });
-  };
-
-  const saveDeptAssignment = async () => {
-    if (!deptAssign) return;
-    setDeptAssignSaving(true);
-
-    // Delete all existing assignments for this coordinator
-    await supabase
-      .from("department_coordinators")
-      .delete()
-      .eq("coordinator_id", deptAssign.userId);
-
-    // Insert new assignments
-    if (deptAssign.selectedDepts.size > 0) {
-      const rows = [...deptAssign.selectedDepts].map((deptId) => ({
-        coordinator_id: deptAssign.userId,
-        department_id: deptId,
-      }));
-      const { error } = await supabase.from("department_coordinators").insert(rows);
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
-        setDeptAssignSaving(false);
-        return;
-      }
+    if (promotedTo === "coordinator") {
+      setDeptAssignTarget({ userId: promotedId, name: promotedName });
     }
+  }
 
-    setDeptAssignSaving(false);
-    toast({
-      title: "Departments updated",
-      description: `${deptAssign.name} is now assigned to ${deptAssign.selectedDepts.size} department${deptAssign.selectedDepts.size !== 1 ? "s" : ""}.`,
-    });
-    setDeptAssign(null);
-  };
-
-  // Delete user
-  const confirmDeleteUser = async () => {
+  // ── Delete user ──
+  async function confirmDeleteUser() {
     if (!deleteTarget) return;
     setDeleting(true);
     const { data, error } = await supabase.functions.invoke("delete-user", {
@@ -261,93 +151,61 @@ export default function AdminUsers() {
     if (error || data?.error) {
       toast({ title: "Error", description: data?.error || error?.message || "Failed to delete user", variant: "destructive" });
     } else {
-      setProfiles((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      optimisticRemove(deleteTarget.id);
       toast({ title: `${deleteTarget.name}'s account has been deleted.` });
     }
     setDeleteTarget(null);
-  };
+  }
 
-  const validateAddUser = () => {
-    let valid = true;
-    setNewNameError("");
-    setNewEmailError("");
-    const trimName = newName.trim();
-    const trimEmail = newEmail.trim();
-    if (!trimName || trimName.length < 2 || trimName.length > 100) {
-      setNewNameError("Name must be 2–100 characters"); valid = false;
-    }
-    if (!trimEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimEmail) || trimEmail.length > 255) {
-      setNewEmailError("Enter a valid email (max 255 chars)"); valid = false;
-    }
-    return valid;
-  };
-
-  const handleAddUser = async () => {
-    if (!validateAddUser()) return;
-    if (newRole === "admin" && adminCount >= 2) {
-      toast({ title: "Admin limit reached", description: "Maximum of 2 admins allowed.", variant: "destructive" });
+  // ── Manage minor consent ──
+  // Extracted from the inline onClick handler in the UserCard. Admin-only
+  // path: check existing consent, otherwise capture a paper-form consent
+  // via window.prompt and insert.
+  async function handleManageMinorConsent(profileId: string) {
+    const { data } = await supabase
+      .from("parental_consents")
+      .select("id, parent_name, is_active, expires_at")
+      .eq("volunteer_id", profileId)
+      .eq("is_active", true)
+      .limit(1);
+    if (data && data.length > 0) {
+      toast({ title: "Consent on file", description: `Parent: ${(data[0] as any).parent_name}` });
       return;
     }
-    setAddingUser(true);
-    const password = generatePassword();
-
-    // Use Supabase Auth admin createUser via edge function or signUp
-    // Since we don't have service_role on client, we use signUp which auto-confirms if configured
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: newEmail.trim(),
-      password,
-      options: { data: { full_name: newName.trim() } },
+    const parentName = window.prompt("Enter parent/guardian name (for paper consent):");
+    if (!parentName) return;
+    const { error } = await (supabase as any).from("parental_consents").insert({
+      volunteer_id: profileId,
+      parent_name: parentName,
+      parent_email: "paper-consent@easterseals.com",
+      consent_method: "paper",
+      expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
     });
-
-    if (authError || !authData.user) {
-      setAddingUser(false);
-      toast({ title: "Error creating user", description: authError?.message || "Unknown error", variant: "destructive" });
-      return;
-    }
-
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      email: newEmail.trim(),
-      full_name: newName.trim(),
-      role: newRole,
-      is_active: true,
-    });
-
-    setAddingUser(false);
-
-    if (profileError) {
-      toast({ title: "User created but profile insert failed", description: profileError.message, variant: "destructive" });
-      return;
-    }
-
-    // Refresh profiles list
-    const { data: refreshed } = await supabase.from("profiles").select("*").order("full_name");
-    if (refreshed) setProfiles(refreshed);
-
-    setCreatedCreds({ email: newEmail.trim(), password });
-    setNewName("");
-    setNewEmail("");
-    setNewRole("coordinator");
-  };
-
-  const closeAddUser = () => {
-    setAddUserOpen(false);
-    setCreatedCreds(null);
-    setNewName("");
-    setNewEmail("");
-    setNewRole("coordinator");
-    setNewNameError("");
-    setNewEmailError("");
-  };
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else toast({ title: "Consent recorded", description: `Paper consent from ${parentName} recorded.` });
+  }
 
   const filtered = profiles
     .filter((p) => roleFilter === "all" || p.role === roleFilter)
-    .filter((p) => !search || p.full_name?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase()));
+    .filter(
+      (p) =>
+        !search ||
+        p.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        p.email?.toLowerCase().includes(search.toLowerCase())
+    );
 
-  const bgBadge = (status: string) => {
-    const map: Record<string, string> = { cleared: "bg-success text-success-foreground", pending: "bg-warning text-warning-foreground", failed: "bg-destructive text-destructive-foreground", expired: "bg-muted text-muted-foreground" };
-    return <Badge className={`text-xs ${map[status] || ""}`}>{status}</Badge>;
+  const cardActions: UserCardActions = {
+    onRoleChangeRequest: initiateRoleChange,
+    onDeptAssignRequest: (userId, name) => setDeptAssignTarget({ userId, name }),
+    onToggleActive: handleToggleActive,
+    onToggleBooking: handleToggleBooking,
+    onToggleMessaging: handleToggleMessaging,
+    onBgCheckChange: handleBgCheck,
+    onDeleteRequest: (id, name, role) => setDeleteTarget({ id, name, role }),
+    onManageMinorConsent: handleManageMinorConsent,
   };
+
+  if (loading) return null;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -358,321 +216,45 @@ export default function AdminUsers() {
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-10" placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-full sm:w-[160px]"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="volunteer">Volunteer</SelectItem>
-            <SelectItem value="coordinator">Coordinator</SelectItem>
-            <SelectItem value="admin">Admin</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <UserListFilters
+        search={search}
+        onSearchChange={setSearch}
+        roleFilter={roleFilter}
+        onRoleFilterChange={setRoleFilter}
+      />
 
       <div className="grid gap-3">
         {filtered.map((p) => (
-          <Card key={p.id}>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium">{p.full_name}</span>
-                    <Badge className={`text-xs ${roleBadgeClass[p.role as UserRole] || ""}`}>
-                      {p.role}
-                    </Badge>
-                    {!p.is_active && <Badge variant="destructive" className="text-xs">Inactive</Badge>}
-                    {p.role === "volunteer" && (
-                      <VolunteerReliabilityBadge volunteerId={p.id} />
-                    )}
-                  </div>
-                 <div className="text-sm text-muted-foreground">{p.email}</div>
-                  {p.role === "volunteer" && (p.emergency_contact_name || p.emergency_contact_phone) && (
-                    <div className="text-xs text-muted-foreground">
-                      Emergency: {p.emergency_contact_name}{p.emergency_contact_name && p.emergency_contact_phone ? " · " : ""}{p.emergency_contact_phone}
-                    </div>
-                  )}
-                  {p.role === "volunteer" && (p as any).is_minor && (
-                    <div className="text-xs text-muted-foreground">
-                      Minor (DOB: {(p as any).date_of_birth}) —{" "}
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-xs text-primary"
-                        onClick={async () => {
-                          // Check if consent exists
-                          const { data } = await supabase
-                            .from("parental_consents")
-                            .select("id, parent_name, is_active, expires_at")
-                            .eq("volunteer_id", p.id)
-                            .eq("is_active", true)
-                            .limit(1);
-                          if (data && data.length > 0) {
-                            toast({ title: "Consent on file", description: `Parent: ${(data[0] as any).parent_name}` });
-                          } else {
-                            // Admin manually marks consent (paper form)
-                            const parentName = window.prompt("Enter parent/guardian name (for paper consent):");
-                            if (!parentName) return;
-                            const { error } = await (supabase as any).from("parental_consents").insert({
-                              volunteer_id: p.id,
-                              parent_name: parentName,
-                              parent_email: "paper-consent@easterseals.com",
-                              consent_method: "paper",
-                              expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-                            });
-                            if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-                            else toast({ title: "Consent recorded", description: `Paper consent from ${parentName} recorded.` });
-                          }
-                        }}
-                      >
-                        Manage Consent
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex gap-2 flex-wrap">
-                    {bgBadge(p.bg_check_status)}
-                    {!p.booking_privileges && <Badge variant="outline" className="text-xs">No Booking</Badge>}
-                    {(p as any).messaging_blocked && <Badge variant="destructive" className="text-xs">Messaging Blocked</Badge>}
-                    {(p as any).is_minor && <Badge className="text-xs bg-yellow-500 text-white">Minor</Badge>}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
-                  {/* Role dropdown */}
-                  <Select
-                    value={p.role}
-                    onValueChange={(v) => initiateRoleChange(p.id, p.full_name, p.role as UserRole, v as UserRole)}
-                  >
-                    <SelectTrigger className="h-8 w-full sm:w-[130px] text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="volunteer">Volunteer</SelectItem>
-                      <SelectItem value="coordinator">Coordinator</SelectItem>
-                      <SelectItem value="admin" disabled={adminCount >= 2 && p.role !== "admin"}>
-                        {adminCount >= 2 && p.role !== "admin" ? "Admin (limit reached)" : "Admin"}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  {(p.role === "coordinator" || p.role === "admin") && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openDeptAssignment(p.id, p.full_name)}
-                    >
-                      <Building2 className="h-3 w-3 mr-1" />
-                      Assign Depts
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" onClick={() => handleToggleActive(p.id, p.is_active)}>
-                    {p.is_active ? <Lock className="h-3 w-3 mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
-                    {p.is_active ? "Deactivate" : "Activate"}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleToggleBooking(p.id, p.booking_privileges)}>
-                    {p.booking_privileges ? "Revoke Booking" : "Grant Booking"}
-                  </Button>
-                  {p.role !== "admin" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleToggleMessaging(p.id, (p as any).messaging_blocked === true)}
-                    >
-                      {(p as any).messaging_blocked ? "Unblock Messaging" : "Block Messaging"}
-                    </Button>
-                  )}
-                  <Select onValueChange={(v) => handleBgCheck(p.id, v as "cleared" | "pending" | "failed" | "expired")}>
-                    <SelectTrigger className="h-8 w-full sm:w-[140px] text-xs"><SelectValue placeholder="BG Check" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cleared">Cleared</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="failed">Failed</SelectItem>
-                      <SelectItem value="expired">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {p.role !== "admin" && (
-                    <Button size="sm" variant="destructive" onClick={() => setDeleteTarget({ id: p.id, name: p.full_name, role: p.role as UserRole })}>
-                      <Trash2 className="h-3 w-3 mr-1" /> Delete
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <UserCard key={p.id} profile={p} adminCount={adminCount} actions={cardActions} />
         ))}
       </div>
 
-      {/* Role change confirmation */}
-      <AlertDialog open={!!roleChange} onOpenChange={(open) => { if (!open) setRoleChange(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change Role</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to change {roleChange?.name}'s role to {roleChange?.to}?
-            </AlertDialogDescription>
-            {roleChange && (roleChange.to === "coordinator" || roleChange.to === "admin") && (
-              <div className="flex items-start gap-2 mt-2 p-3 rounded-md bg-warning/10 border border-warning/30">
-                <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                <p className="text-sm text-foreground">{roleChangeDescription()}</p>
-              </div>
-            )}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={roleChanging}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRoleChange} disabled={roleChanging}>
-              {roleChanging ? "Updating..." : "Confirm"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <RoleChangeDialog
+        target={roleChange}
+        loading={roleChanging}
+        onConfirm={confirmRoleChange}
+        onClose={() => setRoleChange(null)}
+      />
 
-      {/* Delete user confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Account — This Cannot Be Undone</AlertDialogTitle>
-            <AlertDialogDescription>
-              You are about to permanently delete {deleteTarget?.name}'s account. This action cannot be reversed. If this user wishes to use the portal again they will need to register a new account.
-            </AlertDialogDescription>
-            {deleteTarget && (
-              <div className="flex items-start gap-2 mt-2 p-3 rounded-md bg-destructive/10 border border-destructive/30">
-                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                <p className="text-sm text-foreground">
-                  {deleteTarget.role === "volunteer"
-                    ? "All of their active shift bookings will be automatically cancelled."
-                    : "Their created shifts will remain unchanged."}
-                </p>
-              </div>
-            )}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteUser} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {deleting ? "Deleting..." : "Delete Permanently"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteUserDialog
+        target={deleteTarget}
+        loading={deleting}
+        onConfirm={confirmDeleteUser}
+        onClose={() => setDeleteTarget(null)}
+      />
 
-      {/* Department assignment dialog */}
-      <Dialog
-        open={!!deptAssign}
-        onOpenChange={(open) => { if (!open) setDeptAssign(null); }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign Departments</DialogTitle>
-            <DialogDescription>
-              Select which departments {deptAssign?.name} should coordinate.
-              They will see shifts and volunteers for these departments.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 max-h-64 overflow-y-auto py-2">
-            {departments.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No active departments found.
-              </p>
-            ) : (
-              departments.map((dept) => (
-                <label
-                  key={dept.id}
-                  className="flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer hover:bg-muted transition-colors"
-                >
-                  <Checkbox
-                    checked={deptAssign?.selectedDepts.has(dept.id) ?? false}
-                    onCheckedChange={() => toggleDept(dept.id)}
-                  />
-                  <span className="text-sm">{dept.name}</span>
-                </label>
-              ))
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeptAssign(null)}>
-              Cancel
-            </Button>
-            <Button onClick={saveDeptAssignment} disabled={deptAssignSaving}>
-              {deptAssignSaving ? "Saving..." : `Save (${deptAssign?.selectedDepts.size ?? 0} selected)`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeptAssignmentDialog
+        target={deptAssignTarget}
+        departments={departments}
+        onClose={() => setDeptAssignTarget(null)}
+      />
 
-      {/* Add user modal */}
-      <Dialog open={addUserOpen} onOpenChange={(open) => { if (!open) closeAddUser(); else setAddUserOpen(true); }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New User</DialogTitle>
-            <DialogDescription>Create a coordinator or admin account. Volunteers self-register.</DialogDescription>
-          </DialogHeader>
-
-          {createdCreds ? (
-            <div className="space-y-4">
-              <div className="p-4 rounded-md bg-success/10 border border-success/30 space-y-2">
-                <p className="text-sm font-medium text-foreground">User created successfully!</p>
-                <p className="text-sm text-muted-foreground">Share these credentials securely with the new user.</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold">Email</Label>
-                <div className="flex gap-2">
-                  <Input value={createdCreds.email} readOnly className="text-sm" />
-                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(createdCreds.email); toast({ title: "Copied!" }); }}>
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold">Password</Label>
-                <div className="flex gap-2">
-                  <Input value={createdCreds.password} readOnly className="text-sm font-mono" />
-                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(createdCreds.password); toast({ title: "Copied!" }); }}>
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={closeAddUser}>Done</Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Full Name</Label>
-                <Input value={newName} onChange={(e) => { setNewName(e.target.value); setNewNameError(""); }} placeholder="Jane Smith" maxLength={100} />
-                {newNameError && <p className="text-xs text-destructive">{newNameError}</p>}
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Email</Label>
-                <Input type="email" value={newEmail} onChange={(e) => { setNewEmail(e.target.value); setNewEmailError(""); }} placeholder="jane@example.com" maxLength={255} />
-                {newEmailError && <p className="text-xs text-destructive">{newEmailError}</p>}
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-bold">Role</Label>
-                <Select value={newRole} onValueChange={(v) => setNewRole(v as "coordinator" | "admin")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="coordinator">Coordinator</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {newRole === "admin" && (
-                <div className="flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/30">
-                  <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-                  <p className="text-xs text-foreground">Admins have full access to all data. There can only be 2 admins at any time.</p>
-                </div>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={closeAddUser}>Cancel</Button>
-                <Button onClick={handleAddUser} disabled={addingUser}>
-                  {addingUser ? "Creating..." : "Create User"}
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AddUserDialog
+        open={addUserOpen}
+        onOpenChange={setAddUserOpen}
+        adminCount={adminCount}
+        onUserCreated={refresh}
+      />
     </div>
   );
 }
