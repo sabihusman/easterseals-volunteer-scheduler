@@ -25,3 +25,17 @@ class ResizeObserverStub implements ResizeObserver {
   disconnect(): void {}
 }
 globalThis.ResizeObserver = ResizeObserverStub;
+
+// Radix Select uses pointer-capture APIs and scrollIntoView during its
+// open animation. jsdom 20 doesn't implement any of these — neither
+// `Element.prototype.scrollIntoView` nor `HTMLElement.prototype.scrollIntoView`
+// is defined (verified via prototype probe). Polyfill on HTMLElement.prototype
+// per the standard inheritance chain (Radix calls these on instance methods,
+// which resolve through HTMLElement → Element). Stubs only — no behavior
+// beyond not crashing.
+const htmlElProto = HTMLElement.prototype as unknown as Record<string, unknown>;
+htmlElProto.hasPointerCapture = () => false;
+htmlElProto.setPointerCapture = () => {};
+htmlElProto.releasePointerCapture = () => {};
+htmlElProto.scrollIntoView = () => {};
+
