@@ -13,3 +13,15 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
+
+// jsdom 20 doesn't provide ResizeObserver, but Radix UI primitives
+// (Checkbox, Tabs, Select, …) read it during their layout effects. Without
+// this stub, mounting any of those crashes the test render. Same role as
+// the matchMedia stub above — purely a test-environment polyfill.
+class ResizeObserverStub implements ResizeObserver {
+  constructor(_callback: ResizeObserverCallback) { void _callback; }
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+globalThis.ResizeObserver = ResizeObserverStub;
