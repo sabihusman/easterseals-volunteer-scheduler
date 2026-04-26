@@ -7,7 +7,7 @@ import { ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { VolunteerImpactCharts } from "@/components/VolunteerImpactCharts";
+import { VolunteerImpactCharts } from "@/components/volunteer/VolunteerImpactCharts";
 import { getEffectiveTimes, minutesUntilStart } from "@/lib/shift-time";
 import { useVolunteerBookings } from "@/hooks/useVolunteerBookings";
 import { useShiftInvitations, type ShiftInvitation } from "@/hooks/useShiftInvitations";

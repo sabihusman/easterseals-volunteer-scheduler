@@ -5,8 +5,8 @@ import { Calendar, Clock, MapPin, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { downloadICS, googleCalendarUrl, timeLabel } from "@/lib/calendar-utils";
 import { getEffectiveTimes, isCheckInOpen } from "@/lib/shift-time";
-import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
-import { InviteFriendModal } from "@/components/InviteFriendModal";
+import { BookedSlotsDisplay } from "@/components/volunteer/BookedSlotsDisplay";
+import { InviteFriendModal } from "@/components/volunteer/InviteFriendModal";
 import type { VolunteerBooking } from "@/hooks/useVolunteerBookings";
 
 /**

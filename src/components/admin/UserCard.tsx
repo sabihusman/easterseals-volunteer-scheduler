@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Lock, Unlock, Trash2, Building2 } from "lucide-react";
-import { VolunteerReliabilityBadge } from "@/components/VolunteerReliabilityBadge";
+import { VolunteerReliabilityBadge } from "@/components/admin/VolunteerReliabilityBadge";
 import { roleBadgeClass, getBgCheckBadgeClass } from "@/lib/admin-user-utils";
 import type { AdminProfile, AdminUserRole } from "@/hooks/useAdminUsers";
 

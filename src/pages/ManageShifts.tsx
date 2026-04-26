@@ -8,7 +8,7 @@ import { useShiftsList, type Shift } from "@/hooks/useShiftsList";
 import { ShiftsTable } from "@/components/shifts/ShiftsTable";
 import { ShiftFormDialog } from "@/components/shifts/ShiftFormDialog";
 import { DeleteShiftDialog, type DeleteShiftTarget } from "@/components/shifts/DeleteShiftDialog";
-import { InviteVolunteerModal } from "@/components/InviteVolunteerModal";
+import { InviteVolunteerModal } from "@/components/shifts/InviteVolunteerModal";
 
 /**
  * ManageShifts orchestrator. The page coordinates dialog open/close state

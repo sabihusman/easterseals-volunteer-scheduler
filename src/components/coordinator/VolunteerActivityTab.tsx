@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Star } from "lucide-react";
 import { format } from "date-fns";
-import { BookedSlotsDisplay } from "@/components/BookedSlotsDisplay";
-import { CoordinatorHoursConfirmation } from "@/components/CoordinatorHoursConfirmation";
+import { BookedSlotsDisplay } from "@/components/volunteer/BookedSlotsDisplay";
+import { CoordinatorHoursConfirmation } from "@/components/coordinator/CoordinatorHoursConfirmation";
 
 interface BookingEntry {
   id: string;

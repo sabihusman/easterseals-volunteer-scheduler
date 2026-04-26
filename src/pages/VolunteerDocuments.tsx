@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DocumentStatusBadge } from "@/components/DocumentStatusBadge";
+import { DocumentStatusBadge } from "@/components/shared/DocumentStatusBadge";
 import { Upload, FileText, Download, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 
