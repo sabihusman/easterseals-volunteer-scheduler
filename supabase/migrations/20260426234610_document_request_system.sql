@@ -33,9 +33,12 @@
 --     gdpr_erase_document (status-flip path that bypasses the
 --     rejected-only storage DELETE policy)
 --   • Cron extension: warn_expiring_documents() gets Step 0 (pending
---     request expiry, CTE form per §6 implementation note) and Step 3
---     (orphan-storage janitor — deletes objects without a matching
---     volunteer_documents row). Steps 1-2 byte-identical to baseline.
+--     request expiry, CTE form per §6 implementation note). Steps 1-2
+--     byte-identical to baseline. The proposal-specified Step 3
+--     (orphan-storage janitor) is OMITTED here because Supabase blocks
+--     direct `DELETE FROM storage.objects` at the SQL layer; an Edge-
+--     Function-based janitor is a separate architectural concern
+--     tracked at #155.
 --   • Comments documenting design choices (text+CHECK over ENUM for
 --     volunteer_documents.status; cron schedule timezone tracked
 --     separately)
@@ -68,19 +71,22 @@ BEGIN;
 -- ───────────────────────────────────────────────────────────────────────────
 -- 1. Drop-and-reset existing test data
 -- ───────────────────────────────────────────────────────────────────────────
--- Capture storage paths BEFORE deleting rows (we need them to clean
--- the bucket).
-CREATE TEMP TABLE _orphan_storage_paths AS
-  SELECT storage_path FROM public.volunteer_documents;
-
-DELETE FROM storage.objects
-WHERE bucket_id = 'volunteer-documents'
-  AND name IN (SELECT storage_path FROM _orphan_storage_paths);
-
+-- Note: storage object cleanup is NOT part of this SQL migration.
+-- Supabase enforces "operations on storage.objects must go through the
+-- Storage API" — direct `DELETE FROM storage.objects` raises
+-- `Direct deletion from storage tables is not allowed. Use the Storage
+-- API instead. (SQLSTATE 42501)`. The deploy operator removes the
+-- pre-existing test object via the Storage API or dashboard before
+-- applying this migration. See PR description's pre-merge checklist
+-- for the operator step.
+--
+-- We DO delete the volunteer_documents rows here. Any storage object
+-- without a matching row becomes an orphan that the operator's
+-- pre-deploy cleanup, or the future orphan-janitor follow-up
+-- (tracked at #155), removes.
 DELETE FROM public.volunteer_documents;
 
-DROP TABLE _orphan_storage_paths;
--- Note: we do NOT delete document_types here. The seed below upserts
+-- We do NOT delete document_types here. The seed below upserts
 -- canonical types via ON CONFLICT (name); old admin-created types
 -- remain orphaned but harmless (nothing references them post-reset),
 -- and removing them later is a separate cleanup if anyone cares.
@@ -631,19 +637,26 @@ $$;
 GRANT EXECUTE ON FUNCTION public.gdpr_erase_document(uuid) TO authenticated;
 
 -- ───────────────────────────────────────────────────────────────────────────
--- 11. Cron extension — warn_expiring_documents() 4-step body
+-- 11. Cron extension — warn_expiring_documents() 3-step body
 -- ───────────────────────────────────────────────────────────────────────────
 -- Step 0 (NEW): Expire pending document_requests past expires_at.
 -- Step 1: existing — mark approved docs expiring within 30 days as
 --         'expiring_soon' + send warning notifications.
 -- Step 2: existing — mark expired docs as 'expired' + notify.
--- Step 3 (NEW): orphan-storage janitor — delete objects in the
---         volunteer-documents bucket whose name doesn't match any
---         volunteer_documents.storage_path (orphans from failed
---         submit_document RPCs).
+--
+-- Note on the orphan-storage janitor: the proposal §6 originally
+-- specified a Step 3 that deletes orphan storage objects via
+-- `DELETE FROM storage.objects`. Supabase blocks that pattern at the
+-- SQL layer (`Direct deletion from storage tables is not allowed.
+-- Use the Storage API instead.`) — same constraint that prevented
+-- the migration's drop-and-reset from cleaning the existing test
+-- object. An orphan janitor needs an Edge Function or pg_net HTTP
+-- call to the Storage API. That's a separate architectural concern
+-- tracked at #155. Step 3 is omitted from this migration; orphans
+-- accumulate harmlessly until that janitor lands.
 --
 -- Audit log asymmetry: Step 0 logs to admin_action_log because an
--- unfulfilled admin request is a workflow event. Steps 1/2/3 don't
+-- unfulfilled admin request is a workflow event. Steps 1 and 2 don't
 -- log — they're predictable from data already on the row, and the
 -- existing function never logged them.
 CREATE OR REPLACE FUNCTION public.warn_expiring_documents()
@@ -787,18 +800,8 @@ BEGIN
       );
   END LOOP;
 
-  -- ── Step 3 (NEW): Orphan-storage janitor ──
-  -- Deletes objects in the volunteer-documents bucket whose name
-  -- doesn't appear in any volunteer_documents.storage_path AND that
-  -- are older than 24 hours (in-flight uploads have a window to land).
-  -- Bounded orphan lifetime ≤ 24 hours.
-  DELETE FROM storage.objects
-  WHERE bucket_id = 'volunteer-documents'
-    AND created_at < now() - interval '24 hours'
-    AND name NOT IN (
-      SELECT storage_path FROM public.volunteer_documents
-      WHERE storage_path IS NOT NULL
-    );
+  -- Step 3 (orphan-storage janitor) intentionally omitted — see comment
+  -- block at the top of this section. Tracked at #155.
 END;
 $$;
 

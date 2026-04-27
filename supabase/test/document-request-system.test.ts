@@ -355,7 +355,7 @@ describe("Document Request & Upload System — RLS, state machine, triggers", ()
 
   // ───────────── Test 11: Storage DELETE narrowing ─────────────
 
-  it("(11) admin storage DELETE on object whose row status='approved' → RLS denies", async () => {
+  it("(11) admin storage DELETE on object whose row status='approved' → blocked (RLS or storage trigger; either way the object remains)", async () => {
     const users = getHarnessUsers();
     const { storagePath } = await stageVolunteerDocumentRow(users.volunteer.id, "approved");
 
