@@ -119,6 +119,38 @@ async function createTestUser(
 }
 
 /**
+ * Poll the storage-api health endpoint until it responds. `supabase
+ * start` returns when Postgres is up, but the storage-api container
+ * may still be booting; `supabase db reset` immediately hits the
+ * storage API and times out otherwise. Race observed in CI under
+ * `feat: document request & upload system` (PR #154 / #156).
+ *
+ * Polls every 2s; gives up after 60s. Treats any HTTP response —
+ * even 401/404 — as "API is reachable" since the only failure mode
+ * we care about is "container not yet listening."
+ */
+async function waitForStorageApi(apiUrl: string): Promise<void> {
+  const url = `${apiUrl}/storage/v1/bucket`;
+  const deadline = Date.now() + 60_000;
+  let lastError: unknown = null;
+
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
+      // Any HTTP response means the container is listening.
+      console.log(`[harness] Storage API reachable (status ${res.status}).`);
+      return;
+    } catch (err) {
+      lastError = err;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+  throw new Error(
+    `[harness] Storage API at ${url} did not become reachable within 60s. Last error: ${String(lastError)}`,
+  );
+}
+
+/**
  * Vitest globalSetup hook. Vitest calls this once per invocation
  * before any test file runs.
  */
@@ -128,29 +160,34 @@ export async function setup(): Promise<void> {
   // 1. Ensure the local stack is up.
   ensureStackRunning();
 
-  // 2. Reset DB to a clean migrated state. --no-seed because Supabase's
+  // 2. Read stack URLs/keys early so we can health-check the storage
+  //    API before issuing commands that depend on it.
+  const { apiUrl, anonKey, serviceRoleKey, dbUrl } = readStackStatus();
+
+  // 3. Storage API container starts after Postgres is up. `supabase
+  //    db reset` fires HTTP requests to the storage API which fail
+  //    silently if it's not accepting connections yet. Poll until it
+  //    responds before proceeding.
+  console.log("[harness] Waiting for storage API to come up...");
+  await waitForStorageApi(apiUrl);
+
+  // 4. Reset DB to a clean migrated state. --no-seed because Supabase's
   //    default seed.sql isn't part of this harness; we apply our own
   //    fixtures.sql below.
   console.log("[harness] Resetting database + applying migrations...");
   run("supabase db reset --no-seed");
 
-  // 3. Read stack URLs/keys (need DB_URL for fixtures application).
-  // (Order swapped vs the obvious flow — readStackStatus must run before
-  //  fixtures so we have the DB_URL; the CLI's `supabase db psql` was
-  //  removed in 2.x, so we shell out to plain `psql` against DB_URL.)
-  const { apiUrl, anonKey, serviceRoleKey, dbUrl } = readStackStatus();
-
-  // 4. Apply non-user fixtures (department, location, cron suppression).
-  // `psql` is pre-installed on ubuntu-latest CI runners and on most
-  // dev machines (postgresql-client). The local stack exposes the DB
-  // on a deterministic port via DB_URL.
+  // 5. Apply non-user fixtures (department, location, cron suppression).
+  //    `psql` is pre-installed on ubuntu-latest CI runners and on most
+  //    dev machines (postgresql-client). The local stack exposes the DB
+  //    on a deterministic port via DB_URL.
   console.log("[harness] Applying fixtures.sql...");
   run(`psql "${dbUrl}" -v ON_ERROR_STOP=1 -f supabase/test/fixtures.sql`);
   process.env.HARNESS_SUPABASE_URL = apiUrl;
   process.env.HARNESS_ANON_KEY = anonKey;
   process.env.HARNESS_SERVICE_ROLE_KEY = serviceRoleKey;
 
-  // 5. Seed test users. We use a fixed-suffix email pattern ("@harness.local")
+  // 6. Seed test users. We use a fixed-suffix email pattern ("@harness.local")
   //    so they're distinguishable from any other accidentally-present accounts.
   const admin = createClient(apiUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -161,7 +198,7 @@ export async function setup(): Promise<void> {
   const coordinator = await createTestUser(admin, "coordinator@harness.local", "coordinator", "Test Coordinator");
   const adminUser = await createTestUser(admin, "admin@harness.local", "admin", "Test Admin");
 
-  // 6. Link coordinator to the test department.
+  // 7. Link coordinator to the test department.
   const { error: coordLinkError } = await admin
     .from("department_coordinators")
     .insert({
@@ -172,7 +209,7 @@ export async function setup(): Promise<void> {
     throw new Error(`Failed to link coordinator to department: ${coordLinkError.message}`);
   }
 
-  // 7. Stash user IDs for tests via JSON env (process.env can't carry objects).
+  // 8. Stash user IDs for tests via JSON env (process.env can't carry objects).
   const users: HarnessUsers = {
     volunteer: { id: volunteer.id, email: volunteer.email! },
     volunteer2: { id: volunteer2.id, email: volunteer2.email! },

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,90 @@ interface DatePickerProps {
   disabled?: boolean;
 }
 
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  WIP — DIAGNOSTIC INSTRUMENTATION (PR #156 follow-up)                ║
+// ║                                                                      ║
+// ║  Candidate A (`modal={false}`) didn't fix the live behavior despite ║
+// ║  CI passing. This commit captures real event flow on the user's     ║
+// ║  Vercel preview so we can see WHICH event is being consumed and     ║
+// ║  WHERE.                                                              ║
+// ║                                                                      ║
+// ║  How to use:                                                         ║
+// ║   1. Open the preview, navigate to admin's Manage Shifts page       ║
+// ║   2. Open browser DevTools → Console tab                            ║
+// ║   3. Click "New Shift" to open the dialog                           ║
+// ║   4. Click the Date field, then click any day in the calendar       ║
+// ║   5. Copy the [DatePicker DIAG] console lines and share them        ║
+// ║                                                                      ║
+// ║  This block + all the `console.log` / event listener code is        ║
+// ║  REMOVED before merge. No behavior change beyond logging.           ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+const DIAG = "[DatePicker DIAG]";
+
 export function DatePicker({ value, onChange, placeholder = "Pick a date", disabled }: DatePickerProps) {
   const dateValue = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
 
+  // [DIAG WIP] Document-level capture-phase listeners for the three
+  // pointer events. Filters to events whose target is inside a Radix
+  // popper wrapper or is a calendar day button. The capture phase
+  // fires before any element-level handler, so we'll see exactly which
+  // event is intercepted and at what stage.
+  useEffect(() => {
+    const matchesDatePicker = (target: HTMLElement | null): boolean => {
+      if (!target) return false;
+      // react-day-picker day buttons
+      if (target.tagName === "BUTTON" && target.getAttribute("name") === "day") return true;
+      // Radix popper wrapper or popover content
+      if (typeof target.closest === "function") {
+        if (target.closest("[data-radix-popper-content-wrapper]")) return true;
+        if (target.closest("[data-radix-popover-content]")) return true;
+      }
+      return false;
+    };
+
+    const log = (label: string) => (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!matchesDatePicker(target)) return;
+      const ct = e.currentTarget as HTMLElement | null;
+      console.log(`${DIAG} ${label}`, {
+        defaultPrevented: e.defaultPrevented,
+        eventPhase: e.eventPhase, // 1=capture, 2=at-target, 3=bubble
+        targetTag: target?.tagName,
+        targetName: target?.getAttribute("name"),
+        targetText: target?.textContent?.slice(0, 30).trim(),
+        targetClass: typeof target?.className === "string" ? target.className.slice(0, 80) : null,
+        currentTargetTag: ct?.tagName ?? "document",
+      });
+    };
+
+    const wiring: Array<[keyof DocumentEventMap, boolean]> = [
+      ["pointerdown", true],
+      ["mousedown", true],
+      ["click", true],
+      ["pointerdown", false],
+      ["mousedown", false],
+      ["click", false],
+    ];
+
+    const cleanups: Array<() => void> = [];
+    for (const [evt, capture] of wiring) {
+      const handler = log(`${evt} ${capture ? "capture" : "bubble"}`);
+      document.addEventListener(evt, handler, capture);
+      cleanups.push(() => document.removeEventListener(evt, handler, capture));
+    }
+    return () => cleanups.forEach((c) => c());
+  }, []);
+
   return (
-    <Popover>
+    <Popover
+      modal={false}
+      // [DIAG WIP] Log every open/close transition. Pattern A says
+      // we should see onOpenChange(false) without a corresponding
+      // onSelect having fired.
+      onOpenChange={(open) => {
+        console.log(`${DIAG} Popover.onOpenChange`, { open });
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -35,7 +115,18 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
           mode="single"
           selected={dateValue}
           onSelect={(date) => {
-            if (date) onChange(format(date, "yyyy-MM-dd"));
+            // [DIAG WIP] Did onSelect fire? With what value?
+            console.log(`${DIAG} Calendar.onSelect`, {
+              date,
+              isoString: date?.toISOString() ?? null,
+            });
+            if (date) {
+              const formatted = format(date, "yyyy-MM-dd");
+              console.log(`${DIAG} calling onChange(...) with`, formatted);
+              onChange(formatted);
+            } else {
+              console.log(`${DIAG} onSelect fired with falsy date — onChange NOT called`);
+            }
           }}
           initialFocus
         />
