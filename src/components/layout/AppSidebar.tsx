@@ -41,7 +41,6 @@ export function AppSidebar() {
     { title: "Unactioned Shifts", url: "/admin/unactioned-shifts", icon: AlertCircle },
     { title: "Reminders", url: "/admin/reminders", icon: Bell },
     { title: "Admin Settings", url: "/admin/settings", icon: Shield },
-    { title: "Doc Types", url: "/admin/documents", icon: FolderOpen },
     { title: "Compliance", url: "/admin/compliance", icon: CheckSquare },
     { title: "Disputes", url: "/admin/disputes", icon: Scale },
   ];

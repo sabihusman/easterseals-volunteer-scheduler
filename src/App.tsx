@@ -31,7 +31,6 @@ import NotFound from "./pages/NotFound";
 import AdminDepartments from "./pages/AdminDepartments";
 import AdminEvents from "./pages/AdminEvents";
 import VolunteerEvents from "./pages/VolunteerEvents";
-import AdminDocumentTypes from "./pages/AdminDocumentTypes";
 import DocumentCompliance from "./pages/DocumentCompliance";
 import VolunteerDocuments from "./pages/VolunteerDocuments";
 import Messages from "./pages/Messages";
@@ -99,7 +98,8 @@ const App = () => (
             <Route path="/admin/departments" element={<ProtectedRoute requiredRole={["admin"]}><AdminDepartments /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole={["admin"]}><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/events" element={<ProtectedRoute requiredRole={["admin"]}><AdminEvents /></ProtectedRoute>} />
-            <Route path="/admin/documents" element={<ProtectedRoute requiredRole={["admin"]}><AdminDocumentTypes /></ProtectedRoute>} />
+            {/* /admin/documents (Doc Types admin page) retired in PR #154 — document types
+                are now seed-managed; admin self-service replaced by request-driven workflow. */}
             <Route path="/admin/compliance" element={<ProtectedRoute requiredRole={["admin"]}><DocumentCompliance /></ProtectedRoute>} />
             <Route path="/admin/disputes" element={<ProtectedRoute requiredRole={["admin"]}><AdminDisputes /></ProtectedRoute>} />
             <Route path="/events" element={<ProtectedRoute><VolunteerEvents /></ProtectedRoute>} />
