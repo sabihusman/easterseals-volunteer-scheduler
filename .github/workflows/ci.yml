@@ -86,10 +86,16 @@ jobs:
       - name: Install supabase CLI
         # ubuntu-latest GitHub-hosted runners ship Docker; we need the
         # supabase CLI on top to drive `supabase start` / `db reset`.
-        run: |
-          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.deb -o /tmp/supabase.deb
-          sudo dpkg -i /tmp/supabase.deb
-          supabase --version
+        # The official action handles version resolution + install
+        # path; rolling our own with `curl` against a versioned
+        # release artifact had the filename pattern drift from under
+        # us (404 on the unversioned `_latest_` download URL).
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify supabase CLI installed
+        run: supabase --version
 
       - name: Start Supabase local stack
         # Cold start in CI is ~2-5 min as Docker pulls the postgres,
