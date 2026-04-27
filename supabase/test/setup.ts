@@ -62,15 +62,21 @@ function ensureStackRunning(): void {
   }
 }
 
-function readStackStatus(): { apiUrl: string; anonKey: string; serviceRoleKey: string } {
+function readStackStatus(): {
+  apiUrl: string;
+  anonKey: string;
+  serviceRoleKey: string;
+  dbUrl: string;
+} {
   // `supabase status -o json` emits a JSON object with API_URL, ANON_KEY,
-  // SERVICE_ROLE_KEY (and others). Stable across CLI 1.x and 2.x.
+  // SERVICE_ROLE_KEY, DB_URL (and others). Stable across CLI 1.x and 2.x.
   const json = run("supabase status -o json", { silent: true });
   const status = JSON.parse(json) as Record<string, string>;
   return {
     apiUrl: status.API_URL,
     anonKey: status.ANON_KEY,
     serviceRoleKey: status.SERVICE_ROLE_KEY,
+    dbUrl: status.DB_URL,
   };
 }
 
@@ -128,12 +134,18 @@ export async function setup(): Promise<void> {
   console.log("[harness] Resetting database + applying migrations...");
   run("supabase db reset --no-seed");
 
-  // 3. Apply non-user fixtures (department, location, cron suppression).
-  console.log("[harness] Applying fixtures.sql...");
-  run("supabase db psql --file supabase/test/fixtures.sql", { silent: true });
+  // 3. Read stack URLs/keys (need DB_URL for fixtures application).
+  // (Order swapped vs the obvious flow — readStackStatus must run before
+  //  fixtures so we have the DB_URL; the CLI's `supabase db psql` was
+  //  removed in 2.x, so we shell out to plain `psql` against DB_URL.)
+  const { apiUrl, anonKey, serviceRoleKey, dbUrl } = readStackStatus();
 
-  // 4. Read stack URLs/keys and stash for tests.
-  const { apiUrl, anonKey, serviceRoleKey } = readStackStatus();
+  // 4. Apply non-user fixtures (department, location, cron suppression).
+  // `psql` is pre-installed on ubuntu-latest CI runners and on most
+  // dev machines (postgresql-client). The local stack exposes the DB
+  // on a deterministic port via DB_URL.
+  console.log("[harness] Applying fixtures.sql...");
+  run(`psql "${dbUrl}" -v ON_ERROR_STOP=1 -f supabase/test/fixtures.sql`);
   process.env.HARNESS_SUPABASE_URL = apiUrl;
   process.env.HARNESS_ANON_KEY = anonKey;
   process.env.HARNESS_SERVICE_ROLE_KEY = serviceRoleKey;
