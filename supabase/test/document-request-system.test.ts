@@ -367,11 +367,17 @@ describe("Document Request & Upload System — RLS, state machine, triggers", ()
     const adminAuthed = await signInAs("admin");
     await adminAuthed.storage.from(STORAGE_BUCKET).remove([storagePath]);
 
-    // Verify the object is still there (RLS denied the delete).
-    const { data: list } = await admin.storage
+    // Verify the object is still there. Use service-role download() —
+    // bypasses RLS so it tells us the actual storage state regardless
+    // of any policies that would otherwise hide the object. (The
+    // earlier `list()` approach didn't work because list only enumerates
+    // immediate children of the folder arg, and our path has a
+    // requestId subfolder between the volunteer dir and the file.)
+    const { data: stillThere, error: dlError } = await admin.storage
       .from(STORAGE_BUCKET)
-      .list(`${users.volunteer.id}`, { search: storagePath.split("/").pop() });
-    expect(list && list.length > 0).toBe(true);
+      .download(storagePath);
+    expect(dlError).toBeNull();
+    expect(stillThere).not.toBeNull();
   });
 
   // ───────────── Test 12: Happy path ─────────────
