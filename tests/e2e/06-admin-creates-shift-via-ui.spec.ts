@@ -42,9 +42,11 @@ test("admin creates a shift via the Create Shift dialog (date picker works end-t
   // Pre-clean any stale E2E shifts from prior runs.
   await cleanupStaleE2EShifts(request, session.access_token);
 
-  // Open the dialog.
+  // Open the dialog. The trigger button says "New Shift" but the
+  // dialog title is "Create Shift" — match the dialog by its actual
+  // accessible name (derived from DialogTitle).
   await page.getByRole("button", { name: /new shift/i }).click();
-  const dialog = page.getByRole("dialog", { name: /new shift/i });
+  const dialog = page.getByRole("dialog", { name: /create shift/i });
   await expect(dialog).toBeVisible();
 
   // Fill the title with a unique E2E marker so we can find/clean it.
