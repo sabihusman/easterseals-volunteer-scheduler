@@ -3,6 +3,7 @@
 _Draft — 2026-04-26 (revised post-review) — feature branch `feature/document-request-system-proposal`_
 _Resolves Phase 1 of the broader feature work; Phase 2 (build) gated on review of this doc._
 _Revision incorporates review of comments on PR #151: §3 coordinator scope changed to org-wide (OQ-2 resolved as Option C), admin UPDATE policy tightened via state-machine trigger, storage DELETE narrowed to rejected rows only, §4 transactional pattern revised, §7 phrasing fix, §9 OQ-1 fallback to nullable, test-count and pre-deploy-checklist additions._
+_Second revision (Phase 2 PR 1 investigation): §8 rollback approach switched from DOWN migration to corrective-forward runbook entry per `docs/OPERATIONS_RUNBOOK.md` policy; new §8.7 specifies the runbook structure._
 
 ---
 
@@ -739,8 +740,8 @@ These are reviewer requirements, not after-the-fact docs:
 - [ ] Storage bucket export of `volunteer-documents/` taken before deploy; archived alongside the SQL dump
 - [ ] UP migration run against a non-production branch (Supabase project copy or local `supabase db reset` + apply)
 - [ ] Test data seeded post-UP: at least one `document_requests` row in each of `pending`, `approved`, `rejected`, `expired`, `cancelled` states; one `document_acknowledgments` row; one `volunteer_documents` row in each of `under_review`, `approved`, `expiring_soon`, `expired`
-- [ ] DOWN migration run against the same non-production branch
-- [ ] Schema diff between original baseline and post-DOWN confirms full revert (no orphan policies, no orphan columns, no orphan ENUMs)
+- [ ] Corrective-rollback migration applied against the same non-production branch (per §8.7 rollback runbook)
+- [ ] Schema diff between original baseline and post-rollback confirms full revert (no orphan policies, no orphan columns, no orphan ENUMs)
 - [ ] Backup archives committed to the deploy-runbook repo or equivalent durable location
 - [ ] Cron timezone confirmed (see §6 note)
 
@@ -866,6 +867,154 @@ Also delete in PR 1:
 Because PR 1 sets `volunteer_documents.request_id NOT NULL` and there is currently a working volunteer upload page, **PR 1 and PR 2 must land in the same release window** (or PR 1 includes a feature flag that disables the volunteer upload page until PR 3 lands). Concrete recommendation: PR 1 includes a temporary fallback render in `VolunteerDocuments.tsx` ("Document uploads are being upgraded — your administrator will request specific documents from you. Please contact admin@... if you need to submit a document urgently."). PR 3 replaces that fallback with the full new UI.
 
 This avoids leaving the page broken between deploys.
+
+### 8.7 Rollback approach — corrective-forward runbook (not a DOWN migration)
+
+The team's documented database-rollback policy (`docs/OPERATIONS_RUNBOOK.md` line 82) is **forward-only**:
+
+> "Postgres doesn't have a built-in rollback; you write a corrective forward migration."
+
+Earlier drafts of this proposal called for a DOWN migration in `supabase/migrations/down/`. That contradicts the project policy and there's no precedent directory. **PR 1 instead ships a rollback runbook entry** at `docs/migration-history/<timestamp>_document_request_system_rollback.md`. Its content is the same SQL a DOWN migration would have had, framed as a corrective forward migration the on-call engineer applies if PR 1's UP migration needs reversing.
+
+#### Required structure of the runbook entry
+
+```
+# Document Request System — Corrective Rollback Runbook
+_For migration <timestamp>_document_request_system.sql_
+
+## When to run this
+
+Apply this corrective migration if any of:
+- The UP migration partially failed mid-deploy and the schema is in
+  an inconsistent state
+- A post-deploy regression in PRs 2-5 traces back to PR 1's schema
+  changes (RLS misconfiguration, trigger logic error, etc.) and
+  rolling forward with a fix is impractical
+- A security review identifies a defect in the RLS posture that
+  needs immediate revert before a forward-fix can be drafted
+
+Do NOT apply if document_requests or document_acknowledgments
+contain real production data — see "Pre-conditions check" below.
+
+## Pre-conditions check
+
+Run BEFORE applying the rollback SQL. Each query must return the
+expected value.
+
+SELECT count(*) FROM public.document_requests;
+-- Expected: 0 (no real request data exists yet — PR 1 ships before
+-- PR 2 wires the admin "request" UI, so any rows here are test data
+-- the on-call engineer should export first)
+
+SELECT count(*) FROM public.document_acknowledgments;
+-- Expected: 0
+
+SELECT count(*) FROM public.volunteer_documents WHERE request_id IS NOT NULL;
+-- Expected: 0 (only volunteer_documents rows tied to a request would
+-- exist, and PR 1 enforces NOT NULL on request_id, so any non-null
+-- request_id row implies a request was created)
+
+If any of these is non-zero, STOP. Export the rows to a backup file
+before proceeding. The corrective SQL drops these tables and the
+data they contain is unrecoverable from the SQL alone.
+
+## Corrective SQL
+
+(Wrapped in BEGIN/COMMIT for atomicity. Each section is
+individually reversible to baseline.sql state.)
+
+[Full SQL body — same content as the DOWN script formerly
+proposed; see commit history for the prior draft. The script does:
+1. Restore baseline cron function body (Steps 1+2 only, drop Step 0
+   and Step 3 janitor)
+2. Drop all new RLS policies on volunteer_documents,
+   document_requests, document_acknowledgments, document_types,
+   storage.objects
+3. Restore the dropped baseline policies
+4. Drop the volunteer_document_status view
+5. Drop document_acknowledgments and document_requests tables
+6. Drop the trigger function set_document_request_expiry and
+   enforce_document_request_state_machine
+7. Drop the columns added to volunteer_documents (request_id,
+   file_hash, mime_type, rejection_reason_code, rejection_reason_detail,
+   plus the new CHECK constraints)
+8. Restore the original CHECK constraint on volunteer_documents.status
+   (preceded by UPDATEs to migrate any expiring_soon→approved and
+   under_review→pending_review rows)
+9. Delete the seeded document_types rows
+10. Drop the request_validity_days column from document_types
+11. Drop the new ENUM types
+]
+
+## Post-conditions check
+
+Run AFTER applying the rollback SQL. Each must match baseline state.
+
+\\d+ public.document_types
+-- Expected: matches baseline.sql:3188-3199 column set
+-- (no request_validity_days column)
+
+\\d+ public.volunteer_documents
+-- Expected: matches baseline.sql:3553-3569 column set
+-- (no request_id, file_hash, mime_type, rejection_reason_*)
+-- CHECK constraint allows {pending_review, approved, rejected, expired} only
+
+SELECT count(*) FROM pg_class WHERE relname IN (
+  'document_requests', 'document_acknowledgments',
+  'volunteer_document_status'
+);
+-- Expected: 0
+
+SELECT count(*) FROM pg_type WHERE typname IN (
+  'document_request_state', 'document_rejection_reason'
+);
+-- Expected: 0
+
+SELECT count(*) FROM cron.job WHERE jobname = 'warn-expiring-documents-daily';
+-- Expected: 1 (still scheduled; only the function body changed)
+
+SELECT pg_get_functiondef(oid) FROM pg_proc
+WHERE proname = 'warn_expiring_documents';
+-- Expected: matches baseline.sql:2950-3030 body (Steps 1 and 2 only)
+
+## Manual steps the SQL cannot automate
+
+The rollback SQL alone is not sufficient for a complete revert.
+Execute these manually:
+
+1. **AdminDocumentTypes.tsx restoration.** PR 1 deletes
+   `src/pages/AdminDocumentTypes.tsx`, removes the route from
+   `App.tsx`, and removes the sidebar entry. To restore, run
+   `git revert <PR-1-merge-commit>` on the application side, OR
+   manually re-add the file from baseline.
+
+2. **VolunteerDocuments.tsx restoration.** PR 1 replaces the
+   page body with the temporary fallback. To restore, same revert
+   approach.
+
+3. **Test row + storage object restore.** PR 1 deleted the single
+   2026-04-06 test row from volunteer_documents and its storage
+   object. The pg_dump and storage export taken pre-deploy
+   (per §8.0.1 checklist) are the only way to restore them. The
+   on-call engineer applies them via:
+   - psql restore: re-INSERT the captured row
+   - storage upload: restore the object via storage SDK or
+     `supabase storage cp` from the pre-deploy export
+
+4. **Document_types rows.** The corrective SQL deletes the 6
+   seeded canonical types. If old admin-created types existed
+   pre-PR-1 and were not deleted by the drop-and-reset, they remain
+   intact. If you need to re-add the 6 canonical types after this
+   rollback, source them from baseline.sql or re-apply the seed
+   INSERT block from PR 1's UP migration.
+```
+
+#### Why this approach
+
+- **Matches project convention** (`OPERATIONS_RUNBOOK.md`).
+- **Discoverable** — `docs/migration-history/` is where on-call engineers look for migration metadata.
+- **Tied to commit history** — the runbook entry's filename includes the migration timestamp, making it greppable.
+- **Pre/post-condition checks make the runbook safer than a raw DOWN script** — the on-call engineer sees the exact queries to verify state before and after, not just SQL to execute blindly.
 
 ---
 
