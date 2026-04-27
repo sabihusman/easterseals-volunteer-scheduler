@@ -1,7 +1,8 @@
 # Document Request & Upload System — Phase 1 Proposal
 
-_Draft — 2026-04-26 — feature branch `feature/document-request-system-proposal`_
+_Draft — 2026-04-26 (revised post-review) — feature branch `feature/document-request-system-proposal`_
 _Resolves Phase 1 of the broader feature work; Phase 2 (build) gated on review of this doc._
+_Revision incorporates review of comments on PR #151: §3 coordinator scope changed to org-wide (OQ-2 resolved as Option C), admin UPDATE policy tightened via state-machine trigger, storage DELETE narrowed to rejected rows only, §4 transactional pattern revised, §7 phrasing fix, §9 OQ-1 fallback to nullable, test-count and pre-deploy-checklist additions._
 
 ---
 
@@ -92,6 +93,8 @@ CREATE TYPE public.document_rejection_reason AS ENUM (
 ```
 
 `document_review_state` (the per-document review status — `under_review`, `approved`, `rejected`, `expiring_soon`, `expired`) is implemented by **relaxing the existing `volunteer_documents.status` CHECK constraint** to add `'under_review'` and `'expiring_soon'`. Reuses the existing column rather than introducing a parallel enum.
+
+> **Why text+CHECK instead of a PG ENUM here:** the column already exists as text in production with active queries against it, an existing CHECK constraint, and TypeScript types generated from the schema. Migrating to ENUM would require renaming the column (or doing the `ALTER COLUMN ... TYPE` dance with USING clauses), regenerating types, updating every queryside .eq("status", "...") call, and producing user-visible string changes if any literal differed. The CHECK relaxation costs zero of those. ENUM gives marginally better catalog-level documentation; not worth the migration churn.
 
 ### 2.2 Modify: `document_types`
 
@@ -236,6 +239,8 @@ CREATE INDEX document_acknowledgments_volunteer_idx
 
 `UNIQUE` on `document_id` enforces one acknowledgment per uploaded document. The acknowledgment row is INSERTED in the same transaction as the `volunteer_documents` row — see §4 state-machine side-effects.
 
+> **Transactional ordering inside `submit_document(...)` RPC:** the volunteer_documents INSERT must precede the document_acknowledgments INSERT within the function body, because document_acknowledgments.document_id has a NOT NULL UNIQUE FK to volunteer_documents.id. Both rows then commit together. The submit_document RPC body and any test fixtures must reflect this order.
+
 ### 2.6 New view: `volunteer_document_status` (coordinator-safe)
 
 ```sql
@@ -291,6 +296,70 @@ CREATE POLICY "Admins create document requests"
 CREATE POLICY "Admins update document requests"
   ON public.document_requests FOR UPDATE TO authenticated
   USING (public.is_admin()) WITH CHECK (public.is_admin());
+-- The policy alone is too permissive — admin could resurrect cancelled
+-- requests, edit created_at, etc. State-machine enforcement is layered on
+-- top via a BEFORE UPDATE trigger:
+
+CREATE OR REPLACE FUNCTION public.enforce_document_request_state_machine()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  -- Immutable columns: created_at, requested_by_admin_id, document_type_id,
+  -- volunteer_id. (Admin cannot retroactively edit who issued the request,
+  -- which volunteer it was for, or which type. Cancellations and approvals
+  -- are state changes, not metadata changes.)
+  IF NEW.created_at IS DISTINCT FROM OLD.created_at
+     OR NEW.requested_by_admin_id IS DISTINCT FROM OLD.requested_by_admin_id
+     OR NEW.document_type_id IS DISTINCT FROM OLD.document_type_id
+     OR NEW.volunteer_id IS DISTINCT FROM OLD.volunteer_id
+  THEN
+    RAISE EXCEPTION 'document_requests: cannot edit immutable columns';
+  END IF;
+
+  -- Terminal states are terminal. Once approved, rejected, expired, or
+  -- cancelled, no further state changes permitted.
+  IF OLD.state IN ('approved', 'rejected', 'expired', 'cancelled')
+     AND NEW.state IS DISTINCT FROM OLD.state
+  THEN
+    RAISE EXCEPTION 'document_requests: cannot transition out of terminal state %', OLD.state;
+  END IF;
+
+  -- Legal forward transitions from 'pending':
+  --   pending → submitted (volunteer-side via submit_document RPC)
+  --   pending → cancelled (admin)
+  --   pending → expired   (cron)
+  --   pending → pending   (extension)
+  IF OLD.state = 'pending'
+     AND NEW.state NOT IN ('pending', 'submitted', 'cancelled', 'expired')
+  THEN
+    RAISE EXCEPTION 'document_requests: illegal transition from pending → %', NEW.state;
+  END IF;
+
+  -- Legal forward transitions from 'submitted':
+  --   submitted → approved (admin)
+  --   submitted → rejected (admin)
+  IF OLD.state = 'submitted'
+     AND NEW.state NOT IN ('submitted', 'approved', 'rejected')
+  THEN
+    RAISE EXCEPTION 'document_requests: illegal transition from submitted → %', NEW.state;
+  END IF;
+
+  -- Extension cap is enforced by the column CHECK; this trigger
+  -- additionally guards against decrementing extension_count.
+  IF NEW.extension_count < OLD.extension_count THEN
+    RAISE EXCEPTION 'document_requests: extension_count is monotonic';
+  END IF;
+
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_document_requests_state_machine
+  BEFORE UPDATE ON public.document_requests
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_document_request_state_machine();
+-- This trigger enforces the state machine at the DB level — defense even
+-- if a future code path bypasses the RPC. The RPC remains the canonical
+-- entry point but the trigger catches mistakes.
 
 -- SELECT: volunteer sees own; coordinators see requests for volunteers in
 -- their assigned departments (status only — they can't see the document
@@ -299,27 +368,15 @@ CREATE POLICY "Volunteers read own document requests"
   ON public.document_requests FOR SELECT TO authenticated
   USING (volunteer_id = auth.uid());
 
-CREATE POLICY "Coordinators read department document requests"
+CREATE POLICY "Coordinators read all document requests"
   ON public.document_requests FOR SELECT TO authenticated
-  USING (
-    public.is_coordinator_or_admin()
-    AND (
-      public.is_admin()
-      OR EXISTS (
-        SELECT 1 FROM public.department_coordinators dc
-        JOIN public.shift_bookings sb ON sb.volunteer_id = document_requests.volunteer_id
-        JOIN public.shifts s ON s.id = sb.shift_id
-        WHERE dc.coordinator_id = auth.uid()
-          AND dc.department_id = s.department_id
-      )
-    )
-  );
+  USING (public.is_coordinator_or_admin());
 
 -- DELETE: never. Audit trail.
 -- (No DELETE policy = RLS denies.)
 ```
 
-The coordinator policy is intentionally restrictive: a coordinator only sees a volunteer's requests if the volunteer has a booking in the coordinator's assigned department. Open question OQ-2 in §9 (alternative: any active volunteer in the department, regardless of booking).
+**Coordinator row scope is org-wide.** The booking-scoped variant in earlier drafts of this proposal was rejected on review (OQ-2): coordinators need compliance status BEFORE deciding to invite a volunteer, but bookings and invitations both come AFTER that decision. No `volunteer_departments` association table exists in the schema, so there is no association we can scope to that captures the pre-assignment moment. The view's column redaction (no `storage_path`, no rejection reasons, no `under_review` rows) is the load-bearing PHI defense; row-scope expansion does not weaken it. The existing `InviteVolunteerModal` already reads `profiles.bg_check_status` org-wide for the same reason. See §9 OQ-2 for the full reasoning and the follow-up issue tracking eventual scope tightening if a `volunteer_departments` table is later introduced.
 
 ### 3.3 `volunteer_documents` — tighten existing
 
@@ -355,7 +412,12 @@ CREATE POLICY "Admins read all documents"
 
 CREATE POLICY "Admins delete documents on rejection"
   ON public.volunteer_documents FOR DELETE TO authenticated
-  USING (public.is_admin());
+  USING (public.is_admin() AND status = 'rejected');
+-- Narrowed per review: admin can only DELETE rows that have already been
+-- marked rejected. GDPR-style erasure of approved documents requires a
+-- separate code path that flips status first via a dedicated RPC. This
+-- prevents accidental hot-delete of an approved document from the admin
+-- UI shortcutting the state machine.
 
 -- Existing "Volunteers read own documents" preserved.
 
@@ -371,23 +433,18 @@ ALTER VIEW public.volunteer_document_status SET (security_invoker = true);
 -- SELECT policy that's broader than what they'd have on the raw table,
 -- because the view's projection already redacts file paths.
 
-CREATE POLICY "Coordinators read department document status"
+CREATE POLICY "Coordinators read document status org-wide"
   ON public.volunteer_documents FOR SELECT TO authenticated
   USING (
     public.is_coordinator_or_admin()
     AND status IN ('approved', 'expiring_soon', 'expired')
-    AND EXISTS (
-      SELECT 1 FROM public.department_coordinators dc
-      JOIN public.shift_bookings sb ON sb.volunteer_id = volunteer_documents.volunteer_id
-      JOIN public.shifts s ON s.id = sb.shift_id
-      WHERE dc.coordinator_id = auth.uid()
-        AND dc.department_id = s.department_id
-    )
   );
--- This policy lets the view function for coordinators. The view's projection
--- is what redacts file_path/file_name/etc.; the policy gates which rows
--- they can see. Two-layer defense: row filter via policy, column filter via
--- view projection.
+-- Coordinator row scope is org-wide (see §3.2 rationale). The status filter
+-- limits coordinators to terminal-positive document states only — they
+-- never see under_review or rejected rows, even via the raw table. The
+-- view's projection (§2.6) is what redacts the file_path/file_name/
+-- rejection-reason columns. Two-layer defense: row filter via policy,
+-- column filter via view projection.
 ```
 
 ### 3.5 `document_acknowledgments`
@@ -427,12 +484,21 @@ CREATE POLICY "Admins read all docs from storage"
 DROP POLICY IF EXISTS "Volunteers delete own docs from storage"
   ON storage.objects;
 
--- Admin deletion (used by rejection flow + manual cleanup).
-CREATE POLICY "Admins delete docs from storage"
+-- Admin deletion narrowed to objects whose row in volunteer_documents is
+-- already marked rejected. GDPR-style erasure of approved documents uses
+-- a separate code path that flips status to 'rejected' first via a
+-- dedicated RPC (sets rejection_reason_code='other', detail='gdpr_erasure'
+-- or similar). Prevents accidental hot-delete of approved documents.
+CREATE POLICY "Admins delete rejected docs from storage"
   ON storage.objects FOR DELETE TO authenticated
   USING (
     bucket_id = 'volunteer-documents'
     AND public.is_admin()
+    AND EXISTS (
+      SELECT 1 FROM public.volunteer_documents vd
+      WHERE vd.storage_path = storage.objects.name
+        AND vd.status = 'rejected'
+    )
   );
 
 -- Keep volunteer upload + own-read policies. But tighten upload to
@@ -489,9 +555,35 @@ These states are downstream of an `approved` request; the request itself stays i
 
 Three places need atomicity:
 
-- **Submit:** `volunteer_documents` INSERT + `document_acknowledgments` INSERT + `document_requests.state = 'submitted'` UPDATE — all in one transaction (server-side via an RPC `submit_document(request_id, file_metadata, ack_text_version, ack_text)`). If any step fails, the storage upload is the orphan; cleanup is best-effort via a periodic job (or accepted as noise).
-- **Reject:** `document_requests.state = 'rejected'` + `volunteer_documents.status = 'rejected'` + storage DELETE. The storage delete is fire-and-forget after the DB transaction commits — if it fails, the row is already marked rejected, and an admin alert fires (notification: "Storage cleanup failed for document {id}").
-- **Approve:** request UPDATE + document UPDATE — single transaction.
+- **Submit:** revised pattern per review. The client first uploads the file via the storage SDK (which RLS gates on the active pending request — §3.6). Once the upload succeeds, the client calls `submit_document(request_id, storage_path, file_hash, mime_type, file_size, file_name, ack_text_version, ack_text, ip_address, user_agent)` — a single RPC that, in one transaction, (1) verifies the storage object exists at `storage_path` via service-role storage query, (2) INSERTs `volunteer_documents` (status=`under_review`), (3) INSERTs `document_acknowledgments`, (4) UPDATEs `document_requests.state` to `submitted`. If any step fails, the transaction rolls back and the storage object is orphaned. The orphan window is the latency between upload-success and rpc-failure — small but non-zero. **Janitor:** the `warn_expiring_documents()` cron gets an additional Step 3 that deletes storage objects in the `volunteer-documents` bucket whose `name` does not match any `volunteer_documents.storage_path`. Runs daily; bounded orphan lifetime ≤ 24 hours.
+- **Reject:** `document_requests.state = 'rejected'` + `volunteer_documents.status = 'rejected'` + storage DELETE. The DB transaction (request UPDATE + document UPDATE + setting `rejection_reason_code`/`_detail`) commits first. The storage DELETE is then issued via service-role; success/failure is independent. If DELETE fails, the row is already correctly `rejected`, and an admin alert fires (`notification` "Storage cleanup failed for document {id}"). The row's `rejected` state is what the storage RLS policy now requires for any subsequent admin DELETE — so even a manual retry from the admin UI will succeed once the row state catches up.
+- **Approve:** request UPDATE + document UPDATE — single transaction. No storage operation.
+
+### 4.4 Server-side enforcement of extension constraints
+
+The "extend pending request" affordance is an admin RPC (`extend_document_request(request_id)`), not a direct UPDATE. Both the UI (button visibility) and the RPC (precondition guard) enforce the constraints — the RPC body MUST include:
+
+```sql
+-- Inside extend_document_request(p_request_id uuid):
+UPDATE public.document_requests
+SET extension_count   = extension_count + 1,
+    expires_at        = expires_at + (
+                          (SELECT request_validity_days FROM public.document_types
+                           WHERE id = document_requests.document_type_id) || ' days'
+                        )::interval,
+    last_extended_at  = now(),
+    last_extended_by  = auth.uid()
+WHERE id = p_request_id
+  AND state = 'pending'
+  AND expires_at - now() <= INTERVAL '7 days'   -- must be in the visibility window
+  AND extension_count < 2;                       -- cap
+
+IF NOT FOUND THEN
+  RAISE EXCEPTION 'extension preconditions not met (state=pending, within 7 days of expiry, count<2)';
+END IF;
+```
+
+If the UI is bypassed (admin hits the RPC directly via the SDK or psql), the RPC's WHERE-clause precondition is the actual gate. The state-machine trigger from §3.2 also catches the broader "no resurrection from terminal states" case.
 
 ---
 
@@ -562,6 +654,12 @@ $$;
 
 Single function, single cron, single audit trail. Renaming to `process_document_lifecycle()` is **not** part of this PR — that's the same separate-rename concern noted in issue #121, deferred to a future cleanup if anyone cares.
 
+> **Audit log asymmetry — Step 0 logs, Steps 1/2 don't.** Step 0 transitions a request that someone (the originating admin) needs to know about — an unfulfilled request is a workflow event. Steps 1/2 transition documents along their natural aging timeline; the next state is fully predictable from `expires_at` and the current clock. Comment in the function body explains this so a future reader doesn't add logging to Steps 1/2 thinking it was an oversight.
+
+> **Cron schedule timezone.** The notification text uses `'America/Chicago'` for human-readable date formatting. The pg_cron schedule entry must match — either be defined in `'America/Chicago'` (preferred, DST-aware) or correctly converted to UTC at schedule-creation time. Confirm at PR 1 implementation: `SELECT * FROM cron.job WHERE jobname = 'warn-expiring-documents-daily'` and check the `schedule` and `timezone` (if present) columns. If the schedule is in UTC without a timezone column, the 1 PM Central window drifts ±1 hour across DST; document the chosen approach in the migration.
+
+> **Step 3 (NEW): orphan-storage janitor.** Per the §4 transactional pattern revision, a fourth step is added to delete orphaned storage objects (uploaded by a volunteer but never linked to a `volunteer_documents` row, e.g. because the `submit_document` RPC failed post-upload). Step 3 deletes objects in the `volunteer-documents` bucket whose `name` does not appear in any `volunteer_documents.storage_path`. Runs daily; orphan lifetime ≤ 24 hours.
+
 ### 6.2 Alternative considered: separate jobs
 
 Three separate functions on three separate schedules (e.g. 6 AM, 1 PM, 11 PM) would let each step be reasoned about independently. Rejected because (a) operational surface triples, (b) the existing decision in #121 explicitly favored the merged design, (c) all three steps are cheap reads + small UPDATEs and don't compete for resources.
@@ -591,9 +689,10 @@ contact the administrator before uploading.
 
 I understand that:
 
-  • If a document I upload contains prohibited information, it will
-    be deleted from this system. The administrator may close the
-    request and require me to re-submit a corrected document.
+  • If the administrator determines a document contains prohibited
+    information, it will be deleted from this system and the request
+    will be closed. The administrator may require me to re-submit a
+    corrected document.
   • Repeated violations may result in suspension of my volunteer
     account.
   • This acknowledgment is recorded with the date, my account, my IP
@@ -612,6 +711,38 @@ Open question OQ-3: Should this be reviewed by Easterseals legal counsel before 
 ---
 
 ## 8. Migration plan
+
+### 8.0 PR 1 test count and pre-merge checklist
+
+Test count revised per review. PR 1 includes RLS smoke tests + state-machine trigger tests + the trigger-populated `expires_at` check, all run via `supabase db psql --linked` against a local branch. Realistic count: **8–12 tests**.
+
+| # | Test | Asserts |
+|---|---|---|
+| 1 | Coordinator querying `volunteer_document_status` for an under_review document | Returns zero rows (status filter) |
+| 2 | Coordinator querying `volunteer_document_status` for a rejected document | Returns zero rows (status filter) |
+| 3 | Coordinator `createSignedUrl` on a valid `storage_path` | Storage RLS denies (no SELECT policy for coordinator) |
+| 4 | Volunteer INSERT into `volunteer_documents` without an active pending request | Policy denies |
+| 5 | Volunteer INSERT into `volunteer_documents` with active pending request | Succeeds |
+| 6 | Admin INSERT into `document_requests` | Trigger populates `expires_at = created_at + request_validity_days` |
+| 7 | `extension_count = 3` UPDATE | CHECK constraint violation |
+| 8 | UPDATE `document_requests.state = 'pending'` from `cancelled` | State-machine trigger raises |
+| 9 | UPDATE `document_requests.created_at` (any value) | State-machine trigger raises (immutable) |
+| 10 | Admin DELETE on a `volunteer_documents` row with status='approved' | RLS denies (only rejected rows deletable) |
+| 11 | Storage DELETE on object whose row status='approved' | Storage RLS denies |
+| 12 | Happy path: admin creates request → volunteer uploads → admin approves | All transitions succeed |
+
+### 8.0.1 PR 1 pre-merge deploy checklist
+
+These are reviewer requirements, not after-the-fact docs:
+
+- [ ] `pg_dump` of `document_types` and `volunteer_documents` taken before deploy; archived to `pre-migration-backups/<deploy-date>/` (or wherever the team archives such artifacts)
+- [ ] Storage bucket export of `volunteer-documents/` taken before deploy; archived alongside the SQL dump
+- [ ] UP migration run against a non-production branch (Supabase project copy or local `supabase db reset` + apply)
+- [ ] Test data seeded post-UP: at least one `document_requests` row in each of `pending`, `approved`, `rejected`, `expired`, `cancelled` states; one `document_acknowledgments` row; one `volunteer_documents` row in each of `under_review`, `approved`, `expiring_soon`, `expired`
+- [ ] DOWN migration run against the same non-production branch
+- [ ] Schema diff between original baseline and post-DOWN confirms full revert (no orphan policies, no orphan columns, no orphan ENUMs)
+- [ ] Backup archives committed to the deploy-runbook repo or equivalent durable location
+- [ ] Cron timezone confirmed (see §6 note)
 
 ### 8.1 PR 1 — Schema, RLS, drop-and-reset, AdminDocumentTypes retirement
 
@@ -742,8 +873,8 @@ This avoids leaving the page broken between deploys.
 
 | ID | Question | My recommendation |
 |---|---|---|
-| **OQ-1** | `document_types.created_by` is NOT NULL, but seed-managed types have no real creator. Use a sentinel zero-uuid (proposed), or relax to nullable? | Sentinel zero-uuid. Less migration churn, no semantic loss — `created_by = '00000000...'` reads as "system". |
-| **OQ-2** | Coordinator visibility scope: only volunteers with bookings in their assigned departments (proposed), or any active volunteer in those departments (broader)? | Booking-scoped. Tighter PHI defense by default; admins can broaden later if it surfaces a real ergonomics gap. |
+| **OQ-1** | `document_types.created_by` is NOT NULL, but seed-managed types have no real creator. Use a sentinel zero-uuid, or relax to nullable? | **Resolved (review): nullable.** Investigation found `document_types.created_by → profiles.id`, and `profiles.id → auth.users.id ON DELETE CASCADE`. A sentinel zero-uuid would fail the FK chain. Per the pre-approved fallback in the OQ-1 review response, the migration drops the NOT NULL constraint on `document_types.created_by` and seeded rows have `created_by = NULL`. |
+| **OQ-2** | Coordinator visibility scope: booking-scoped, department-scoped (no formal table exists), or org-wide? | **Resolved (review): org-wide.** Investigation found no `volunteer_departments` association table; `shift_invitations` and `shift_bookings` both come AFTER the assignment decision and so cannot scope a "compliance-before-assignment" read. The view's column redaction (no `storage_path`, no rejection reasons, no `under_review` rows) is the load-bearing PHI defense; row-scope expansion does not weaken it. The existing `InviteVolunteerModal` already reads `profiles.bg_check_status` org-wide for the same reason — formalizing the policy here aligns with current production behavior. **Follow-up issue:** filed as #152 ("Tighten coordinator compliance read scope when a `volunteer_departments` association exists"); reference from PR 1's §3.2 migration comment. |
 | **OQ-3** | Should acknowledgment text v1.0 go through Easterseals legal review before PR 3 ships? | Yes. Get legal review in parallel with PR 2's build so it doesn't block. |
 | **OQ-4** | When a document hits `expired` (cron Step 2), should the system auto-create a fresh `pending` request for the same type? | No. Admin re-issues manually. Auto-issue would create a request the admin doesn't know about and may not still want; the workflow assumes deliberate admin initiation. |
 | **OQ-5** | The 30-day BG-check `request_validity_days` was confirmed; the admin extension cap is 2 (so max effective request lifetime: 30 + 30 + 30 = 90 days). Is 90 days enough headroom for the worst-case BG check tail? | Almost certainly yes. The tail of the tail (90+ days) usually indicates the volunteer dropped off and a new request is the right answer anyway. |
