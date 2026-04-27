@@ -16,7 +16,13 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
   const dateValue = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
 
   return (
-    <Popover>
+    // modal={false}: when this Popover is mounted inside a Radix Dialog,
+    // the Dialog's outside-pointer-down trap was intercepting clicks on
+    // the portaled calendar content before react-day-picker's onSelect
+    // could fire. Result: clicking a day closed the popover without
+    // setting the date. Telling Popover not to render as a modal layer
+    // tells the parent Dialog to leave its pointer events alone.
+    <Popover modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
