@@ -31,7 +31,6 @@ const registerSchema = z.object({
 export default function Auth() {
   const [tab, setTab] = useState<"login" | "register">("login");
   const [loading, setLoading] = useState(false);
-  const [showReset, setShowReset] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -49,7 +48,6 @@ export default function Auth() {
   const [tosAccepted, setTosAccepted] = useState(false);
   const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
-  const [resetEmail, setResetEmail] = useState("");
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -173,27 +171,6 @@ export default function Auth() {
     toast({ title: "Account created", description: "Please check your email to verify your account." });
   };
 
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!turnstileToken) {
-      toast({ title: "Verification required", description: "Please complete the security check.", variant: "destructive" });
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
-      captchaToken: turnstileToken,
-    });
-    setTurnstileToken(null);
-    setLoading(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Check your email", description: "Password reset link sent." });
-      setShowReset(false);
-    }
-  };
-
   const handleOAuth = async (provider: "google") => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -201,47 +178,6 @@ export default function Auth() {
     });
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
   };
-
-  if (showReset) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
-              <Leaf className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <CardTitle>Reset Password</CardTitle>
-            <CardDescription>Enter your email to receive a reset link.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleReset} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="reset-email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input id="reset-email" type="email" className="pl-10" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required />
-                </div>
-              </div>
-              <div className="flex justify-center">
-                <Turnstile
-                  siteKey={TURNSTILE_SITE_KEY}
-                  onSuccess={(token) => setTurnstileToken(token)}
-                  onExpire={() => setTurnstileToken(null)}
-                  options={{ theme: "light", size: "normal" }}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading || !turnstileToken}>
-                {loading ? "Sending..." : !turnstileToken ? "Verifying..." : "Send Reset Link"}
-              </Button>
-              <Button type="button" variant="ghost" className="w-full" onClick={() => setShowReset(false)}>
-                Back to Login
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
