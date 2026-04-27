@@ -110,7 +110,39 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
           {dateValue ? format(dateValue, "MMMM d, yyyy") : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        className="w-auto p-0"
+        align="start"
+        // Sabih's diagnostic from PR #156 captured zero pointerdown /
+        // click / Calendar.onSelect events on production despite
+        // `modal={false}` — only Popover.onOpenChange(false) fired,
+        // meaning something was consuming pointer events on the
+        // popover content before they reached the calendar.
+        //
+        // Two-part hardening:
+        //
+        // 1. onOpenAutoFocus → preventDefault: stops Radix from
+        //    auto-focusing the first focusable element inside the
+        //    popover. The auto-focus interacts with the parent
+        //    Dialog's focus trap when content is portaled, in some
+        //    browsers / extensions producing a focus-stolen event
+        //    that downstream handlers misinterpret as outside-click.
+        //
+        // 2. onPointerDownOutside → conditional preventDefault:
+        //    when the pointerdown target is INSIDE the Radix popper
+        //    wrapper (i.e. on the calendar itself), prevent the
+        //    parent Dialog's outside-pointer-down trap from acting
+        //    on it. We still allow real outside clicks to close the
+        //    popover normally — that's why we don't unconditionally
+        //    preventDefault.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => {
+          const target = e.target as HTMLElement;
+          if (target?.closest?.("[data-radix-popper-content-wrapper]")) {
+            e.preventDefault();
+          }
+        }}
+      >
         <Calendar
           mode="single"
           selected={dateValue}
@@ -128,7 +160,12 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
               console.log(`${DIAG} onSelect fired with falsy date — onChange NOT called`);
             }
           }}
-          initialFocus
+          // initialFocus removed: Sabih's diagnostic showed zero
+          // events reached the calendar in production. The auto-
+          // focus react-day-picker performs when initialFocus is
+          // set can interact badly with the parent Dialog's focus
+          // trap when popover content is portaled. Pairs with the
+          // onOpenAutoFocus preventDefault on PopoverContent above.
         />
       </PopoverContent>
     </Popover>
