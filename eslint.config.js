@@ -30,6 +30,21 @@ export default tseslint.config(
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-require-imports": "off",
       "react-hooks/exhaustive-deps": "warn",
+      // The two rules below are new in eslint-plugin-react-hooks v7. They
+      // implement React Compiler stylistic checks that don't apply to this
+      // codebase yet — re-enable when we migrate. Tracked in issue #142.
+      //
+      // set-state-in-effect: fires on the standard fetch-on-mount pattern
+      // (`useEffect(() => loadData(), [loadData])` where loadData calls
+      // setState) and on `useState(initializerFn)`. The rule's prescribed
+      // remedy is to migrate data fetching out of effects (TanStack Query
+      // / Suspense), which is project-wide architectural work.
+      "react-hooks/set-state-in-effect": "off",
+      // purity: flags Date.now() / Math.random() / new Date() during
+      // render. Our usages are intentional time-sensitive recomputations:
+      // age-cutoff `max` on DOB inputs, countdown timers, skeleton
+      // placeholder widths. Correct under non-Compiler React semantics.
+      "react-hooks/purity": "off",
     },
   },
   // shadcn/ui generated files export constants alongside components by design;

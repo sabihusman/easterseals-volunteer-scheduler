@@ -31,6 +31,20 @@
 DO $migration$
 BEGIN
 
+  -- pg_cron parity guard. Production has pg_cron installed (these are
+  -- exports of jobs already running there) but environments without it —
+  -- e.g. the Supabase CLI's local stack used by the RLS test harness, or
+  -- a fresh dev clone — cause this migration to fail with
+  -- `relation "cron.job" does not exist (SQLSTATE 42P01)` because the
+  -- `cron` schema isn't created. Match the guard pattern from
+  -- 20260415000000_shift_lifecycle_rules.sql:87 so the migration silently
+  -- skips its body when pg_cron isn't installed. No production behavior
+  -- change — pg_cron is installed there and the guard passes.
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    RAISE NOTICE 'pg_cron extension not installed; skipping cron job exports.';
+    RETURN;
+  END IF;
+
   -- =========================================================================
   -- 1. dispute-auto-resolve  (hourly at :17)
   -- Auto-resolves attendance disputes >7 days old in favor of the volunteer.
