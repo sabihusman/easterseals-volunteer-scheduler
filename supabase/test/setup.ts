@@ -164,10 +164,10 @@ export async function setup(): Promise<void> {
   //    API before issuing commands that depend on it.
   const { apiUrl, anonKey, serviceRoleKey, dbUrl } = readStackStatus();
 
-  // 3. Wait for the storage-api container to actually accept
-  //    connections. `supabase start` returns once Postgres is ready
-  //    but other services may still be booting; `supabase db reset`
-  //    talks to the storage API as part of its work.
+  // 3. Storage API container starts after Postgres is up. `supabase
+  //    db reset` fires HTTP requests to the storage API which fail
+  //    silently if it's not accepting connections yet. Poll until it
+  //    responds before proceeding.
   console.log("[harness] Waiting for storage API to come up...");
   await waitForStorageApi(apiUrl);
 
