@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import { downloadCSV } from "@/lib/calendar-utils";
 import { useToast } from "@/hooks/use-toast";
+import { summarizeReports, formatRate, formatRating } from "@/lib/reports";
 
 interface Department {
   id: string;
@@ -62,13 +63,27 @@ interface DepartmentReportRow {
   department_name: string;
   total_shifts: number;
   total_confirmed: number;
+  /**
+   * Post-event finalized attended count. Added in PR
+   * "fix: reporting and time-display correctness bundle" (audit C2):
+   * the rollup line previously only displayed total_confirmed (current
+   * confirmed bookings) but attendance_rate was computed from this
+   * historical attended count. A booking that flipped from confirmed
+   * to cancelled after attendance was marked would produce
+   * "0 confirmed · 0 no-shows · Attend 100%" because the 100% came
+   * from a hidden 1/(1+0). We now display this denominator.
+   */
+  total_attended: number;
   total_no_shows: number;
   total_cancellations: number;
   total_waitlisted: number;
-  avg_fill_rate: number;
-  attendance_rate: number;
+  /** null when there are no slots in the window — render as "—". */
+  avg_fill_rate: number | null;
+  /** null when there's no attendance signal — render as "—". */
+  attendance_rate: number | null;
   rated_shift_count: number;
-  avg_rating: number;
+  /** null when no shifts in the set are rated. */
+  avg_rating: number | null;
 }
 
 const PIE_COLORS = ["#006B3E", "#cf4b04", "#ffa300", "#94a3b8"];
@@ -224,34 +239,22 @@ export default function Reports() {
     return departmentReport.filter((d) => d.department_id === selectedDept);
   }, [departmentReport, selectedDept]);
 
-  // Summary stats
+  // Summary stats. Math is delegated to summarizeReports — the helper
+  // returns null for any rate without a meaningful denominator (no
+  // slots → null fillRate; no attended/no_show signal → null
+  // attendRate). The frontend renders null as "—" via formatRate /
+  // formatRating, fixing the audit-C2 anomaly where 0/0 attendance
+  // displayed as 0% and a hidden-attended case displayed as 100%.
   const summary = useMemo(() => {
-    const totalShifts = filteredShifts.length;
-    let totalConfirmedBookings = 0;          // pre-event bookings (for fill %)
-    let totalAttended = 0, totalNoShows = 0; // post-event (for attendance %)
-    let totalSlots = 0;
-    let ratedCount = 0, ratingSum = 0;
-    for (const s of filteredShifts) {
-      const c = consistency[s.id];
-      const p = popularity[s.id];
-      if (c) {
-        totalAttended += c.attended;
-        totalNoShows += c.no_shows;
-      }
-      if (p) {
-        totalConfirmedBookings += p.confirmed_count;
-      }
-      totalSlots += s.total_slots;
-      const r = ratings[s.id];
-      if (r) {
-        ratedCount += 1;
-        ratingSum += r.avg_rating;
-      }
-    }
-    const fillRate = totalSlots > 0 ? Math.round((totalConfirmedBookings / totalSlots) * 100) : 0;
-    const attendRate = totalAttended + totalNoShows > 0 ? Math.round((totalAttended / (totalAttended + totalNoShows)) * 100) : 0;
-    const avgRating = ratedCount > 0 ? +(ratingSum / ratedCount).toFixed(1) : 0;
-    return { totalShifts, fillRate, attendRate, avgRating, ratedCount };
+    return summarizeReports(
+      filteredShifts.map((s) => ({
+        totalSlots: s.total_slots,
+        confirmedCount: popularity[s.id]?.confirmed_count ?? 0,
+        attended: consistency[s.id]?.attended ?? 0,
+        noShows: consistency[s.id]?.no_shows ?? 0,
+        ratingAvg: ratings[s.id]?.avg_rating,
+      }))
+    );
   }, [filteredShifts, consistency, popularity, ratings]);
 
   const handleExport = () => {
@@ -330,9 +333,9 @@ export default function Reports() {
       {/* Summary stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <SummaryCard icon={<Calendar className="h-5 w-5 text-primary" />} label="Total Shifts" value={summary.totalShifts.toString()} />
-        <SummaryCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="Fill Rate" value={`${summary.fillRate}%`} />
-        <SummaryCard icon={<CheckCircle2 className="h-5 w-5 text-primary" />} label="Attendance" value={`${summary.attendRate}%`} />
-        <SummaryCard icon={<Star className="h-5 w-5 text-primary" />} label="Avg Rating" value={summary.avgRating > 0 ? `${summary.avgRating}★` : "—"} subtitle={`${summary.ratedCount} rated`} />
+        <SummaryCard icon={<TrendingUp className="h-5 w-5 text-primary" />} label="Fill Rate" value={formatRate(summary.fillRate)} />
+        <SummaryCard icon={<CheckCircle2 className="h-5 w-5 text-primary" />} label="Attendance" value={formatRate(summary.attendRate)} />
+        <SummaryCard icon={<Star className="h-5 w-5 text-primary" />} label="Avg Rating" value={summary.avgRating !== null ? `${formatRating(summary.avgRating)}★` : "—"} subtitle={`${summary.ratedCount} rated`} />
       </div>
 
       {loading ? (
@@ -387,14 +390,20 @@ export default function Reports() {
                         <div>
                           <p className="font-medium">{d.department_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {d.total_shifts} shifts · {d.total_confirmed} confirmed · {d.total_no_shows} no-shows
+                            {/* total_attended is the denominator the
+                                attendance_rate percentage was computed
+                                from. Surfacing it here closes the audit-C2
+                                gap where 0 confirmed + 0 no-shows + a
+                                hidden 1-attended produced a 100% display
+                                that read as nonsensical. */}
+                            {d.total_shifts} shifts · {d.total_confirmed} confirmed · {d.total_attended} attended · {d.total_no_shows} no-shows
                           </p>
                         </div>
                         <div className="text-right text-xs">
-                          <p>Fill: <strong>{d.avg_fill_rate}%</strong></p>
-                          <p>Attend: <strong>{d.attendance_rate}%</strong></p>
-                          {d.rated_shift_count > 0 && (
-                            <p>Rating: <strong>{d.avg_rating}★</strong> ({d.rated_shift_count})</p>
+                          <p>Fill: <strong>{formatRate(d.avg_fill_rate)}</strong></p>
+                          <p>Attend: <strong>{formatRate(d.attendance_rate)}</strong></p>
+                          {d.rated_shift_count > 0 && d.avg_rating !== null && (
+                            <p>Rating: <strong>{formatRating(d.avg_rating)}★</strong> ({d.rated_shift_count})</p>
                           )}
                         </div>
                       </div>
