@@ -90,7 +90,7 @@ jobs:
         # path; rolling our own with `curl` against a versioned
         # release artifact had the filename pattern drift from under
         # us (404 on the unversioned `_latest_` download URL).
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v2
         with:
           version: latest
 
