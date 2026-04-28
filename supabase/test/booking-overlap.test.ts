@@ -54,6 +54,20 @@ beforeAll(async () => {
   const admin = adminBypassClient();
   const users = getHarnessUsers();
 
+  // Pre-flight: a separate trigger blocks shift_bookings inserts when
+  // the volunteer's profile is missing an emergency contact. The
+  // harness seeds profiles without one, which would mask the overlap
+  // trigger we're actually testing here. Stamp valid emergency-contact
+  // fields on the volunteer once. (Service-role bypass is the right
+  // tool for setup; the assertion path still runs as the volunteer.)
+  await admin
+    .from("profiles")
+    .update({
+      emergency_contact_name: "Harness Contact",
+      emergency_contact_phone: "555-555-0100",
+    } as never)
+    .eq("id", users.volunteer.id);
+
   // Department B at the SAME location as Dept A. The location dimension
   // is irrelevant to the trigger — predicate doesn't reference it — but
   // we include it explicitly so a future location-scoped check would
