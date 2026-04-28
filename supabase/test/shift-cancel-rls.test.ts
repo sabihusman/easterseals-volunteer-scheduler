@@ -142,6 +142,19 @@ describe("shifts: coordinator soft-delete (UPDATE status='cancelled') — RLS", 
       .single();
     console.log("[probe] shift state after UPDATE attempt (service-role view):", postState);
 
+    // Probe the EXISTS subquery as the coordinator: does the same
+    // join-equivalent return a row when we do it ourselves?
+    const targetDept = (visibleShift as { department_id: string } | null)?.department_id;
+    const { data: existsCheck } = await client
+      .from("department_coordinators")
+      .select("department_id, coordinator_id")
+      .eq("department_id", targetDept ?? "")
+      .eq("coordinator_id", users.coordinator.id);
+    console.log(
+      "[probe] EXISTS subquery equivalent (dept_coords WHERE dept=NEW.dept AND coord=auth.uid()):",
+      existsCheck,
+    );
+
     expect(updateNoSelect.error).toBeNull();
     expect((postState as { status: string })?.status).toBe("cancelled");
   });
