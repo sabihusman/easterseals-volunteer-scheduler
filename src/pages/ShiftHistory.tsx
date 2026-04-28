@@ -242,7 +242,15 @@ export default function ShiftHistory() {
               {hoursByMonth.slice(0, 8).map(([month, h]) => (
                 <div key={month} className="text-center p-2 bg-muted rounded">
                   <div className="text-lg font-bold">{h}</div>
-                  <div className="text-xs text-muted-foreground">{format(new Date(month + "-01"), "MMM yyyy")}</div>
+                  {/* Append T00:00:00 so the date parses as LOCAL midnight,
+                      not UTC midnight. Without it, `new Date("2026-04-01")`
+                      lands at UTC midnight which is March 31 evening in
+                      US time zones — `format()` then renders "Mar 2026"
+                      for an April booking. Audit 2026-04-28 V2. The
+                      aggregation key on line 102 already uses the
+                      "+T00:00:00" form; this display formatter just
+                      drifted out of sync. */}
+                  <div className="text-xs text-muted-foreground">{format(new Date(month + "-01T00:00:00"), "MMM yyyy")}</div>
                 </div>
               ))}
             </div>
