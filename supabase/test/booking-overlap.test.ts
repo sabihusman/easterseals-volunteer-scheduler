@@ -35,7 +35,16 @@ import { TEST_DEPARTMENT_ID, TEST_LOCATION_ID } from "./setup";
  * way it would in production.
  */
 
-const SHIFT_DATE = "2099-01-15"; // far-future to avoid colliding with any other test
+// 7 days out — comfortably inside the 14-day default booking window and
+// late enough to not collide with any "today" trigger logic. Computed
+// at module-load so each CI run picks a relative date; using a fixed
+// far-future date hit the booking-window-exceeded trigger (max 14 days
+// ahead unless the volunteer has extended_booking).
+const SHIFT_DATE = (() => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 7);
+  return d.toISOString().slice(0, 10);
+})();
 const DEPT_A = TEST_DEPARTMENT_ID;
 const DEPT_B_ID = "00000000-0000-0000-0000-000000000299";
 
