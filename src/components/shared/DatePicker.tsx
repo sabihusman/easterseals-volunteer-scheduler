@@ -37,34 +37,27 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", disab
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        // z-[60] overrides the default z-50 from
-        // src/components/ui/popover.tsx via tailwind-merge.
+        // pointer-events-auto + z-[60]: PR #160's z-index bump alone
+        // didn't resolve the bug. Diagnosis: Radix Dialog with
+        // modal={true} (its default in DialogContent) sets
+        // `pointer-events: none` on document.body while open.
+        // PopoverContent is portaled to body via Radix Portal, so it
+        // INHERITS pointer-events: none from body — even though it has
+        // higher z-index, browsers' elementFromPoint() skips over
+        // pointer-events:none elements, so the click goes through to
+        // the dialog content beneath. That's the "subtree intercepts
+        // pointer events" Playwright trace from PR #159.
         //
-        // The DialogOverlay, DialogContent, and PopoverContent are all
-        // at z-50 by default. DialogContent creates a stacking context
-        // via `transform: translate(...)`, so its descendants (form
-        // labels, inputs, etc.) compete with the popover at the same
-        // z-50 layer when both are portaled to body. Real-Chromium
-        // evidence (PR #159 Playwright spec timeout): the dialog
-        // subtree was intercepting clicks on day-cell and next-month
-        // buttons inside the popover. Raising the popover above the
-        // dialog's z-50 layer ensures the calendar wins stacking
-        // regardless of DOM-append order or React re-render timing.
+        // `pointer-events-auto` on PopoverContent breaks the
+        // inheritance — the popover and its descendants reactivate
+        // click handling. z-[60] keeps the popover stacked above the
+        // dialog so it actually catches the clicks once they're
+        // routable to it.
         //
-        // Pairs with `modal={false}` (PR #156) and the
-        // onPointerDownOutside / onOpenAutoFocus handlers below
-        // (PR #158). Each layer addresses a different surface:
-        //   - modal={false}: Dialog stops trapping pointerdown for
-        //     popover-content events at the Radix model layer
-        //   - onPointerDownOutside conditional preventDefault: stops
-        //     the popover from closing when its own descendants are
-        //     clicked
-        //   - onOpenAutoFocus preventDefault: stops focus-stolen
-        //     events from being misread as outside-clicks
-        //   - z-[60] (this fix): puts the popover physically above
-        //     the dialog so descendants of the dialog don't
-        //     geometrically intercept the click
-        className="z-[60] w-auto p-0"
+        // Pairs with `modal={false}` (PR #156), onPointerDownOutside
+        // and onOpenAutoFocus (PR #158), and z-[60] (PR #160). Each
+        // layer addresses a different surface; all four remain.
+        className="z-[60] w-auto p-0 pointer-events-auto"
         align="start"
         // Sabih's diagnostic from PR #156 captured zero pointerdown /
         // click / Calendar.onSelect events on production despite
