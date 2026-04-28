@@ -5,7 +5,7 @@ import { Calendar, Clock, MapPin, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { downloadICS, googleCalendarUrl, timeLabel } from "@/lib/calendar-utils";
 import { getEffectiveTimes, isCheckInOpen } from "@/lib/shift-time";
-import { BookedSlotsDisplay } from "@/components/volunteer/BookedSlotsDisplay";
+import { formatSlotRange, slotHours } from "@/lib/slot-utils";
 import { InviteFriendModal } from "@/components/volunteer/InviteFriendModal";
 import type { VolunteerBooking } from "@/hooks/useVolunteerBookings";
 
@@ -49,6 +49,33 @@ export function UpcomingShiftCard({ bookings, today, userId, onCheckIn, onCancel
   const checkInOpen = isToday && isCheckInOpen(s, new Date(nowMs));
   const anyCheckedIn = bookings.some((b) => !!b.checked_in_at);
 
+  // When the volunteer booked specific time slots (rather than the full
+  // shift), the actual committed hours are the slot range(s), NOT the
+  // parent shift window. Pre-PR #170 the card showed only the parent
+  // shift window (e.g. "10:00 AM – 2:00 PM") even when the booking was
+  // for a 2-hour slot inside it, which made two adjacent bookings on the
+  // same day (10–12 + 12–2 in two different shifts that both span 10–2)
+  // visually read as identical duplicates. We now lift the slot times to
+  // the prominent line and demote the parent shift window to secondary.
+  const slotBookings = bookings.filter(
+    (b) => b.time_slot_id && b.shift_time_slots
+  );
+  const sortedSlots = [...slotBookings]
+    .map((b) => b.shift_time_slots!)
+    .sort((a, b) => a.slot_start.localeCompare(b.slot_start));
+  const hasSlotBookings = sortedSlots.length > 0;
+  const slotRangeText = hasSlotBookings
+    ? sortedSlots
+        .map((sl) => formatSlotRange(sl.slot_start, sl.slot_end))
+        .join(", ")
+    : "";
+  const slotTotalHours = hasSlotBookings
+    ? sortedSlots.reduce(
+        (sum, sl) => sum + slotHours(sl.slot_start, sl.slot_end),
+        0
+      )
+    : 0;
+
   return (
     <Card>
       <CardContent className="pt-4 pb-4">
@@ -57,14 +84,24 @@ export function UpcomingShiftCard({ bookings, today, userId, onCheckIn, onCancel
             <div className="font-medium">{s.title}</div>
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(s.shift_date + "T00:00:00"), "MMM d, yyyy")}</span>
-              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{timeLabel(s)}</span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {hasSlotBookings ? `${slotRangeText} (${slotTotalHours}h)` : timeLabel(s)}
+              </span>
               <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{s.departments?.name}</span>
             </div>
+            {hasSlotBookings && (
+              // Secondary line: the parent shift window. Kept so the
+              // volunteer still has context for what shift their slot is
+              // part of, but visually subordinate to their actual booked
+              // hours so adjacent bookings can no longer collide visually.
+              <div className="text-xs text-muted-foreground/80 pl-4">
+                Part of {timeLabel(s)} shift
+              </div>
+            )}
             <div className="flex gap-2">
               {s.requires_bg_check && <Badge variant="outline" className="text-xs"><Shield className="h-3 w-3 mr-1" />BG Check</Badge>}
             </div>
-            {/* Per-slot bookings */}
-            <BookedSlotsDisplay shiftId={s.id} volunteerId={userId} />
 
             {/* Individual slot actions */}
             {bookings.length > 1 && (
