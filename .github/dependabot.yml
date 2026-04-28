@@ -69,6 +69,14 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-day-picker"
         update-types: ["version-update:semver-major"]
+      # date-fns is pinned by react-day-picker@8's peer dep
+      # (^2.28.0 || ^3.0.0). PR #163: date-fns 3→4 alone fails
+      # `npm install` with ERESOLVE on the day-picker peer (Vercel
+      # build log: "peer date-fns ^2.28.0 || ^3.0.0 from
+      # react-day-picker@8.10.1"). v4 has to wait for the
+      # coordinated react-day-picker 8→9 migration above.
+      - dependency-name: "date-fns"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "react-resizable-panels"
         update-types: ["version-update:semver-major"]
       # Vite + its React plugin must move together; @vitejs/plugin-react-swc
