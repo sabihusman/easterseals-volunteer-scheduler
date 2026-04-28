@@ -64,7 +64,7 @@ export function ShiftsTable({ shifts, onEdit, onDelete, onInvite }: Props) {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => onInvite(s)} title="Invite volunteer">
+                  <Button variant="ghost" size="icon" onClick={() => onInvite(s)} title="Invite volunteer" aria-label="Invite volunteer">
                     <UserPlus className="h-4 w-4" />
                   </Button>
                   <Button
@@ -73,6 +73,7 @@ export function ShiftsTable({ shifts, onEdit, onDelete, onInvite }: Props) {
                     onClick={() => onEdit(s)}
                     disabled={s.status === "completed"}
                     title={s.status === "completed" ? "Completed shifts cannot be edited" : undefined}
+                    aria-label="Edit shift"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -83,6 +84,7 @@ export function ShiftsTable({ shifts, onEdit, onDelete, onInvite }: Props) {
                     onClick={() => onDelete(s.id)}
                     disabled={s.status === "completed"}
                     title={s.status === "completed" ? "Completed shifts cannot be deleted" : undefined}
+                    aria-label="Delete shift"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
