@@ -20,6 +20,15 @@ export interface VolunteerBooking {
   waitlist_offer_expires_at: string | null;
   created_at: string;
   time_slot_id?: string | null;
+  /**
+   * Joined slot times when this booking is for a specific time slot. The
+   * UpcomingShiftCard reads these to show the volunteer's actual booked
+   * range (e.g. 12:00–14:00) instead of the parent shift window. PR #170
+   * added the embedded select; before that the dashboard card showed the
+   * parent shift window which made adjacent same-day bookings (e.g.
+   * 10–12 + 12–2) read as duplicate "10:00–14:00" rows.
+   */
+  shift_time_slots?: { slot_start: string; slot_end: string } | null;
   shifts: {
     id: string;
     title: string;
@@ -87,7 +96,7 @@ export function useVolunteerBookings(user: User | null, today: string): UseVolun
       const [{ data, error: bookingsErr }, { data: pendingData }] = await Promise.all([
         supabase
           .from("shift_bookings")
-          .select("id, booking_status, confirmation_status, checked_in_at, waitlist_offer_expires_at, created_at, shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
+          .select("id, booking_status, confirmation_status, checked_in_at, waitlist_offer_expires_at, created_at, time_slot_id, shift_time_slots(slot_start, slot_end), shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
           .eq("volunteer_id", user.id)
           .in("booking_status", ["confirmed", "waitlisted"])
           .order("created_at", { ascending: false }),
