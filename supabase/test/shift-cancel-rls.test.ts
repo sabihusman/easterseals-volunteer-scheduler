@@ -96,8 +96,33 @@ afterAll(async () => {
 
 describe("shifts: coordinator soft-delete (UPDATE status='cancelled') — RLS", () => {
   it("coordinator can UPDATE a shift in their own department (returns the row)", async () => {
+    const users = getHarnessUsers();
     const client = await signInAs("coordinator");
 
+    // Diagnostic probes before the UPDATE so a future regression
+    // here surfaces with the cause (auth, missing dept link, RLS
+    // policy drift) rather than just "got 42501 — unclear why."
+    const { data: deptLinks, error: deptLinksErr } = await client
+      .from("department_coordinators")
+      .select("department_id, coordinator_id")
+      .eq("coordinator_id", users.coordinator.id);
+    expect(deptLinksErr).toBeNull();
+    const ownDeptLinked = (deptLinks ?? []).some(
+      (r: { department_id: string }) => r.department_id === TEST_DEPARTMENT_ID,
+    );
+    expect(ownDeptLinked).toBe(true);
+
+    const { data: visibleShift, error: selectErr } = await client
+      .from("shifts")
+      .select("id, department_id, status")
+      .eq("id", ownDeptShiftId)
+      .maybeSingle();
+    expect(selectErr).toBeNull();
+    expect(visibleShift).not.toBeNull();
+
+    // Now attempt the UPDATE. The chained `.select()` is the
+    // load-bearing part of the production fix — without it the
+    // helper can't distinguish RLS denial from real success.
     const { data, error } = await client
       .from("shifts")
       .update({ status: "cancelled" } as never)
