@@ -304,8 +304,8 @@ export default function CoordinatorDashboard() {
           <div className="flex justify-end">
             <Tabs value={view} onValueChange={(v) => setView(v as "list" | "calendar")}>
               <TabsList>
-                <TabsTrigger value="list"><List className="h-4 w-4" /></TabsTrigger>
-                <TabsTrigger value="calendar"><CalendarDays className="h-4 w-4" /></TabsTrigger>
+                <TabsTrigger value="list" aria-label="List view"><List className="h-4 w-4" /></TabsTrigger>
+                <TabsTrigger value="calendar" aria-label="Calendar view"><CalendarDays className="h-4 w-4" /></TabsTrigger>
               </TabsList>
             </Tabs>
           </div>

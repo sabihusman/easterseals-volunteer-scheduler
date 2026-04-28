@@ -131,7 +131,6 @@ export function ProfilePanel({
           <Input type="tel" placeholder="(XXX) XXX-XXXX" value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
         </div>
         <Separator />
-        <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
         <div className="space-y-2">
           <Label>Date of Birth</Label>
           <Input
