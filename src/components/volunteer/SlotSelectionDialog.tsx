@@ -166,6 +166,97 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
 
     setSubmitting(true);
 
+    // Adjacency warning: if the volunteer already has a same-day booking
+    // whose slot ends exactly when one of these starts (or vice versa)
+    // AND the existing booking's department lives at a different
+    // physical location, surface a soft confirm. The DB trigger
+    // prevent_overlapping_bookings only blocks true [a,b)-overlap, so
+    // back-to-back slots at different sites pass through silently —
+    // which is what produced the user-reported "double-booked 10–2"
+    // visual in PR #168 review (different shifts, adjacent slots, same
+    // calendar day, distinct locations, zero travel time). Non-blocking
+    // by design: same-LOCATION back-to-back is a legitimate volunteer
+    // pattern (split shift), so we only warn on cross-location adjacency.
+    const selectedSlotRanges = selectedSlots.map((s) => ({
+      slot_start: s.slot_start,
+      slot_end: s.slot_end,
+    }));
+    if (selectedSlotRanges.length > 0) {
+      // Find this shift's location once. department_id is on the prop;
+      // location_id requires the join.
+      const { data: thisShiftLoc } = await supabase
+        .from("shifts")
+        .select("departments(location_id, locations:location_id(name))")
+        .eq("id", shift.id)
+        .maybeSingle();
+      const thisLocationId =
+        // PostgREST embedded select shape — single boundary cast
+        (thisShiftLoc as any)?.departments?.location_id ?? null;
+      const thisLocationName =
+        (thisShiftLoc as any)?.departments?.locations?.name ?? "another location";
+
+      // Pull all same-day bookings for this volunteer with their slot
+      // times AND the location of the parent shift's department.
+      const { data: sameDay } = await supabase
+        .from("shift_bookings")
+        .select(
+          "id, shifts!inner(title, shift_date, department_id, departments(location_id, locations:location_id(name))), shift_time_slots(slot_start, slot_end)"
+        )
+        .eq("volunteer_id", user.id)
+        .in("booking_status", ["confirmed", "waitlisted"])
+        .eq("shifts.shift_date", shift.shift_date);
+
+      type SameDayRow = {
+        id: string;
+        shifts: {
+          title: string;
+          shift_date: string;
+          department_id: string;
+          departments: {
+            location_id: string | null;
+            locations: { name: string } | null;
+          } | null;
+        } | null;
+        shift_time_slots: { slot_start: string; slot_end: string } | null;
+      };
+      const sameDayRows = (sameDay as unknown as SameDayRow[]) || [];
+
+      // Detect adjacency: existing.slot_end == new.slot_start OR
+      // existing.slot_start == new.slot_end. Time strings are HH:MM:SS
+      // so direct equality is safe.
+      let adjacentExisting: SameDayRow | null = null;
+      for (const row of sameDayRows) {
+        if (!row.shift_time_slots) continue;
+        const otherLocId = row.shifts?.departments?.location_id ?? null;
+        // Same-location adjacency is allowed silently.
+        if (otherLocId && thisLocationId && otherLocId === thisLocationId) continue;
+        for (const sel of selectedSlotRanges) {
+          if (
+            row.shift_time_slots.slot_end === sel.slot_start ||
+            row.shift_time_slots.slot_start === sel.slot_end
+          ) {
+            adjacentExisting = row;
+            break;
+          }
+        }
+        if (adjacentExisting) break;
+      }
+
+      if (adjacentExisting) {
+        const otherTitle = adjacentExisting.shifts?.title ?? "another shift";
+        const otherLoc =
+          adjacentExisting.shifts?.departments?.locations?.name ??
+          "a different location";
+        const ok = window.confirm(
+          `Heads up: "${otherTitle}" at ${otherLoc} is back-to-back with this booking, with no travel time between locations (${thisLocationName} ↔ ${otherLoc}). Book anyway?`
+        );
+        if (!ok) {
+          setSubmitting(false);
+          return;
+        }
+      }
+    }
+
     // Fresh per-slot capacity check
     const { data: freshSlots } = await supabase
       .from("shift_time_slots")
