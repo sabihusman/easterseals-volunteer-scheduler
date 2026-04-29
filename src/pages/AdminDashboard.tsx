@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Calendar, Users, Download, Trash2, XCircle, Search } from "lucide-react";
 import { format } from "date-fns";
 import { downloadCSV, timeLabel, parseShiftDate } from "@/lib/calendar-utils";
+import { cancelShiftWithNotifications } from "@/lib/shift-cancel";
 import { isUpcoming, isPast } from "@/lib/shift-lifecycle";
 import { DepartmentCoordinatorManager } from "@/components/admin/DepartmentCoordinatorManager";
 import { VolunteerLeaderboard } from "@/components/admin/VolunteerLeaderboard";
@@ -110,45 +111,38 @@ export default function AdminDashboard() {
 
   const handleCancelShift = async (shift: any) => {
     setCancelLoading(true);
-    // Get booked volunteers
-    const { data: bookings } = await supabase
-      .from("shift_bookings")
-      .select("id, volunteer_id")
-      .eq("shift_id", shift.id)
-      .eq("booking_status", "confirmed");
+    // Delegate to the shared cancel helper. Same audit fix as
+    // ManageShifts: previous code called .update() without .select(),
+    // so an RLS denial would surface as a "Shift cancelled" toast on
+    // a no-op. The helper does .update().select() and distinguishes
+    // zero-rows from a real error.
+    const startMs = new Date(`${shift.shift_date}T${shift.start_time || "00:00:00"}`).getTime();
+    const isUrgent = startMs - Date.now() < 24 * 60 * 60 * 1000 && startMs > Date.now();
+    const result = await cancelShiftWithNotifications({
+      shift,
+      reason: null,
+      isUrgent,
+      shiftDateFormatted: format(parseShiftDate(shift.shift_date), "MMM d, yyyy"),
+      shiftTimeLabel: timeLabel(shift),
+    });
 
-    const bookedCount = bookings?.length || 0;
-
-    // Cancel the shift
-    const { error } = await supabase.from("shifts").update({ status: "cancelled" as any }).eq("id", shift.id);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    if (!result.ok) {
+      toast({
+        title: result.kind === "not_allowed" ? "Cannot cancel shift" : "Error",
+        description: result.message,
+        variant: "destructive",
+      });
       setCancelLoading(false);
       setCancelPrompt(null);
       return;
     }
 
-    // Cancel all bookings
-    if (bookedCount > 0) {
-      await supabase
-        .from("shift_bookings")
-        .update({ booking_status: "cancelled" as any, cancelled_at: new Date().toISOString() })
-        .eq("shift_id", shift.id)
-        .eq("booking_status", "confirmed");
-
-      // Notify each volunteer
-      const notifications = bookings!.map((b: any) => ({
-        user_id: b.volunteer_id,
-        type: "shift_cancelled",
-        title: `Shift Cancelled — ${shift.title}`,
-        message: `Your shift "${shift.title}" on ${format(parseShiftDate(shift.shift_date), "MMM d, yyyy")} at ${timeLabel(shift)} has been cancelled by the administrator.`,
-        link: "/dashboard",
-      }));
-      await supabase.from("notifications").insert(notifications);
-    }
-
     setShifts((prev) => prev.map((s) => s.id === shift.id ? { ...s, status: "cancelled" } : s));
-    toast({ title: `Shift cancelled. ${bookedCount} volunteer${bookedCount !== 1 ? "s have" : " has"} been notified.` });
+    toast({
+      title: result.notifiedCount > 0
+        ? `Shift cancelled. ${result.notifiedCount} volunteer${result.notifiedCount !== 1 ? "s have" : " has"} been notified.`
+        : "Shift cancelled.",
+    });
     setCancelLoading(false);
     setCancelPrompt(null);
   };
@@ -175,9 +169,25 @@ export default function AdminDashboard() {
       await supabase.from("notifications").insert(notifRows);
     }
 
-    const { error } = await supabase.from("shifts").delete().eq("id", shift.id);
+    // .select() is the audit correctness fix: PostgREST returns 200 +
+    // empty array when RLS filters the row out, so without RETURNING the
+    // previous code would emit "Shift permanently deleted" on a no-op.
+    // Admin RLS (`shifts: admin delete`) allows this for is_admin()
+    // users, but a future policy regression or an admin role being
+    // revoked mid-session would silently fail without this gate.
+    const { data: deleted, error } = await supabase
+      .from("shifts")
+      .delete()
+      .eq("id", shift.id)
+      .select("id");
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else if (!deleted || deleted.length === 0) {
+      toast({
+        title: "Cannot delete shift",
+        description: "You don't have permission to delete this shift, or it was already removed.",
+        variant: "destructive",
+      });
     } else {
       setShifts((prev) => prev.filter((s) => s.id !== shift.id));
       const suffix = affected && affected.length > 0
