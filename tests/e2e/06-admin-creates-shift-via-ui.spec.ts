@@ -30,27 +30,18 @@ import {
 
 const SHIFT_DATE_OFFSET_DAYS = 11; // distinct from other E2E specs to avoid trigger collisions
 
-// SKIPPED until this PR's fix lands on production main.
-//
-// PLAYWRIGHT_BASE_URL in ci.yml points at production
-// (https://easterseals-volunteer-scheduler.vercel.app), not at the
-// PR preview. Running this spec against production while the fix
-// is still on a branch means we test the OLD broken date picker
-// (only #156's modal={false}, missing the layered onPointerDownOutside
-// + onOpenAutoFocus + initialFocus-removal from this PR).
-//
-// First run on this PR captured the exact Pattern A trace as evidence:
-//
-//   <label "End Time *"> from <div role="dialog" id="radix-:r7:">
-//   subtree intercepts pointer events
-//
-// Confirming that production CI Chromium also exhibits the click-
-// interception bug — not just Sabih's environment. That's why the
-// fix is needed, and why this test will pass once the fix is live.
-//
-// Re-enable in a follow-up PR after this one merges. Tracked at
-// the PR-158 description's "Sequencing" section.
-test.skip("admin creates a shift via the Create Shift dialog (date picker works end-to-end)", async ({ page, context, request }) => {
+// Re-enabled on 2026-04-29 after the date-picker fix saga landed on
+// production via PRs #156, #158, #160, and #171's display polish.
+// Originally skipped because PLAYWRIGHT_BASE_URL points at production
+// and the spec would have tested the OLD broken picker while the fix
+// was on a branch — Pattern A trace
+// `<label "End Time *"> ... subtree intercepts pointer events` was
+// captured on the first run as evidence that the bug repro'd in CI
+// Chromium too. With all four layered defenses now on prod, the
+// spec exercises the full create-shift flow against the FIXED picker
+// and verifies the load-bearing onSelect → setForm → save path that
+// JSDOM unit tests can't reach (per the file header comment).
+test("admin creates a shift via the Create Shift dialog (date picker works end-to-end)", async ({ page, context, request }) => {
   const session = await loginAndVisit(
     request,
     context,
