@@ -105,8 +105,18 @@ test("admin creates a shift via the Create Shift dialog (date picker works end-t
   // Assertion 1: trigger label updates to the formatted date.
   // (This is the assertion that the JSDOM unit test also makes —
   // but in real Chromium against real Radix portals.)
+  //
+  // Trigger format from src/components/shared/DatePicker.tsx:
+  //   {dateValue ? format(dateValue, "MMMM d, yyyy") : <placeholder />}
+  // → e.g. "May 10, 2026". Matching just `targetMonthYear` ("May 2026")
+  // FAILED because the day-of-month + comma sit between them in the
+  // actual label. We assert the full expected string instead.
+  const expectedTriggerLabel = new Date(shiftDate + "T00:00:00").toLocaleString(
+    "en-US",
+    { month: "long", day: "numeric", year: "numeric" },
+  );
   await expect(
-    dialog.getByRole("button", { name: new RegExp(targetMonthYear, "i") })
+    dialog.getByRole("button", { name: new RegExp(expectedTriggerLabel, "i") }),
   ).toBeVisible();
 
   // ── Fill remaining required fields ─────────────────────────────
