@@ -63,6 +63,23 @@ function detail(label: string, value: string): string {
   return `<p style="margin:0 0 8px;font-size:14px;color:#374151;"><strong>${label}:</strong> ${value}</p>`;
 }
 
+/**
+ * Escape HTML-significant characters in untrusted strings (e.g. the
+ * coordinator's free-form cancellation reason) so a malicious or
+ * accidental "<script>" / "&" doesn't break out of the surrounding
+ * paragraph or render markup the volunteer didn't author. Used by
+ * shift_cancelled where the only user-supplied field is a reason
+ * paragraph; other templates only render server-controlled strings.
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function bigNumber(number: string, label: string): string {
   return `<div style="text-align:center;padding:24px 0;">
 <div style="font-size:48px;font-weight:700;color:${BRAND_COLOR};">${number}</div>
@@ -88,10 +105,18 @@ interface EmailPayload {
   resetLink?: string;
   daysSinceShift?: number;
   cancellationTime?: string;
+  /**
+   * Optional explanation string surfaced in the shift_cancelled
+   * template. When omitted/empty/null the "Reason: …" paragraph is
+   * dropped entirely rather than rendered as "Reason: " — see PR
+   * "fix: coordinator delete-shift silent failure + soft-delete +
+   * notifications" (2026-04-28).
+   */
+  cancellationReason?: string | null;
 }
 
 function buildTemplateEmail(payload: EmailPayload): { subject: string; html: string } | null {
-  const { type, shiftTitle, shiftDate, shiftTime, department, selectedSlots, volunteerName, coordinatorName, bookingId, totalHours, resetLink, daysSinceShift, cancellationTime } = payload;
+  const { type, shiftTitle, shiftDate, shiftTime, department, selectedSlots, volunteerName, coordinatorName, bookingId, totalHours, resetLink, daysSinceShift, cancellationTime, cancellationReason } = payload;
 
   switch (type) {
     case "shift_booked":
@@ -277,21 +302,28 @@ function buildTemplateEmail(payload: EmailPayload): { subject: string; html: str
         ),
       };
 
-    case "shift_cancelled":
+    case "shift_cancelled": {
       // Sent when an admin or coordinator cancels an entire shift that
-      // a volunteer was booked on.
+      // a volunteer was booked on. The cancellationReason field is
+      // optional — if blank/null, drop the paragraph entirely rather
+      // than render "Reason: " with an empty value (PR brief, 2026-04-28).
+      const trimmedReason = (cancellationReason ?? "").trim();
       return {
         subject: `Shift Cancelled — ${shiftTitle || "your shift"}`,
         html: brandedHtml(
           h2("Your Shift Was Cancelled") +
           p(`Unfortunately, <strong>${shiftTitle || "your shift"}</strong> has been cancelled by the coordinator.`) +
           (shiftDate ? detail("Date", shiftDate) : "") +
-          (shiftTime ? detail("Time", shiftTime) : "") +
+          (shiftTime ? detail("Original time", shiftTime) : "") +
           (department ? detail("Department", department) : "") +
+          (trimmedReason
+            ? `<p style="margin:16px 0;padding:12px 16px;background:#f3f4f6;border-left:3px solid #16a34a;border-radius:4px;"><strong>Reason from coordinator:</strong><br>${escapeHtml(trimmedReason)}</p>`
+            : "") +
           p("We're sorry for the inconvenience. Please browse other available shifts to book a new one.") +
           button("Browse Shifts", `${APP_URL}/shifts`)
         ),
       };
+    }
 
     case "booking_cancelled":
       // Confirmation email to a volunteer who just cancelled their

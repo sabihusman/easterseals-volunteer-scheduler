@@ -156,6 +156,7 @@ describe("ShiftFormDialog", () => {
       title: "Stale Edit",
       department_id: "dept-2", // not in coordinator's assigned list below
       shift_date: "2026-06-15",
+      time_type: "custom",
       start_time: "09:00:00",
       end_time: "12:00:00",
       total_slots: 1,
@@ -233,6 +234,7 @@ describe("ShiftFormDialog", () => {
       title: "Edit Me",
       department_id: "dept-1",
       shift_date: "2026-06-15",
+      time_type: "custom",
       start_time: "09:00:00",
       end_time: "12:00:00",
       total_slots: 4,
@@ -284,6 +286,7 @@ describe("ShiftFormDialog", () => {
       title: "Pre-Populated Title",
       department_id: "dept-2",
       shift_date: "2026-07-04",
+      time_type: "custom",
       start_time: "13:00:00",
       end_time: "16:00:00",
       total_slots: 7,
