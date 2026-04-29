@@ -30,6 +30,13 @@
 -- The function preserves its existing IS-A-COORDINATOR-OR-ADMIN guard
 -- and SECURITY DEFINER setup; only the return signature and the rate
 -- expressions change.
+--
+-- DROP first because CREATE OR REPLACE refuses to change the
+-- RETURNS TABLE shape on an existing function (SQLSTATE 42P13). The
+-- old signature didn't include `total_attended`; adding it counts as
+-- changing the row type even though the argument list is unchanged.
+
+DROP FUNCTION IF EXISTS "public"."get_department_report"("uuid"[], "date", "date");
 
 CREATE OR REPLACE FUNCTION "public"."get_department_report"(
   "dept_uuids" "uuid"[],
