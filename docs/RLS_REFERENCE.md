@@ -219,7 +219,7 @@ These helpers stand in for the inline `EXISTS (SELECT … FROM department_coordi
 
 | Policy | Op | Allows | Why |
 |---|---|---|---|
-| `Users read own participations` | SELECT | Self or admin | A user only sees rows where they are a participant — which is why `ConversationList.tsx` resolves "other participant" via message senders, not via `conversation_participants`. |
+| `Users read own participations` | SELECT | Self or admin | A user only sees rows where they are a participant. To resolve the OTHER participant in conversations, the frontend uses three paths: (1) `messages.sender_id`, (2) `conversations.created_by`, (3) the SECURITY DEFINER RPC `get_other_participants(uuid[])` for self-created conversations pending the first reply. The RPC re-checks caller-membership inside the body so the SECURITY DEFINER context can't be used to enumerate arbitrary conversations' participants. Audit 2026-04-28 — without path 3 a freshly-created conversation displayed "Unknown" until the recipient replied. |
 | `Users update own participation` | UPDATE | Self | Update `last_read_at`, `cleared_at`, `is_archived`. |
 | `Creator or staff adds participants` | INSERT | Creator or staff | Adding participants to a conversation. |
 

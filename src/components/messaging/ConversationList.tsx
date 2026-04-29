@@ -10,6 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { resolveOtherParticipants, type MessageRow, type ConversationCreator, type ParticipantRow } from "@/lib/conversation-participants";
 
 interface ConversationItem {
   id: string;
@@ -64,29 +65,65 @@ export function ConversationList({ selectedId, onSelect, refreshTrigger }: Conve
 
     if (!convos) { setConversations([]); setLoading(false); return; }
 
-    // Get other participants by looking up message sender IDs
-    // (conversation_participants RLS only returns own rows)
+    // Get other participants. Three resolution paths, in order:
+    //
+    //   1. messages.sender_id where it isn't the caller — covers any
+    //      conversation that has at least one inbound message.
+    //   2. conversations.created_by — covers conversations someone
+    //      else started, where they haven't yet sent a message body
+    //      (rare but possible).
+    //   3. get_other_participants RPC — covers conversations the
+    //      caller themselves created, where the recipient hasn't
+    //      replied yet. The per-row RLS on conversation_participants
+    //      ("Users read own participations") would otherwise hide the
+    //      recipient's row from the caller; the SECURITY DEFINER RPC
+    //      returns it after re-checking caller-membership inside the
+    //      function body. Audit 2026-04-28 — without path 3 the UI
+    //      shows "Unknown" for self-created conversations until the
+    //      recipient's first reply.
     const { data: allMsgs } = await (supabase as any)
       .from("messages")
       .select("conversation_id, sender_id")
       .in("conversation_id", convoIds);
 
-    // Build a map of conversation_id -> other user IDs
-    const convoToOthers: Record<string, string> = {};
-    const otherUserIds: string[] = [];
-    (allMsgs || []).forEach((m: any) => {
-      if (m.sender_id !== user.id && !convoToOthers[m.conversation_id]) {
-        convoToOthers[m.conversation_id] = m.sender_id;
-        if (!otherUserIds.includes(m.sender_id)) otherUserIds.push(m.sender_id);
-      }
+    // Run paths 1 + 2 first (no extra round trip), find the still-
+    // unresolved set, then backfill via the RPC (path 3).
+    const messages: MessageRow[] = (allMsgs as MessageRow[] | null) || [];
+    const conversationsForResolve: ConversationCreator[] =
+      ((convos as Array<{ id: string; created_by: string }> | null) || []).map(
+        (c) => ({ id: c.id, created_by: c.created_by }),
+      );
+
+    const partial = resolveOtherParticipants({
+      callerId: user.id,
+      conversations: conversationsForResolve,
+      messages,
+      rpcParticipants: [],
     });
 
-    // Also check conversations created_by (for convos where the other person sent no messages yet)
-    (convos || []).forEach((c: any) => {
-      if (c.created_by !== user.id && !otherUserIds.includes(c.created_by)) {
-        otherUserIds.push(c.created_by);
-        if (!convoToOthers[c.id]) convoToOthers[c.id] = c.created_by;
-      }
+    // Path 3 — backfill any conversation we still haven't resolved.
+    // The RPC is a SECURITY DEFINER round-trip; only call it for the
+    // conversations paths 1+2 missed.
+    const unresolvedConvoIds = convoIds.filter(
+      (id: string) => !partial.convoToOthers[id],
+    );
+    let rpcParticipants: ParticipantRow[] = [];
+    if (unresolvedConvoIds.length > 0) {
+      // Boundary cast — RPC return shape (an array of rows) doesn't
+      // round-trip cleanly through the generated types. Single cast at
+      // the call site, same pattern documented in eslint.config.js.
+      const { data: extras } = await (supabase as any).rpc(
+        "get_other_participants",
+        { p_conversation_ids: unresolvedConvoIds },
+      );
+      rpcParticipants = (extras as ParticipantRow[] | null) || [];
+    }
+
+    const { convoToOthers, otherUserIds } = resolveOtherParticipants({
+      callerId: user.id,
+      conversations: conversationsForResolve,
+      messages,
+      rpcParticipants,
     });
 
     type ProfileLite = { id: string; full_name: string | null; email: string | null };
