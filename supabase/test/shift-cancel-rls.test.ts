@@ -155,6 +155,19 @@ describe("shifts: coordinator soft-delete (UPDATE status='cancelled') — RLS", 
       existsCheck,
     );
 
+    // Try a non-status UPDATE (coordinator_note) as a control: if the
+    // policy works for *any* UPDATE, this should succeed. If this also
+    // fails 42501, the policy's WITH CHECK is broken regardless of
+    // which column we touch.
+    const noteUpdate = await client
+      .from("shifts")
+      .update({ coordinator_note: "test diagnostic note" } as never)
+      .eq("id", ownDeptShiftId);
+    console.log("[probe] UPDATE coordinator_note (non-status field):", {
+      error: noteUpdate.error,
+      status: noteUpdate.status,
+    });
+
     expect(updateNoSelect.error).toBeNull();
     expect((postState as { status: string })?.status).toBe("cancelled");
   });
