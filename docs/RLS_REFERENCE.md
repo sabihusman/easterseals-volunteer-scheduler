@@ -323,6 +323,40 @@ These helpers stand in for the inline `EXISTS (SELECT … FROM department_coordi
 
 ---
 
+## Storage buckets
+
+Storage RLS lives on `storage.objects`, scoped per-bucket via `bucket_id = '<name>'`. There are three buckets in production:
+
+### `shift-attachments` (private)
+
+| Policy | Op | Allows | Why |
+|---|---|---|---|
+| `Users can upload their own attachments` | INSERT | Volunteer (own folder) | `(storage.foldername(name))[1] = auth.uid()::text` — volunteers attach files to their own bookings. |
+| `Users can read their own attachments` | SELECT | Volunteer (own folder) | Same scope as INSERT. |
+| `Coordinators and admins can read all attachments` | SELECT | Coordinator/Admin | Staff need to review attachments on shifts they manage. |
+
+### `volunteer-documents` (private)
+
+| Policy | Op | Allows | Why |
+|---|---|---|---|
+| `Volunteers upload to storage against active requests` | INSERT | Volunteer (own folder) + active `document_requests` row | Compliance documents are upload-only against an admin-initiated request — see `20260426234610_document_request_system.sql`. |
+| `Volunteers read own docs from storage` | SELECT | Volunteer (own folder) | Self-service read of own compliance files. |
+| `Admins read all docs from storage` | SELECT | Admin | Coordinator equivalent intentionally absent — coordinators see compliance status via `volunteer_document_status` view, never raw files. |
+| `Admins delete rejected docs from storage` | DELETE | Admin (rejected docs only) | GDPR erasure goes through `gdpr_erase_document` RPC which flips `status='rejected'` first. |
+
+### `avatars` (private)
+
+Profile photos. Separate from `volunteer-documents` because the document policies require an active document-request row that avatars don't have, and because avatars need authenticated-by-anyone read scope (multi-user views) while compliance documents are admin-only.
+
+| Policy | Op | Allows | Why |
+|---|---|---|---|
+| `Users INSERT own avatar` | INSERT | Authenticated user (own folder) | `(storage.foldername(name))[1]::uuid = auth.uid()` — single canonical path per user (`{uuid}/avatar.{ext}`). |
+| `Users UPDATE own avatar` | UPDATE | Authenticated user (own folder) | Same scoping; both USING and WITH CHECK to prevent moving someone else's blob onto your path. |
+| `Users DELETE own avatar` | DELETE | Authenticated user (own folder) | Self-service avatar removal. |
+| `Authenticated SELECT any avatar` | SELECT | Any authenticated user | Avatars surface across the app (settings, dashboards, future messaging UI). The bucket is NOT public — anonymous role has no SELECT policy and reads fail closed. The frontend uses `createSignedUrl` (1h TTL) to render via `<img>` tags. |
+
+---
+
 ## Notes for maintainers
 
 - **`(supabase as any).rpc()` and RLS:** RPCs run as the caller (unless declared `SECURITY DEFINER`). The few `SECURITY DEFINER` RPCs in this codebase (waitlist accept, MFA flows) have explicit guards inside their function body — check the migration before changing them.
