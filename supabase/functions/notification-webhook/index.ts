@@ -139,6 +139,15 @@ Deno.serve(async (req) => {
     if (record.data?.shift_date) emailPayload.shiftDate = record.data.shift_date;
     if (record.data?.booking_id) emailPayload.bookingId = record.data.booking_id;
     if (record.data?.volunteer_name) emailPayload.volunteerName = record.data.volunteer_name;
+    // shift_cancelled-specific fields. shift_time + department + the
+    // optional cancellation_reason are populated by the cancel helper
+    // (src/lib/shift-cancel.ts) so the email template can render the
+    // original time window and an optional explanation paragraph.
+    if (record.data?.shift_time) emailPayload.shiftTime = record.data.shift_time;
+    if (record.data?.department) emailPayload.department = record.data.department;
+    if (record.data?.cancellation_reason !== undefined) {
+      emailPayload.cancellationReason = record.data.cancellation_reason;
+    }
 
     // ── Send Email ──
     // Urgent waitlist offers send email regardless of notif_email pref.
@@ -152,11 +161,29 @@ Deno.serve(async (req) => {
     }
 
     // ── Send SMS ──
-    // SMS delivery is gated by a global feature flag. The Twilio sending
-    // number is currently not verified for our destination numbers, so
-    // messages are accepted by Twilio's API but silently dropped at the
-    // carrier. Set SMS_ENABLED=true in Supabase secrets to re-enable
-    // once the Twilio number/recipients are verified.
+    // The truth-table for the SMS gate is canonically defined in
+    // src/lib/notification-sms-gate.ts (and exercised by
+    // src/lib/__tests__/notification-sms-gate.test.ts). This webhook
+    // duplicates the predicate inline because it lives in the Deno
+    // module system and can't import from src/. If you change the
+    // logic here, update the contract test file in lockstep.
+    //
+    // SMS delivery is gated by THREE independent flags. ALL must be on:
+    //
+    //   1. Global kill switch: SMS_ENABLED=true in Supabase secrets.
+    //      Twilio's sending number is currently not verified for our
+    //      destination numbers, so messages are accepted by Twilio's
+    //      API but silently dropped at the carrier. Set SMS_ENABLED
+    //      true once the Twilio number/recipients are verified.
+    //   2. Per-user pref: profile.notif_sms (overridden by urgent
+    //      waitlist offers).
+    //   3. Per-notification eligibility: data.sms_eligible. Long-lead
+    //      cancellations (>24h) and most non-urgent notification types
+    //      don't justify a text message; the producer of the
+    //      notification sets sms_eligible=true only when it does.
+    //      Default behaviour for types that pre-date this flag is to
+    //      stay SMS-eligible (no key set) so we don't accidentally
+    //      stop sending shift_reminder texts.
     const smsEnabled = Deno.env.get("SMS_ENABLED") === "true";
 
     // Only send to the volunteer's own phone number. Previously this
@@ -166,8 +193,20 @@ Deno.serve(async (req) => {
     // alerts without any opt-in from them. Fail closed: if the
     // volunteer hasn't set a phone number, SMS is simply not sent.
     const smsTarget = profile.phone || null;
-    // Urgent waitlist offers send SMS regardless of notif_sms pref.
-    if (smsEnabled && (profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
+    // Per-notification eligibility. `null`/missing means "respect the
+    // per-type default" (true for everything that existed before this
+    // flag). Explicit `false` suppresses SMS while still letting email
+    // + in-app go through — used by shift_cancelled when the shift is
+    // 24h+ out, since a text feels disproportionate that far ahead.
+    const smsEligible =
+      record.data?.sms_eligible === undefined ||
+      record.data?.sms_eligible === null
+        ? true
+        : record.data.sms_eligible !== false;
+    // Urgent waitlist offers send SMS regardless of notif_sms pref AND
+    // regardless of the per-notification eligibility flag — they are
+    // the most time-sensitive notification we send.
+    if (smsEnabled && smsEligible && (profile.notif_sms || isUrgentWaitlistOffer) && smsTarget) {
       // Build a concise SMS message from notification
       let smsBody = `[Easterseals Iowa] ${record.title || "Notification"}: ${(record.message || "").slice(0, 140)}`;
 
