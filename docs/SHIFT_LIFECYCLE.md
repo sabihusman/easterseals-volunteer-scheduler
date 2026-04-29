@@ -84,6 +84,46 @@ Defense-in-depth: users should never see a button that will only 500 on click.
 - **Recurring shifts:** Each generated child row has its own `shift_date` / `end_time` and transitions independently. The `recurrence_parent` column is unaffected.
 - **Sub-slot behavior (per-slot bookings):** If the per-slot booking feature lands (see `feature/per-slot-booking` plan), each booking row's `time_slot_id` should be considered when defining "past" at slot granularity. Today, the shift-level `shift_end_at` drives both triggers and frontend filters.
 
+## Coordinator-initiated cancellation flow
+
+The "Cancel shift" action on `/coordinator/manage` is a soft-delete:
+
+1. `src/lib/shift-cancel.ts::cancelShiftWithNotifications` reads the
+   confirmed bookings, then issues `UPDATE shifts SET status='cancelled'
+   ... RETURNING id`. The `RETURNING id` is load-bearing: PostgREST
+   returns 200 + empty array when RLS filters the row out, so without
+   it the helper cannot distinguish a real success from an RLS denial.
+   (Audit 2026-04-28: the previous code lacked `.select()` and surfaced
+   "Shift deleted" toasts on no-ops.)
+2. All confirmed `shift_bookings` for the shift are then UPDATEd to
+   `cancelled` with `cancelled_at = now()`. Failure here is non-fatal —
+   the shift is already cancelled and filtered from the volunteer view.
+3. One `notifications` row per affected volunteer is INSERTed with
+   `type='shift_cancelled'` and `data` carrying the original time
+   window, optional cancellation reason, and `sms_eligible` flag. The
+   DB notification webhook fans these out to email + SMS based on
+   per-user prefs and the global `SMS_ENABLED` env flag.
+
+The hard `DELETE` policies (`shifts: admin delete`,
+`shifts: coord delete cancelled`) remain in place. The coordinator UI
+never reaches them — the only coordinator-facing destructive action is
+the soft-cancel above. Hard deletion of cancelled shifts is operator-
+only via SQL or the admin Danger Zone (out of scope for the soft-delete
+flow).
+
+### SMS gating contract
+
+`data.sms_eligible` on a `shift_cancelled` notification is `true` iff
+the cancellation happened within 24h of the shift's start time. The
+notification webhook reads this flag to decide whether to invoke
+Twilio for THIS notification — long-lead cancellations (>24h) send
+email + in-app only. The full predicate is at
+`src/lib/notification-sms-gate.ts` and pinned by tests in
+`src/lib/__tests__/notification-sms-gate.test.ts`.
+
+The webhook duplicates the predicate inline because it lives in the
+Deno module system and can't import from `src/`. Keep the two in sync.
+
 ## Known gaps
 
 1. **Invariant #6 (hours finalized)** is a convention, not a DB rule. `hours_worked` and related numeric fields on `shift_bookings` remain UPDATE-able on completed shifts, which is by design (coordinators need to correct hours after the fact). Adding a hard lock would require an explicit "coordinator-sign-off" state.

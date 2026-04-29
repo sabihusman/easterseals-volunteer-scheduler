@@ -12,6 +12,16 @@ export interface Shift {
   title: string;
   department_id: string;
   shift_date: string;
+  /**
+   * The "morning" / "afternoon" / "all_day" / "custom" enum used by
+   * `timeLabel()` to format the leading "Custom · 9 AM – 5 PM" /
+   * "Morning · 8 AM – 12 PM" prefix on shift cards. The select pulls
+   * this column via `*, departments(name)` — adding to the type so
+   * downstream callers (cancel-shift helper, shift-form dialog) can
+   * pass the row through without a cast. CI's `tsc --build` catches
+   * the missing-field error that `tsc --noEmit` lets slide.
+   */
+  time_type: string;
   start_time: string;
   end_time: string;
   total_slots: number;

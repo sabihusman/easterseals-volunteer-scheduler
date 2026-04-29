@@ -219,7 +219,7 @@ These helpers stand in for the inline `EXISTS (SELECT … FROM department_coordi
 
 | Policy | Op | Allows | Why |
 |---|---|---|---|
-| `Users read own participations` | SELECT | Self or admin | A user only sees rows where they are a participant — which is why `ConversationList.tsx` resolves "other participant" via message senders, not via `conversation_participants`. |
+| `Users read own participations` | SELECT | Self or admin | A user only sees rows where they are a participant. To resolve the OTHER participant in conversations, the frontend uses three paths: (1) `messages.sender_id`, (2) `conversations.created_by`, (3) the SECURITY DEFINER RPC `get_other_participants(uuid[])` for self-created conversations pending the first reply. The RPC re-checks caller-membership inside the body so the SECURITY DEFINER context can't be used to enumerate arbitrary conversations' participants. Audit 2026-04-28 — without path 3 a freshly-created conversation displayed "Unknown" until the recipient replied. |
 | `Users update own participation` | UPDATE | Self | Update `last_read_at`, `cleared_at`, `is_archived`. |
 | `Creator or staff adds participants` | INSERT | Creator or staff | Adding participants to a conversation. |
 
@@ -320,6 +320,40 @@ These helpers stand in for the inline `EXISTS (SELECT … FROM department_coordi
 |---|---|---|---|
 | `event_regs: volunteer own` | ALL | Volunteer (theirs) | Self-service registration. |
 | `event_regs: admin read` | SELECT | Admin | Admin attendance views. |
+
+---
+
+## Storage buckets
+
+Storage RLS lives on `storage.objects`, scoped per-bucket via `bucket_id = '<name>'`. There are three buckets in production:
+
+### `shift-attachments` (private)
+
+| Policy | Op | Allows | Why |
+|---|---|---|---|
+| `Users can upload their own attachments` | INSERT | Volunteer (own folder) | `(storage.foldername(name))[1] = auth.uid()::text` — volunteers attach files to their own bookings. |
+| `Users can read their own attachments` | SELECT | Volunteer (own folder) | Same scope as INSERT. |
+| `Coordinators and admins can read all attachments` | SELECT | Coordinator/Admin | Staff need to review attachments on shifts they manage. |
+
+### `volunteer-documents` (private)
+
+| Policy | Op | Allows | Why |
+|---|---|---|---|
+| `Volunteers upload to storage against active requests` | INSERT | Volunteer (own folder) + active `document_requests` row | Compliance documents are upload-only against an admin-initiated request — see `20260426234610_document_request_system.sql`. |
+| `Volunteers read own docs from storage` | SELECT | Volunteer (own folder) | Self-service read of own compliance files. |
+| `Admins read all docs from storage` | SELECT | Admin | Coordinator equivalent intentionally absent — coordinators see compliance status via `volunteer_document_status` view, never raw files. |
+| `Admins delete rejected docs from storage` | DELETE | Admin (rejected docs only) | GDPR erasure goes through `gdpr_erase_document` RPC which flips `status='rejected'` first. |
+
+### `avatars` (private)
+
+Profile photos. Separate from `volunteer-documents` because the document policies require an active document-request row that avatars don't have, and because avatars need authenticated-by-anyone read scope (multi-user views) while compliance documents are admin-only.
+
+| Policy | Op | Allows | Why |
+|---|---|---|---|
+| `Users INSERT own avatar` | INSERT | Authenticated user (own folder) | `(storage.foldername(name))[1]::uuid = auth.uid()` — single canonical path per user (`{uuid}/avatar.{ext}`). |
+| `Users UPDATE own avatar` | UPDATE | Authenticated user (own folder) | Same scoping; both USING and WITH CHECK to prevent moving someone else's blob onto your path. |
+| `Users DELETE own avatar` | DELETE | Authenticated user (own folder) | Self-service avatar removal. |
+| `Authenticated SELECT any avatar` | SELECT | Any authenticated user | Avatars surface across the app (settings, dashboards, future messaging UI). The bucket is NOT public — anonymous role has no SELECT policy and reads fail closed. The frontend uses `createSignedUrl` (1h TTL) to render via `<img>` tags. |
 
 ---
 

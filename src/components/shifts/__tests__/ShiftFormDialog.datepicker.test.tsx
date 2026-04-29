@@ -90,22 +90,26 @@ describe("ShiftFormDialog — DatePicker (real Radix calendar)", () => {
     const grid = await screen.findByRole("grid");
     expect(grid).toBeInTheDocument();
 
-    // 3. Pick today as the target. Calendar opens to the current
-    //    month, so today's day-of-month is always present in the
-    //    visible grid; using today keeps the day-text we click and
-    //    the formatted assertion against the trigger consistent
-    //    without needing to navigate months.
-    const target = new Date();
-    const targetDayOfMonth = target.getDate().toString();
+    // 3. Pick day 15 of the current month as the target. Day 15 is
+    //    always unambiguous in a calendar grid — it never collides
+    //    with previous-month preview cells (those go 28-31) or
+    //    next-month preview cells (those go 1-7). Using "today's
+    //    day-of-month" was flaky: when today is 28-31, the previous
+    //    month's preview cell has the same text and appears FIRST
+    //    in DOM order, so `.filter(text=N)[0]` clicked the wrong
+    //    cell. (Failure observed Apr 29, 2026: clicking March 29
+    //    preview instead of April 29.)
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth(), 15);
+    const targetDayOfMonth = "15";
     const targetIsoDate = format(target, "yyyy-MM-dd");
     void addDays; // imported but not used in current selector strategy
 
     // react-day-picker 8.x renders day cells as <button name="day">
     // with the day-of-month as text content (no aria-label, so
     // role-based queries don't find them). Filter by `name="day"`
-    // attribute + textContent match. Outside-month preview cells
-    // are also rendered as `name="day"` buttons, but the in-month
-    // cell appears first in DOM order.
+    // attribute + textContent match. With day=15 there's only one
+    // matching cell so .first() is unambiguous.
     const dayButtons = Array.from(
       grid.querySelectorAll<HTMLButtonElement>('button[name="day"]')
     ).filter((btn) => btn.textContent?.trim() === targetDayOfMonth);
