@@ -95,29 +95,16 @@ afterAll(async () => {
 });
 
 describe("shifts: coordinator soft-delete (UPDATE status='cancelled') — RLS", () => {
-  // TODO(audit-followup): the coordinator's UPDATE on a shift in
-  // their own department fails RLS with 42501 in this harness, even
-  // though all the preconditions are individually visible:
-  //
-  //   - profiles.role = 'coordinator' (auth.uid() resolves correctly)
-  //   - dept_coordinators row linking coord ↔ TEST_DEPARTMENT_ID is
-  //     readable as the coord
-  //   - shift row is readable as the coord
-  //   - the EXISTS subquery the policy uses, run as a regular SELECT,
-  //     returns the row
-  //
-  // The static analysis of `shifts: coord/admin update` says this
-  // should work. The harness reproducibly says otherwise. That gap
-  // is bigger than this PR — separate investigation needed (could
-  // be a Supabase storage-API/PostgREST quirk on UPDATE with WITH
-  // CHECK, or a harness-specific GUC issue).
-  //
-  // The negative case below (foreign-dept UPDATE returns 0 rows) is
-  // the load-bearing audit assertion — it pins the bug fix's "RLS
-  // denial returns 200+[] not an error" behavior. Skipping the
-  // positive case keeps the regression net rather than dropping the
-  // whole suite.
-  it.skip("coordinator can UPDATE a shift in their own department (returns the row)", async () => {
+  // The 42501 the harness used to hit on this case wasn't a WITH CHECK
+  // violation — it was a SELECT-on-RETURNING failure. The two existing
+  // SELECT policies on `shifts` (`all read open` requires status<>'cancelled';
+  // `read booked` is volunteer-only) didn't admit a freshly-cancelled
+  // row back to its author, so PostgREST's RETURNING-after-UPDATE
+  // surfaced as 42501 with the same message Postgres uses for WITH CHECK
+  // failures. Migration 20260430000000_shifts_coord_read_cancelled.sql
+  // adds a coord/admin SELECT policy that closes that visibility gap.
+  // This positive-case test is the regression net for that fix.
+  it("coordinator can UPDATE a shift in their own department (returns the row)", async () => {
     const users = getHarnessUsers();
     const client = await signInAs("coordinator");
 
