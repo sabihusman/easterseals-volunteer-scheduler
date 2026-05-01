@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AvatarUploadField } from "./AvatarUploadField";
 import type { SettingsProfile } from "./types";
@@ -18,26 +17,32 @@ interface Props {
   setPhone: (v: string) => void;
   emergencyPhone: string;
   setEmergencyPhone: (v: string) => void;
+  /**
+   * Read-only here. is_minor is now answered once at signup (over-18
+   * radio in Auth.tsx) and is not editable from this panel — see
+   * migration 20260501000000_remove_dob_capture.sql. Settings.tsx still
+   * passes it down because ParentalConsentPanel visibility depends on
+   * it, but this panel no longer mutates it.
+   */
   isMinor: boolean;
-  setIsMinor: (v: boolean) => void;
   /** Called after a successful save so the parent can refreshProfile(). */
   onSaved: () => Promise<void> | void;
 }
 
-const MIN_AGE_MS = 13 * 365.25 * 86400000;
-
 /**
  * Profile information panel: avatar, display name, email (with auth update),
- * phone, emergency contact, and date-of-birth (with minor detection).
+ * phone, and emergency contact.
  *
- * Phone/emergencyPhone/isMinor are lifted to the page so other panels can
- * react to in-progress edits before the user clicks Save.
+ * Phone/emergencyPhone are lifted to the page so NotificationsPanel can
+ * react to in-progress edits before the user clicks Save. isMinor is read
+ * but no longer mutated here — Half A removed DOB capture in favor of a
+ * one-time signup question.
  */
 export function ProfilePanel({
   userId, profile,
   phone, setPhone,
   emergencyPhone, setEmergencyPhone,
-  isMinor, setIsMinor,
+  isMinor: _isMinor,
   onSaved,
 }: Props) {
   const { toast } = useToast();
@@ -45,7 +50,6 @@ export function ProfilePanel({
   const [fullName, setFullName] = useState(profile.full_name || "");
   const [email, setEmail] = useState(profile.email || "");
   const [emergencyName, setEmergencyName] = useState(profile.emergency_contact_name || "");
-  const [dateOfBirth, setDateOfBirth] = useState(profile.date_of_birth || "");
   const [loading, setLoading] = useState(false);
 
   // Re-sync local form state when a fresh profile arrives.
@@ -53,7 +57,6 @@ export function ProfilePanel({
     setFullName(profile.full_name || "");
     setEmail(profile.email || "");
     setEmergencyName(profile.emergency_contact_name || "");
-    setDateOfBirth(profile.date_of_birth || "");
   }, [profile]);
 
   const handleSave = async () => {
@@ -66,7 +69,6 @@ export function ProfilePanel({
         phone: phone || null,
         emergency_contact_name: emergencyName.trim() || null,
         emergency_contact_phone: emergencyPhone.trim() || null,
-        date_of_birth: dateOfBirth || null,
         updated_at: new Date().toISOString(),
       } as never)
       .eq("id", userId);
@@ -129,28 +131,6 @@ export function ProfilePanel({
         <div className="space-y-2">
           <Label>Emergency Contact Phone</Label>
           <Input type="tel" placeholder="(XXX) XXX-XXXX" value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
-        </div>
-        <Separator />
-        <div className="space-y-2">
-          <Label>Date of Birth</Label>
-          <Input
-            type="date"
-            value={dateOfBirth}
-            onChange={(e) => {
-              setDateOfBirth(e.target.value);
-              if (e.target.value) {
-                const age = (Date.now() - new Date(e.target.value).getTime()) / (365.25 * 86400000);
-                setIsMinor(age < 18);
-              } else {
-                setIsMinor(false);
-              }
-            }}
-            max={new Date(Date.now() - MIN_AGE_MS).toISOString().slice(0, 10)}
-          />
-          <p className="text-xs text-muted-foreground">Must be at least 13 years old to volunteer.</p>
-          {isMinor && (
-            <Badge className="bg-yellow-500 text-white">Under 18 — Parental consent required</Badge>
-          )}
         </div>
         <Button onClick={handleSave} disabled={loading}>
           {loading ? "Saving..." : "Save Changes"}

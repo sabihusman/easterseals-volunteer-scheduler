@@ -17,22 +17,21 @@ import type { SettingsProfile } from "@/components/settings/types";
  *   - phone, emergencyPhone — read by NotificationsPanel to gate the SMS
  *     toggle. Lifting preserves the pre-refactor UX where typing a phone in
  *     the profile form enables SMS *before* save.
- *   - isMinor — drives ParentalConsentPanel visibility. Lifted so the consent
- *     panel appears immediately when DOB is changed to a minor's birthday.
+ *   - isMinor — drives ParentalConsentPanel visibility. Read directly from
+ *     the profile (not lifted to local state) since Half A removed the
+ *     in-page editing path that needed pre-save reactivity.
  */
 export default function Settings() {
   const { user, profile, session, role, signOut, refreshProfile } = useAuth();
 
   const [phone, setPhone] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
-  const [isMinor, setIsMinor] = useState(false);
 
   // Sync the lifted cross-panel state when a fresh profile arrives.
   useEffect(() => {
     if (!profile) return;
     setPhone(profile.phone || "");
     setEmergencyPhone(profile.emergency_contact_phone || "");
-    setIsMinor((profile as unknown as SettingsProfile).is_minor === true);
   }, [profile]);
 
   const lastSignIn = session?.user?.last_sign_in_at
@@ -42,9 +41,10 @@ export default function Settings() {
   if (!user || !profile) return null;
 
   // The supabase generated Profile type doesn't model is_minor / username /
-  // notif_* / date_of_birth — bridge with SettingsProfile here. Same boundary-
-  // cast pattern as AlertProfile in src/components/volunteer/DashboardAlerts.tsx.
+  // notif_* — bridge with SettingsProfile here. Same boundary-cast pattern
+  // as AlertProfile in src/components/volunteer/DashboardAlerts.tsx.
   const settingsProfile = profile as unknown as SettingsProfile;
+  const isMinor = settingsProfile.is_minor === true;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -58,7 +58,6 @@ export default function Settings() {
         emergencyPhone={emergencyPhone}
         setEmergencyPhone={setEmergencyPhone}
         isMinor={isMinor}
-        setIsMinor={setIsMinor}
         onSaved={refreshProfile}
       />
 

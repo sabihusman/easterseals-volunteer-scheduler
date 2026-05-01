@@ -5,12 +5,17 @@ export type AdminUserRole = "volunteer" | "coordinator" | "admin";
 
 /**
  * Profile shape as needed by the AdminUsers page. Extends the supabase
- * generated `Profile` row with three columns the type generator hasn't
- * picked up yet (`is_minor`, `date_of_birth`, `messaging_blocked`). Same
- * pattern as `SettingsProfile` / `AlertProfile` in earlier refactors.
+ * generated `Profile` row with two columns the type generator hasn't
+ * picked up yet (`is_minor`, `messaging_blocked`). Same pattern as
+ * `SettingsProfile` / `AlertProfile` in earlier refactors.
  *
  * Page bridges with `profile as unknown as AdminProfile` once at the panel
  * boundary; sub-components accept the typed prop.
+ *
+ * Note: date_of_birth was removed from this type in Half A. The DB
+ * column still exists (per the product call to leave the door open
+ * for a future regulatory reversal) but app code should not read or
+ * write it. See migration 20260501000000_remove_dob_capture.sql.
  */
 export interface AdminProfile {
   id: string;
@@ -24,7 +29,6 @@ export interface AdminProfile {
   emergency_contact_phone: string | null;
   // Columns the type generator hasn't surfaced yet:
   is_minor: boolean;
-  date_of_birth: string | null;
   messaging_blocked: boolean;
 }
 

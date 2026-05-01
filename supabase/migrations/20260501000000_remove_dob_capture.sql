@@ -1,0 +1,92 @@
+-- =============================================
+-- Half A — Remove date-of-birth capture; flip is_minor source
+-- to user-answered (the new "Are you 18 or older?" toggle in
+-- onboarding).
+--
+-- Background
+-- ----------
+-- date_of_birth was captured on signup and in profile settings,
+-- and a BEFORE INSERT/UPDATE trigger (trg_sync_is_minor, defined
+-- in 20260410_minor_consent.sql) derived profiles.is_minor from
+-- it via age(date_of_birth) < interval '18 years'.
+--
+-- Product decision: stop capturing DOB. It's PHI we don't need.
+-- The only thing the system used DOB for was minor classification,
+-- and a single yes/no question at signup is sufficient for that.
+--
+-- This migration is the data side of that change. The matching
+-- frontend changes (Auth signup radio replacing the DOB input,
+-- ProfilePanel DOB section removed, UserCard "Minor (DOB: …)"
+-- line removed) ship together with this migration in the same
+-- PR so we never have a runtime where the UI captures a column
+-- the DB no longer derives from.
+--
+-- What this changes
+-- -----------------
+-- 1. NULL out every existing date_of_birth value. The column is
+--    kept (not dropped) per the product call to leave the door
+--    open for a future regulatory reversal — but the data is
+--    cleared so we don't sit on stale PHI. The column was
+--    already nullable (added via `ADD COLUMN ... date` in
+--    20260410_minor_consent.sql with no NOT NULL), so no
+--    DROP NOT NULL is required.
+--
+-- 2. Drop trg_sync_is_minor and the sync_is_minor() function.
+--    From this point on, profiles.is_minor is set directly by
+--    the frontend at signup based on the over-18 radio answer
+--    (Yes → is_minor=false, No → is_minor=true). The column
+--    keeps its NOT NULL DEFAULT false, so legacy users who never
+--    answered the new question stay at false — which matches the
+--    reality that 99% of existing volunteers are adults; the
+--    handful of minors who already booked have parental_consents
+--    rows already, and admins can flip is_minor manually if
+--    needed before they re-book.
+--
+-- 3. The parental-consents flow (parental_consents table,
+--    ParentalConsentPanel UI, enforce_booking_window minor
+--    consent gate) is INTENTIONALLY left intact in this PR.
+--    Half B will rewrite it as part of the minor approval queue
+--    feature. Right now: minors with active consent still book;
+--    minors without consent still get rejected by the existing
+--    trigger. That continuity is what makes Half A safe to ship
+--    on its own.
+--
+-- One-off post-deploy seed
+-- ------------------------
+-- For sabih.usman@live.com (the first admin), `is_minor=false`
+-- needs to be set after this migration runs. That update is NOT
+-- in this file — versioned migrations should not contain
+-- environment-specific user data. Run it manually post-deploy:
+--
+--   UPDATE public.profiles
+--   SET is_minor = false, updated_at = now()
+--   WHERE email = 'sabih.usman@live.com';
+--
+-- It's a no-op against the existing column default, but it
+-- documents intent and makes the change auditable.
+-- =============================================
+
+-- ── 1. NULL out existing date_of_birth values ──
+UPDATE public.profiles
+SET date_of_birth = NULL
+WHERE date_of_birth IS NOT NULL;
+
+-- ── 2. Drop the DOB-derived is_minor sync trigger and function ──
+-- Trigger first (depends on the function), then the function.
+DROP TRIGGER IF EXISTS trg_sync_is_minor ON public.profiles;
+DROP FUNCTION IF EXISTS public.sync_is_minor();
+
+-- ── 3. Sanity-check post-state ──
+-- After this migration:
+--   - profiles.date_of_birth column still exists, all values NULL
+--   - profiles.is_minor still exists, NOT NULL DEFAULT false,
+--     no longer auto-derived
+--   - parental_consents table and its policies are untouched
+--   - enforce_booking_window still gates minor bookings on consent
+--
+-- Half B (separate PR) will:
+--   - Add the pending_admin_approval booking_status enum value
+--   - Replace the consent gate in enforce_booking_window with a
+--     pending-approval routing trigger
+--   - Add the /admin/pending-minor-approvals page
+--   - Remove the parental_consents UI and (eventually) the table

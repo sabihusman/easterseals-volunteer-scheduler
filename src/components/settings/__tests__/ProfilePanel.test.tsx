@@ -54,7 +54,6 @@ const baseProfile: SettingsProfile = {
   notif_email: true,
   notif_in_app: true,
   notif_sms: false,
-  date_of_birth: "1990-05-15",
   is_minor: false,
   username: "voltester",
   notif_shift_reminders: true,
@@ -80,14 +79,12 @@ interface RenderOptions {
   isMinor?: boolean;
   setPhone?: (v: string) => void;
   setEmergencyPhone?: (v: string) => void;
-  setIsMinor?: (v: boolean) => void;
   onSaved?: () => Promise<void> | void;
 }
 
 function renderPanel(opts: RenderOptions = {}) {
   const setPhone = opts.setPhone ?? vi.fn();
   const setEmergencyPhone = opts.setEmergencyPhone ?? vi.fn();
-  const setIsMinor = opts.setIsMinor ?? vi.fn();
   const onSaved = opts.onSaved ?? vi.fn();
   render(
     <ProfilePanel
@@ -98,11 +95,10 @@ function renderPanel(opts: RenderOptions = {}) {
       emergencyPhone={opts.emergencyPhone ?? baseProfile.emergency_contact_phone ?? ""}
       setEmergencyPhone={setEmergencyPhone}
       isMinor={opts.isMinor ?? false}
-      setIsMinor={setIsMinor}
       onSaved={onSaved}
     />
   );
-  return { setPhone, setEmergencyPhone, setIsMinor, onSaved };
+  return { setPhone, setEmergencyPhone, onSaved };
 }
 
 function clickSave() {
@@ -176,23 +172,18 @@ describe("ProfilePanel", () => {
     });
   });
 
-  it("calls setIsMinor(true) when DOB changes to a minor age", () => {
-    const setIsMinor = vi.fn();
-    renderPanel({ setIsMinor });
-    // 2015 → ~10 years old → minor.
-    fireEvent.change(screen.getByDisplayValue(baseProfile.date_of_birth!), {
-      target: { value: "2015-06-15" },
-    });
-    expect(setIsMinor).toHaveBeenCalledWith(true);
-  });
+  // DOB-driven setIsMinor tests removed in Half A — the panel no
+  // longer captures DOB or mutates is_minor. is_minor is now answered
+  // once at signup via the over-18 radio in Auth.tsx and is read-only
+  // in this panel. See migration 20260501000000_remove_dob_capture.sql.
 
-  it("calls setIsMinor(false) when DOB changes to an adult age", () => {
-    const setIsMinor = vi.fn();
-    renderPanel({ setIsMinor });
-    // 1990 → adult.
-    fireEvent.change(screen.getByDisplayValue(baseProfile.date_of_birth!), {
-      target: { value: "1980-06-15" },
+  it("does NOT send date_of_birth in the profile update payload", async () => {
+    renderPanel();
+    clickSave();
+    await waitFor(() => {
+      expect(profileUpdateMock).toHaveBeenCalledTimes(1);
     });
-    expect(setIsMinor).toHaveBeenCalledWith(false);
+    const payload = profileUpdateMock.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("date_of_birth");
   });
 });

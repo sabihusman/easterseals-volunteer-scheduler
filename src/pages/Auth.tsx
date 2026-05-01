@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Leaf, Mail, Lock, User, Phone } from "lucide-react";
 import { z } from "zod";
@@ -44,7 +45,12 @@ export default function Auth() {
   const [regPassword, setRegPassword] = useState("");
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
-  const [regDob, setRegDob] = useState("");
+  // Required at signup: "Are you 18 or older?". null until answered so
+  // we can block submit on missing answer (radio buttons have no
+  // unselected default in our RadioGroup wrapper). Yes → is_minor=false,
+  // No → is_minor=true. Replaces the previous date_of_birth capture;
+  // see migration 20260501000000_remove_dob_capture.sql.
+  const [regIsAdult, setRegIsAdult] = useState<boolean | null>(null);
   const [tosAccepted, setTosAccepted] = useState(false);
   const [regErrors, setRegErrors] = useState<Record<string, string>>({});
 
@@ -116,6 +122,10 @@ export default function Auth() {
       toast({ title: "Terms required", description: "Please accept the Terms of Service and Code of Conduct.", variant: "destructive" });
       return;
     }
+    if (regIsAdult === null) {
+      toast({ title: "Age confirmation required", description: "Please answer whether you are 18 or older.", variant: "destructive" });
+      return;
+    }
     if (!turnstileToken) {
       toast({ title: "Verification required", description: "Please complete the security check.", variant: "destructive" });
       return;
@@ -143,7 +153,10 @@ export default function Auth() {
         username: result.data.username,
         full_name: result.data.name,
         phone: regPhone || null,
-        date_of_birth: regDob || null,
+        // is_minor is the inverse of the over-18 toggle — see migration
+        // 20260501000000_remove_dob_capture.sql for the data-side
+        // counterpart that drops trg_sync_is_minor.
+        is_minor: regIsAdult === false,
         role: "volunteer",
         is_active: false,
         onboarding_complete: false,
@@ -293,15 +306,22 @@ export default function Auth() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-dob">Date of Birth (optional)</Label>
-                    <Input
-                      id="reg-dob"
-                      type="date"
-                      value={regDob}
-                      onChange={(e) => setRegDob(e.target.value)}
-                      max={new Date(Date.now() - 13 * 365.25 * 86400000).toISOString().slice(0, 10)}
-                    />
-                    <p className="text-xs text-muted-foreground">Must be at least 13 years old. Volunteers under 18 will need parental consent.</p>
+                    <Label>Are you 18 or older?</Label>
+                    <RadioGroup
+                      value={regIsAdult === null ? "" : regIsAdult ? "yes" : "no"}
+                      onValueChange={(v) => setRegIsAdult(v === "yes")}
+                      className="flex gap-6 pt-1"
+                    >
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="yes" id="reg-adult-yes" />
+                        <Label htmlFor="reg-adult-yes" className="font-normal cursor-pointer">Yes</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="reg-adult-no" />
+                        <Label htmlFor="reg-adult-no" className="font-normal cursor-pointer">No</Label>
+                      </div>
+                    </RadioGroup>
+                    <p className="text-xs text-muted-foreground">Volunteers under 18 will need parental consent before booking shifts.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-password">Password</Label>
@@ -331,7 +351,7 @@ export default function Auth() {
                       options={{ theme: "light", size: "normal" }}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading || !tosAccepted || !turnstileToken}>
+                  <Button type="submit" className="w-full" disabled={loading || !tosAccepted || !turnstileToken || regIsAdult === null}>
                     {loading ? "Creating account..." : !turnstileToken ? "Verifying..." : "Create Account"}
                   </Button>
                 </form>

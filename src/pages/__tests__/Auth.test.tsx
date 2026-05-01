@@ -128,7 +128,7 @@ function submitFormContaining(input: HTMLElement) {
   fireEvent.submit(form);
 }
 
-function fillRegister(opts: Partial<{ name: string; email: string; username: string; password: string; tos: boolean }>) {
+function fillRegister(opts: Partial<{ name: string; email: string; username: string; password: string; tos: boolean; isAdult: boolean }>) {
   if (opts.name !== undefined) {
     fireEvent.change(getInput("reg-name"), { target: { value: opts.name } });
   }
@@ -143,6 +143,13 @@ function fillRegister(opts: Partial<{ name: string; email: string; username: str
   }
   if (opts.tos) {
     fireEvent.click(screen.getByRole("checkbox", { name: /terms of service/i }));
+  }
+  // Over-18 radio (Half A): required to enable submit. Default to true
+  // for the happy-path tests; tests that exercise the missing-answer
+  // path opt out by passing isAdult: undefined.
+  if (opts.isAdult !== undefined) {
+    const id = opts.isAdult ? "reg-adult-yes" : "reg-adult-no";
+    fireEvent.click(document.getElementById(id)!);
   }
 }
 
@@ -319,7 +326,7 @@ describe("Auth — Register tab", () => {
 
     render(<Auth />);
     await switchToRegister();
-    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", tos: true });
+    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", tos: true, isAdult: true });
     clickTurnstile();
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
@@ -335,6 +342,7 @@ describe("Auth — Register tab", () => {
         username: "jane_doe",
         full_name: "Jane Doe",
         role: "volunteer",
+        is_minor: false,
       }));
       expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({
         title: "Account created",
@@ -351,7 +359,7 @@ describe("Auth — Register tab", () => {
     rpcMock.mockResolvedValue({ data: false, error: null });
     render(<Auth />);
     await switchToRegister();
-    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", tos: true });
+    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", tos: true, isAdult: true });
     clickTurnstile();
     fireEvent.click(screen.getByRole("button", { name: /create account/i }));
 
@@ -365,7 +373,7 @@ describe("Auth — Register tab", () => {
     rpcMock.mockResolvedValue({ data: true, error: null });
     render(<Auth />);
     await switchToRegister();
-    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234" });
+    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", isAdult: true });
     // Skip TOS click intentionally.
     clickTurnstile();
     submitFormContaining(getInput("reg-name"));
@@ -376,5 +384,54 @@ describe("Auth — Register tab", () => {
       }));
     });
     expect(signUpMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit (button disabled) when the over-18 question is unanswered", async () => {
+    render(<Auth />);
+    await switchToRegister();
+    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", tos: true });
+    // Intentionally skip the isAdult radio.
+    clickTurnstile();
+    const submitBtn = screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement;
+    expect(submitBtn).toBeDisabled();
+    fireEvent.click(submitBtn);
+    expect(signUpMock).not.toHaveBeenCalled();
+  });
+
+  it("persists is_minor=true on profile insert when user answers 'No' to over-18", async () => {
+    rpcMock.mockResolvedValue({ data: true, error: null });
+    signUpMock.mockResolvedValue({ data: { user: { id: "new-minor-id" } }, error: null });
+    insertMock.mockResolvedValue({ error: null });
+
+    render(<Auth />);
+    await switchToRegister();
+    fillRegister({ name: "Tim Minor", email: "tim@example.com", username: "tim_m", password: "abcd1234", tos: true, isAdult: false });
+    clickTurnstile();
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({
+        id: "new-minor-id",
+        is_minor: true,
+      }));
+    });
+  });
+
+  it("does NOT send date_of_birth in the profile insert payload (Half A — DOB removed)", async () => {
+    rpcMock.mockResolvedValue({ data: true, error: null });
+    signUpMock.mockResolvedValue({ data: { user: { id: "new-user-id" } }, error: null });
+    insertMock.mockResolvedValue({ error: null });
+
+    render(<Auth />);
+    await switchToRegister();
+    fillRegister({ name: "Jane Doe", email: "jane@example.com", username: "jane_doe", password: "abcd1234", tos: true, isAdult: true });
+    clickTurnstile();
+    fireEvent.click(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(insertMock).toHaveBeenCalled();
+    });
+    const payload = insertMock.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("date_of_birth");
   });
 });
