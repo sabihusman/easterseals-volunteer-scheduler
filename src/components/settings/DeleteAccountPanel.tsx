@@ -21,32 +21,66 @@ interface Props {
 }
 
 /**
- * Account deletion danger zone. Renders nothing for admins (caller decides
- * whether to mount this panel; behavior preservation: the original page
- * gated the entire card on `role !== "admin"`).
+ * Account self-deletion ("Danger Zone") panel.
  *
- * Confirms with email-typing match. On success, calls `delete-user` edge
- * function, signs out, and navigates to /auth with `accountDeleted: true`
- * passed through router state.
+ * Calls the dedicated `delete-self` edge function rather than the
+ * admin-only `delete-user` endpoint. Issue #178 root-caused the
+ * cross-flow bug: `delete-user` requires the caller to be an admin,
+ * which broke self-delete for everyone. The two endpoints are now
+ * separate and have opposite role gates by design.
+ *
+ * Confirmation pattern: user must type their account email to enable
+ * the destructive button. Comparison is case-insensitive but
+ * trim-sensitive (per the brief — leading/trailing whitespace counts
+ * as a typo, since real users don't paste-with-whitespace by design).
+ *
+ * On 200: clear local auth, navigate to /account-deleted (public).
+ * On 403 (admin self-delete blocked): surface the admin-specific
+ * message verbatim from the server. On any other error: generic
+ * "contact support" toast.
  */
-export function DeleteAccountPanel({ userId, email, role, onSignOut }: Props) {
+export function DeleteAccountPanel({ userId: _userId, email, role, onSignOut }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Case-insensitive: real users sometimes have inconsistent casing
+  // in their typing. Trim-sensitive: a paste with stray whitespace
+  // would suggest the user typed in the wrong place; better to make
+  // them retype than silently accept.
+  const emailMatches = deleteConfirmEmail.toLowerCase() === email.toLowerCase();
+
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
-    const { error } = await supabase.functions.invoke("delete-user", {
-      body: { userId },
-    });
+    const { data, error } = await supabase.functions.invoke<{ error?: string; success?: boolean }>(
+      "delete-self",
+      { body: {} },
+    );
     setDeleteLoading(false);
-    if (error) {
-      toast({ title: "Error", description: "Could not delete account. Please contact support.", variant: "destructive" });
+
+    // Two error shapes can arrive: (a) supabase-js wraps non-2xx
+    // responses in `error`, (b) the function itself returns a JSON
+    // body with an `error` field. Inspect both.
+    const serverError = error?.message || data?.error;
+    if (serverError) {
+      // Surface the admin-specific message verbatim so admins
+      // understand why and what their alternative is. Other errors
+      // are mapped to the generic copy — server-side logs carry the
+      // detail without leaking internals.
+      const isAdminBlocked = /admins cannot self-delete/i.test(serverError);
+      toast({
+        title: "Could not delete account",
+        description: isAdminBlocked
+          ? serverError
+          : "Could not delete account. Please contact support.",
+        variant: "destructive",
+      });
       return;
     }
+
     await onSignOut();
-    navigate("/auth", { state: { accountDeleted: true } });
+    navigate("/account-deleted");
   };
 
   return (
@@ -60,7 +94,10 @@ export function DeleteAccountPanel({ userId, email, role, onSignOut }: Props) {
       <CardContent>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
+            <Button
+              variant="outline"
+              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+            >
               <Trash2 className="h-4 w-4 mr-2" /> Delete My Account
             </Button>
           </AlertDialogTrigger>
@@ -68,33 +105,43 @@ export function DeleteAccountPanel({ userId, email, role, onSignOut }: Props) {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Your Account — This Cannot Be Undone</AlertDialogTitle>
               <AlertDialogDescription className="space-y-2">
-                <p>You are about to permanently delete your account.</p>
-                {role === "volunteer" && (
-                  <p>All your active shift bookings will be automatically cancelled.</p>
-                )}
+                <p>
+                  This will permanently delete your account, your bookings,
+                  and your profile. Your recorded volunteer hours will be
+                  retained for reporting but will no longer be linked to
+                  your name. This cannot be undone.
+                </p>
                 {role === "coordinator" && (
-                  <p>Your created shifts will remain but will no longer have a coordinator assigned.</p>
+                  <p>
+                    Your created shifts will remain on the schedule but
+                    will no longer be attributed to you.
+                  </p>
                 )}
-                <p>You will need to register a new account if you wish to return.</p>
                 <div className="pt-2">
-                  <Label>Type your email to confirm:</Label>
+                  <Label htmlFor="delete-confirm-email">
+                    Type your email to confirm:
+                  </Label>
                   <Input
+                    id="delete-confirm-email"
                     className="mt-1"
                     value={deleteConfirmEmail}
                     onChange={(e) => setDeleteConfirmEmail(e.target.value)}
                     placeholder={email}
+                    autoComplete="off"
                   />
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setDeleteConfirmEmail("")}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                disabled={deleteConfirmEmail !== email || deleteLoading}
+                disabled={!emailMatches || deleteLoading}
                 onClick={handleDeleteAccount}
               >
-                {deleteLoading ? "Deleting..." : "Delete My Account"}
+                {deleteLoading ? "Deleting..." : "Delete my account"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
