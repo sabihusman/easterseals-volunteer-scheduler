@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import AccountDeleted from "./pages/AccountDeleted";
 import MfaVerify from "./pages/MfaVerify";
 import VolunteerDashboard from "./pages/VolunteerDashboard";
 import BrowseShifts from "./pages/BrowseShifts";
@@ -76,6 +77,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/account-deleted" element={<AccountDeleted />} />
             <Route path="/mfa-verify" element={<MfaVerify />} />
             <Route path="/checkin" element={<CheckIn />} />
 
