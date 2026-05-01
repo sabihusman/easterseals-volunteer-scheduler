@@ -325,6 +325,29 @@ CREATE UNIQUE INDEX uq_booking_per_slot
 -- minors' booking_status to 'pending_admin_approval' before WITH
 -- CHECK runs, so the policy must permit that value for minors.
 -- The CASE WHEN keeps adults from sneaking pending in directly.
+--
+-- The is_minor lookup goes through a SECURITY DEFINER helper to
+-- avoid an RLS recursion: a naive `SELECT is_minor FROM profiles
+-- WHERE id = auth.uid()` inside the policy triggers profiles' own
+-- RLS, and one of profiles' SELECT policies references
+-- shift_bookings — Postgres rejects this with SQLSTATE 42P17
+-- (infinite recursion in policy). Same pattern the codebase
+-- already uses for is_admin() / is_coordinator_or_admin().
+CREATE OR REPLACE FUNCTION public.is_current_user_minor()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path TO 'public'
+AS $$
+  SELECT COALESCE(
+    (SELECT is_minor FROM public.profiles WHERE id = auth.uid()),
+    false
+  );
+$$;
+ALTER FUNCTION public.is_current_user_minor() OWNER TO postgres;
+GRANT EXECUTE ON FUNCTION public.is_current_user_minor() TO authenticated, anon, service_role;
+
 DROP POLICY IF EXISTS "bookings: volunteer insert" ON public.shift_bookings;
 CREATE POLICY "bookings: volunteer insert"
   ON public.shift_bookings
@@ -333,7 +356,7 @@ CREATE POLICY "bookings: volunteer insert"
   WITH CHECK (
     volunteer_id = auth.uid()
     AND CASE
-      WHEN (SELECT is_minor FROM public.profiles WHERE id = auth.uid())
+      WHEN public.is_current_user_minor()
         THEN booking_status = 'pending_admin_approval'
         ELSE booking_status IN ('confirmed', 'waitlisted')
       END
