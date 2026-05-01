@@ -52,7 +52,7 @@ export function UserCard({ profile: p, adminCount, actions }: Props) {
             )}
             {p.role === "volunteer" && p.is_minor && (
               <div className="text-xs text-muted-foreground">
-                Minor (DOB: {p.date_of_birth}) —{" "}
+                Minor —{" "}
                 <Button
                   variant="link"
                   size="sm"

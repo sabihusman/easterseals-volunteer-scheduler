@@ -19,7 +19,10 @@ export interface SettingsProfile {
   notif_in_app: boolean;
   notif_sms: boolean;
   // Columns the type generator hasn't surfaced:
-  date_of_birth: string | null;
+  // (date_of_birth removed from boundary type in Half A — capture
+  // surface is gone; column still exists in DB but should not be
+  // read or written by app code. See migration
+  // 20260501000000_remove_dob_capture.sql.)
   is_minor: boolean;
   username: string | null;
   notif_shift_reminders: boolean | null;
