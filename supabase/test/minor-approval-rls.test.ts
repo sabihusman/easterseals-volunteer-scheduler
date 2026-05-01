@@ -61,6 +61,12 @@ beforeAll(async () => {
   // Two open shifts on the same date — one we'll use for the adult
   // path, one for the minor path. Keeps the two flows from racing on
   // the unique-per-slot index.
+  //
+  // requires_bg_check is explicitly false because the shifts table
+  // defaults this column to TRUE (baseline.sql:3442), and our test
+  // volunteers are seeded with bg_check_status='pending' — leaving
+  // it on the default would trip enforce_booking_window's BG-check
+  // gate before the minor-routing trigger ever fires.
   const insertShift = async (title: string) => {
     const { data, error } = await admin.from("shifts").insert({
       department_id: TEST_DEPARTMENT_ID,
@@ -72,6 +78,7 @@ beforeAll(async () => {
       total_slots: 5,
       booked_slots: 0,
       status: "open",
+      requires_bg_check: false,
     } as never).select("id").single();
     if (error || !data) throw new Error(`Setup: shift insert failed: ${error?.message}`);
     return (data as { id: string }).id;
@@ -134,7 +141,8 @@ describe("shift_bookings: minor approval queue — RLS + trigger contract", () =
     const client = await signInAs("volunteer");
 
     // Use a different shift to avoid uniqueness collision with the
-    // first adult test's confirmed booking.
+    // first adult test's confirmed booking. requires_bg_check=false
+    // for the same reason as the main beforeAll insertShift helper.
     const admin = adminBypassClient();
     const { data: probe } = await admin.from("shifts").insert({
       department_id: TEST_DEPARTMENT_ID,
@@ -146,6 +154,7 @@ describe("shift_bookings: minor approval queue — RLS + trigger contract", () =
       total_slots: 1,
       booked_slots: 0,
       status: "open",
+      requires_bg_check: false,
     } as never).select("id").single();
     const probeShiftId = (probe as { id: string }).id;
 
