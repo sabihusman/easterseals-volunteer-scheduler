@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Shield, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { NOTES_ENABLED } from "@/config/featureFlags";
 
 export default function AdminSettings() {
   const { user } = useAuth();
@@ -88,34 +89,41 @@ export default function AdminSettings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />All Shift Notes</CardTitle>
-          <CardDescription>Notes from all departments</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingNotes ? (
-            <p className="text-muted-foreground">Loading...</p>
-          ) : notes.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No notes found.</p>
-          ) : (
-            <div className="space-y-3">
-              {notes.map((n) => (
-                <div key={n.id} className="p-3 rounded-md bg-muted/50 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{n.profiles?.full_name}</span>
-                    <span className="text-xs text-muted-foreground">{format(new Date(n.created_at), "MMM d, yyyy")}</span>
+      {/* Pilot dark-launch — see src/config/featureFlags.ts.
+          The notes audit panel is part of the Notes feature surface;
+          hiding it keeps the admin UI consistent with the volunteer-
+          side hide. The shift_notes table itself is untouched, so
+          existing rows remain in the DB for re-enable. */}
+      {NOTES_ENABLED && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />All Shift Notes</CardTitle>
+            <CardDescription>Notes from all departments</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingNotes ? (
+              <p className="text-muted-foreground">Loading...</p>
+            ) : notes.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No notes found.</p>
+            ) : (
+              <div className="space-y-3">
+                {notes.map((n) => (
+                  <div key={n.id} className="p-3 rounded-md bg-muted/50 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{n.profiles?.full_name}</span>
+                      <span className="text-xs text-muted-foreground">{format(new Date(n.created_at), "MMM d, yyyy")}</span>
+                    </div>
+                    <p className="text-sm">{n.content}</p>
+                    <div className="text-xs text-muted-foreground">
+                      {n.shift_bookings?.shifts?.title} • {n.shift_bookings?.shifts?.departments?.name}
+                    </div>
                   </div>
-                  <p className="text-sm">{n.content}</p>
-                  <div className="text-xs text-muted-foreground">
-                    {n.shift_bookings?.shifts?.title} • {n.shift_bookings?.shifts?.departments?.name}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

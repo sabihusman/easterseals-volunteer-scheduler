@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { MESSAGING_ENABLED } from "@/config/featureFlags";
 
 interface Department {
   id: string;
@@ -146,15 +147,18 @@ export function BulkComposeMessage({ open, onOpenChange, onSent }: BulkComposeMe
         content: content.trim(),
       });
 
-      // Notification
-      await supabase.from("notifications").insert({
-        user_id: recipient.id,
-        title: `Message from ${senderName}`,
-        message: content.trim().slice(0, 100),
-        type: "new_message",
-        link: "/messages",
-        is_read: false,
-      });
+      // Notification (gated for pilot dark-launch — see
+      // src/config/featureFlags.ts).
+      if (MESSAGING_ENABLED) {
+        await supabase.from("notifications").insert({
+          user_id: recipient.id,
+          title: `Message from ${senderName}`,
+          message: content.trim().slice(0, 100),
+          type: "new_message",
+          link: "/messages",
+          is_read: false,
+        });
+      }
 
       sentCount++;
     }
