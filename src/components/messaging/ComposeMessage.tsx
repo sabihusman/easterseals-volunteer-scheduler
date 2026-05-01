@@ -13,6 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { MESSAGING_ENABLED } from "@/config/featureFlags";
 
 interface User {
   id: string;
@@ -133,20 +134,28 @@ export function ComposeMessage({ open, onOpenChange, onSent }: ComposeMessagePro
       .update({ updated_at: new Date().toISOString() })
       .eq("id", conversationId);
 
-    // Send notification
+    // Send notification.
     // NOTE: `users` is filtered to exclude the current user (line 49),
     // so the previous `users.find(u => u.id === user.id)` always failed
     // and every compose-notification said "Someone". Pull the sender's
     // name directly from their own profile via useAuth instead.
-    const senderName = profile?.full_name || user.email || "Someone";
-    await supabase.from("notifications").insert({
-      user_id: selectedUserId,
-      title: `New message from ${senderName || "a user"}`,
-      message: content.trim().slice(0, 100),
-      type: "new_message",
-      link: "/messages",
-      is_read: false,
-    });
+    //
+    // Pilot dark-launch (see src/config/featureFlags.ts): the
+    // messaging UI is unreachable when MESSAGING_ENABLED is false,
+    // so this code path doesn't run anyway — but gating the fan-out
+    // here too prevents stray dead-link notifications if a deep
+    // import or test happens to call this component.
+    if (MESSAGING_ENABLED) {
+      const senderName = profile?.full_name || user.email || "Someone";
+      await supabase.from("notifications").insert({
+        user_id: selectedUserId,
+        title: `New message from ${senderName || "a user"}`,
+        message: content.trim().slice(0, 100),
+        type: "new_message",
+        link: "/messages",
+        is_read: false,
+      });
+    }
 
     setSending(false);
 

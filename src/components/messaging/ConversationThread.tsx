@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageBubble } from "./MessageBubble";
 import { Send, Loader2 } from "lucide-react";
+import { MESSAGING_ENABLED } from "@/config/featureFlags";
 
 interface Message {
   id: string;
@@ -156,19 +157,25 @@ export function ConversationThread({ conversationId, participantNames: externalN
       setNewMessage("");
       onMessageSent?.();
 
-      // Insert notification for other participants
-      const otherParticipants = Object.keys(participantNames).filter((id) => id !== user.id);
-      if (otherParticipants.length > 0) {
-        const senderName = participantNames[user.id] || "Someone";
-        const notifs = otherParticipants.map((uid) => ({
-          user_id: uid,
-          title: `New message from ${senderName}`,
-          message: newMessage.trim().slice(0, 100),
-          type: "new_message",
-          link: `/messages`,
-          is_read: false,
-        }));
-        await supabase.from("notifications").insert(notifs);
+      // Insert notification for other participants. Gated for the
+      // pilot dark-launch — see src/config/featureFlags.ts. The
+      // messaging UI is unreachable when the flag is off, so this
+      // path can't run; the gate is a belt-and-suspenders guard
+      // against stray imports / future test harnesses.
+      if (MESSAGING_ENABLED) {
+        const otherParticipants = Object.keys(participantNames).filter((id) => id !== user.id);
+        if (otherParticipants.length > 0) {
+          const senderName = participantNames[user.id] || "Someone";
+          const notifs = otherParticipants.map((uid) => ({
+            user_id: uid,
+            title: `New message from ${senderName}`,
+            message: newMessage.trim().slice(0, 100),
+            type: "new_message",
+            link: `/messages`,
+            is_read: false,
+          }));
+          await supabase.from("notifications").insert(notifs);
+        }
       }
     }
     setSending(false);

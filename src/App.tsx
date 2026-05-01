@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import AccountDeleted from "./pages/AccountDeleted";
+import { MESSAGING_ENABLED, DOCUMENTS_ENABLED, NOTES_ENABLED } from "./config/featureFlags";
 import MfaVerify from "./pages/MfaVerify";
 import VolunteerDashboard from "./pages/VolunteerDashboard";
 import BrowseShifts from "./pages/BrowseShifts";
@@ -85,8 +86,15 @@ const App = () => (
             <Route path="/shifts" element={<ProtectedRoute requiredRole={["volunteer"]}><BrowseShifts /></ProtectedRoute>} />
             <Route path="/history" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftHistory /></ProtectedRoute>} />
             <Route path="/my-shifts/confirm/:bookingId" element={<ProtectedRoute requiredRole={["volunteer"]}><ShiftConfirmation /></ProtectedRoute>} />
-            <Route path="/notes" element={<ProtectedRoute requiredRole={["volunteer"]}><MyNotes /></ProtectedRoute>} />
-            <Route path="/documents" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDocuments /></ProtectedRoute>} />
+            {/* Pilot dark-launch — see src/config/featureFlags.ts.
+                When disabled, route is not registered and falls
+                through to <Route path="*" element={<NotFound />} />. */}
+            {NOTES_ENABLED && (
+              <Route path="/notes" element={<ProtectedRoute requiredRole={["volunteer"]}><MyNotes /></ProtectedRoute>} />
+            )}
+            {DOCUMENTS_ENABLED && (
+              <Route path="/documents" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerDocuments /></ProtectedRoute>} />
+            )}
             <Route path="/unactioned" element={<ProtectedRoute requiredRole={["volunteer"]}><VolunteerUnactionedShifts /></ProtectedRoute>} />
 
             <Route path="/coordinator" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><CoordinatorDashboard /></ProtectedRoute>} />
@@ -106,7 +114,10 @@ const App = () => (
             <Route path="/admin/disputes" element={<ProtectedRoute requiredRole={["admin"]}><AdminDisputes /></ProtectedRoute>} />
             <Route path="/events" element={<ProtectedRoute><VolunteerEvents /></ProtectedRoute>} />
 
-            <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            {/* Pilot dark-launch — see src/config/featureFlags.ts. */}
+            {MESSAGING_ENABLED && (
+              <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+            )}
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />

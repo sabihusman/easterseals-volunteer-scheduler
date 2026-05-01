@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { downloadCSV, timeLabel } from "@/lib/calendar-utils";
 import { BookedSlotsDisplay } from "@/components/volunteer/BookedSlotsDisplay";
 import { VolunteerHoursLetter } from "@/components/volunteer/VolunteerHoursLetter";
+import { NOTES_ENABLED } from "@/config/featureFlags";
 
 export default function ShiftHistory() {
   const { user, profile } = useAuth();
@@ -304,20 +305,23 @@ export default function ShiftHistory() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" onClick={() => setActiveBooking(b.id)}>
-                            <FileText className="h-3 w-3 mr-1" />Note
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader><DialogTitle>Add Note for {s.title}</DialogTitle></DialogHeader>
-                          <Textarea placeholder="Write your note..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={4} maxLength={2000} />
-                          <p className="text-xs text-muted-foreground">{noteContent.length}/2000</p>
-                          {noteContent.length > 2000 && <p className="text-xs text-destructive">Note must be under 2000 characters</p>}
-                          <Button onClick={handleAddNote} disabled={!noteContent.trim() || noteContent.length > 2000}>Save Note</Button>
-                        </DialogContent>
-                      </Dialog>
+                      {/* Pilot dark-launch — see src/config/featureFlags.ts */}
+                      {NOTES_ENABLED && (
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" onClick={() => setActiveBooking(b.id)}>
+                              <FileText className="h-3 w-3 mr-1" />Note
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader><DialogTitle>Add Note for {s.title}</DialogTitle></DialogHeader>
+                            <Textarea placeholder="Write your note..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={4} maxLength={2000} />
+                            <p className="text-xs text-muted-foreground">{noteContent.length}/2000</p>
+                            {noteContent.length > 2000 && <p className="text-xs text-destructive">Note must be under 2000 characters</p>}
+                            <Button onClick={handleAddNote} disabled={!noteContent.trim() || noteContent.length > 2000}>Save Note</Button>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                       <label className="cursor-pointer">
                         <Button variant="outline" size="sm" asChild>
                           <span><Upload className="h-3 w-3 mr-1" />{uploading ? "..." : "Upload"}</span>

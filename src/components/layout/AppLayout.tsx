@@ -10,6 +10,7 @@ import { Leaf, MessageSquare, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
 import { useNavigate } from "react-router-dom";
+import { MESSAGING_ENABLED } from "@/config/featureFlags";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
@@ -48,27 +49,30 @@ export function AppLayout({ children }: { children: ReactNode }) {
                 {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
               </TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => navigate("/messages")}
-                  className="relative p-2 rounded-md hover:bg-muted transition-colors"
-                  aria-label={`Messages${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-                >
-                  <MessageSquare className="h-5 w-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 flex items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {unreadCount > 0
-                  ? `Messages (${unreadCount} unread)`
-                  : "Messages"}
-              </TooltipContent>
-            </Tooltip>
+            {/* Pilot dark-launch — see src/config/featureFlags.ts */}
+            {MESSAGING_ENABLED && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => navigate("/messages")}
+                    className="relative p-2 rounded-md hover:bg-muted transition-colors"
+                    aria-label={`Messages${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
+                  >
+                    <MessageSquare className="h-5 w-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] px-1 flex items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {unreadCount > 0
+                    ? `Messages (${unreadCount} unread)`
+                    : "Messages"}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <NotificationBell />
           </header>
           <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8 overflow-auto" role="main" style={{ paddingBottom: 'max(6rem, calc(6rem + env(safe-area-inset-bottom)))' }}>

@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare, BarChart3, AlertCircle, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MESSAGING_ENABLED, DOCUMENTS_ENABLED, NOTES_ENABLED } from "@/config/featureFlags";
 
 export function AppSidebar() {
   const { role, profile, signOut } = useAuth();
@@ -14,15 +15,24 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
 
+  // Pilot dark-launch: filter out nav entries for hidden features.
+  // See src/config/featureFlags.ts. When flags flip back to true,
+  // the entries reappear automatically — no other code changes.
   const volunteerItems = role === "volunteer" ? [
     { title: "My Shifts", url: "/dashboard", icon: Home },
     { title: "Browse Shifts", url: "/shifts", icon: Calendar },
     { title: "Unactioned Shifts", url: "/unactioned", icon: AlertCircle },
     { title: "Events", url: "/events", icon: CalendarDays },
     { title: "My History", url: "/history", icon: ClipboardList },
-    { title: "My Notes", url: "/notes", icon: FileText },
-    { title: "Documents", url: "/documents", icon: FolderOpen },
-    { title: "Messages", url: "/messages", icon: MessageSquare },
+    ...(NOTES_ENABLED
+      ? [{ title: "My Notes", url: "/notes", icon: FileText }]
+      : []),
+    ...(DOCUMENTS_ENABLED
+      ? [{ title: "Documents", url: "/documents", icon: FolderOpen }]
+      : []),
+    ...(MESSAGING_ENABLED
+      ? [{ title: "Messages", url: "/messages", icon: MessageSquare }]
+      : []),
   ] : [];
 
   const coordinatorItems = [
@@ -30,7 +40,9 @@ export function AppSidebar() {
     { title: "Manage Shifts", url: "/coordinator/manage", icon: Settings },
     { title: "Unactioned Shifts", url: "/admin/unactioned-shifts", icon: AlertCircle },
     { title: "Reports", url: "/reports", icon: BarChart3 },
-    { title: "Messages", url: "/messages", icon: MessageSquare },
+    ...(MESSAGING_ENABLED
+      ? [{ title: "Messages", url: "/messages", icon: MessageSquare }]
+      : []),
   ];
 
   const adminItems = [

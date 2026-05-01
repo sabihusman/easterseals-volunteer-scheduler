@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, NavLink } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { MESSAGING_ENABLED, DOCUMENTS_ENABLED, NOTES_ENABLED } from "@/config/featureFlags";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -66,14 +67,21 @@ function getSections(role: UserRole): NavSection[] {
     sections.push({
       heading: "Volunteer",
       items: [
+        // Pilot dark-launch: see src/config/featureFlags.ts
         { label: "My Shifts", to: "/dashboard", icon: Home },
         { label: "Browse Shifts", to: "/shifts", icon: Calendar },
         { label: "Unactioned Shifts", to: "/unactioned", icon: AlertCircle },
         { label: "Events", to: "/events", icon: CalendarDays },
         { label: "My History", to: "/history", icon: ClipboardList },
-        { label: "My Notes", to: "/notes", icon: FileText },
-        { label: "Documents", to: "/documents", icon: FolderOpen },
-        { label: "Messages", to: "/messages", icon: MessageSquare },
+        ...(NOTES_ENABLED
+          ? [{ label: "My Notes", to: "/notes", icon: FileText }]
+          : []),
+        ...(DOCUMENTS_ENABLED
+          ? [{ label: "Documents", to: "/documents", icon: FolderOpen }]
+          : []),
+        ...(MESSAGING_ENABLED
+          ? [{ label: "Messages", to: "/messages", icon: MessageSquare }]
+          : []),
       ],
     });
   }
@@ -86,7 +94,9 @@ function getSections(role: UserRole): NavSection[] {
         { label: "Manage Shifts", to: "/coordinator/manage", icon: Settings },
         { label: "Unactioned Shifts", to: "/admin/unactioned-shifts", icon: AlertCircle },
         { label: "Reports", to: "/reports", icon: BarChart3 },
-        { label: "Messages", to: "/messages", icon: MessageSquare },
+        ...(MESSAGING_ENABLED
+          ? [{ label: "Messages", to: "/messages", icon: MessageSquare }]
+          : []),
       ],
     });
   }
