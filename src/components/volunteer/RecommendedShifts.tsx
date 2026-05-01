@@ -55,7 +55,7 @@ export function RecommendedShifts({ onBookShift, refreshKey = 0 }: RecommendedSh
           .from('shift_bookings')
           .select('shift_id')
           .eq('volunteer_id', user.id)
-          .in('booking_status', ['confirmed', 'waitlisted']);
+          .in('booking_status', ['confirmed', 'waitlisted', 'pending_admin_approval'] as never[]);
         const bookedIds = new Set((myBookings || []).map((b) => b.shift_id));
 
         // Helper: compute a shift's end datetime using time_type defaults

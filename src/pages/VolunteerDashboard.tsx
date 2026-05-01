@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +42,7 @@ export default function VolunteerDashboard() {
 
   const {
     upcoming: upcomingBookings,
+    pendingApproval: pendingApprovalBookings,
     pendingConfirmations,
     waitlistOffers,
     waitlistPassive,
@@ -265,6 +267,31 @@ export default function VolunteerDashboard() {
       <DashboardAlerts profile={profile as unknown as AlertProfile} />
 
       <PendingConfirmationsBanner pendingConfirmations={pendingConfirmations} />
+
+      {pendingApprovalBookings.length > 0 && (
+        <div className="rounded-lg border border-amber-300/60 bg-amber-50 p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-amber-500 text-white">Pending approval</Badge>
+            <span className="text-sm font-medium">
+              {pendingApprovalBookings.length} booking{pendingApprovalBookings.length === 1 ? "" : "s"} awaiting administrator review
+            </span>
+          </div>
+          <ul className="text-sm text-muted-foreground space-y-1 pl-1">
+            {pendingApprovalBookings.map((b) => (
+              <li key={b.id}>
+                <span className="font-medium text-foreground">{b.shifts?.title ?? "(Shift unavailable)"}</span>
+                {b.shifts?.shift_date && (
+                  <> — {format(new Date(b.shifts.shift_date + "T00:00:00"), "EEE, MMM d")}</>
+                )}
+                {b.shifts?.departments?.name && <> · {b.shifts.departments.name}</>}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">
+            You'll be notified by email and in-app once an administrator reviews your booking.
+          </p>
+        </div>
+      )}
 
       {waitlistOffers.map((offer) => (
         <WaitlistOfferCard

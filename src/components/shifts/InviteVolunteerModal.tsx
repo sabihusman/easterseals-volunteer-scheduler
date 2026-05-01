@@ -138,12 +138,15 @@ export function InviteVolunteerModal({ shift, open, onOpenChange, onSent }: Prop
   }
 
   async function checkConflict(volunteerId: string): Promise<ConflictInfo | null> {
-    // Find confirmed bookings on the same date with overlapping times
+    // Find confirmed (or pending-approval) bookings on the same date
+    // with overlapping times. Half B-1: a minor's pending booking
+    // is a held slot — the trigger has rewritten the status — so we
+    // treat it as a real conflict for invitation purposes too.
     const { data } = await supabase
       .from("shift_bookings")
       .select("shifts(title, shift_date, start_time, end_time)")
       .eq("volunteer_id", volunteerId)
-      .eq("booking_status", "confirmed");
+      .in("booking_status", ["confirmed", "pending_admin_approval"] as never[]);
 
     if (!data) return null;
 

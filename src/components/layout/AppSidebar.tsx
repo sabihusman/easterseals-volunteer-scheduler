@@ -1,12 +1,15 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { NavLink } from "@/components/layout/NavLink";
 import { useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter, useSidebar,
 } from "@/components/ui/sidebar";
-import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare, BarChart3, AlertCircle, Scale } from "lucide-react";
+import { Calendar, CalendarDays, ClipboardList, Users, Shield, Settings, LogOut, Home, Building2, Bell, FileText, Cog, FolderOpen, CheckSquare, MessageSquare, BarChart3, AlertCircle, Scale, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 import { MESSAGING_ENABLED, DOCUMENTS_ENABLED, NOTES_ENABLED } from "@/config/featureFlags";
 
 export function AppSidebar() {
@@ -14,6 +17,26 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+
+  // Pending-minor-approvals badge count for admins. Polled every 60s
+  // (queue is slow-moving and a head-only count query is cheap). Live
+  // subscription would be marginally better UX but adds another
+  // realtime channel for a feature that's small-scale by design.
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+  useEffect(() => {
+    if (role !== "admin") return;
+    let cancelled = false;
+    const fetchCount = async () => {
+      const { count } = await (supabase as any)
+        .from("shift_bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("booking_status", "pending_admin_approval");
+      if (!cancelled) setPendingApprovalsCount(count ?? 0);
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [role]);
 
   // Pilot dark-launch: filter out nav entries for hidden features.
   // See src/config/featureFlags.ts. When flags flip back to true,
@@ -45,12 +68,13 @@ export function AppSidebar() {
       : []),
   ];
 
-  const adminItems = [
+  const adminItems: { title: string; url: string; icon: typeof Calendar; badge?: number }[] = [
     { title: "All Shifts", url: "/admin", icon: Calendar },
     { title: "Users", url: "/admin/users", icon: Users },
     { title: "Departments", url: "/admin/departments", icon: Building2 },
     { title: "Events", url: "/admin/events", icon: CalendarDays },
     { title: "Unactioned Shifts", url: "/admin/unactioned-shifts", icon: AlertCircle },
+    { title: "Pending Minor Approvals", url: "/admin/pending-minor-approvals", icon: UserCheck, badge: pendingApprovalsCount },
     { title: "Reminders", url: "/admin/reminders", icon: Bell },
     { title: "Admin Settings", url: "/admin/settings", icon: Shield },
     { title: "Compliance", url: "/admin/compliance", icon: CheckSquare },
@@ -138,7 +162,10 @@ export function AppSidebar() {
                         }`}
                       >
                         <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
+                        {!collapsed && <span className="flex-1">{item.title}</span>}
+                        {!collapsed && typeof item.badge === "number" && item.badge > 0 && (
+                          <Badge variant="destructive" className="h-5 px-1.5 text-xs">{item.badge}</Badge>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

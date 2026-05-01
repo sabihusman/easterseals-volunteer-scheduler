@@ -61,15 +61,17 @@ export async function cancelShiftWithNotifications(
 ): Promise<CancelShiftResult> {
   const { shift, reason, isUrgent, shiftDateFormatted, shiftTimeLabel } = input;
 
-  // 1. Read confirmed bookings — service-side filter so we don't see
-  //    rows we shouldn't. RLS may legitimately return zero here even on
-  //    shifts the coordinator can update (no booked volunteers), so this
-  //    is informational only and must not gate the cancel.
+  // 1. Read affected bookings — confirmed AND pending_admin_approval
+  //    (Half B-1: minor bookings still in the queue need to be
+  //    cancelled and notified too, per the brief's cascade rule).
+  //    RLS may legitimately return zero here even on shifts the
+  //    coordinator can update (no booked volunteers), so this is
+  //    informational only and must not gate the cancel.
   const { data: bookings } = await supabase
     .from("shift_bookings")
     .select("id, volunteer_id")
     .eq("shift_id", shift.id)
-    .eq("booking_status", "confirmed");
+    .in("booking_status", ["confirmed", "pending_admin_approval"] as never[]);
 
   const affected = (bookings ?? []) as Array<{ id: string; volunteer_id: string }>;
 
@@ -109,7 +111,7 @@ export async function cancelShiftWithNotifications(
         cancelled_at: new Date().toISOString(),
       } as never)
       .eq("shift_id", shift.id)
-      .eq("booking_status", "confirmed");
+      .in("booking_status", ["confirmed", "pending_admin_approval"] as never[]);
   }
 
   // 4. Notification fan-out. The `data` payload is read by both the

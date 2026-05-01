@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ProfilePanel } from "@/components/settings/ProfilePanel";
-import { ParentalConsentPanel } from "@/components/settings/ParentalConsentPanel";
 import { UsernamePanel } from "@/components/settings/UsernamePanel";
 import { PasswordPanel } from "@/components/settings/PasswordPanel";
 import { MfaPanel } from "@/components/settings/MfaPanel";
@@ -13,13 +12,15 @@ import type { SettingsProfile } from "@/components/settings/types";
 /**
  * Settings page — thin orchestrator. Each panel owns its own form state.
  *
- * Three pieces of cross-panel state live here:
+ * Cross-panel state:
  *   - phone, emergencyPhone — read by NotificationsPanel to gate the SMS
  *     toggle. Lifting preserves the pre-refactor UX where typing a phone in
  *     the profile form enables SMS *before* save.
- *   - isMinor — drives ParentalConsentPanel visibility. Read directly from
- *     the profile (not lifted to local state) since Half A removed the
- *     in-page editing path that needed pre-save reactivity.
+ *
+ * Half B-1 removed the parental-consent panel entirely. Minor handling
+ * now lives in the BEFORE INSERT trigger (routes minor bookings to
+ * pending_admin_approval) and the /admin/pending-minor-approvals queue.
+ * profiles.is_minor remains, but is purely informational on this page.
  */
 export default function Settings() {
   const { user, profile, session, role, signOut, refreshProfile } = useAuth();
@@ -44,6 +45,9 @@ export default function Settings() {
   // notif_* — bridge with SettingsProfile here. Same boundary-cast pattern
   // as AlertProfile in src/components/volunteer/DashboardAlerts.tsx.
   const settingsProfile = profile as unknown as SettingsProfile;
+  // is_minor is still surfaced to ProfilePanel as a read-only prop for
+  // any future minor-aware UI in that panel; nothing on this page
+  // branches on it after the parental-consent removal in Half B-1.
   const isMinor = settingsProfile.is_minor === true;
 
   return (
@@ -60,8 +64,6 @@ export default function Settings() {
         isMinor={isMinor}
         onSaved={refreshProfile}
       />
-
-      {isMinor && <ParentalConsentPanel userId={user.id} />}
 
       <UsernamePanel
         userId={user.id}

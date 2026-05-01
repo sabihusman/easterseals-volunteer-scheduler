@@ -23,6 +23,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminReminders from "./pages/AdminReminders";
 import AdminUnactionedShifts from "./pages/AdminUnactionedShifts";
+import PendingMinorApprovals from "./pages/PendingMinorApprovals";
 import Reports from "./pages/Reports";
 import AdminSettings from "./pages/AdminSettings";
 
@@ -104,6 +105,7 @@ const App = () => (
             <Route path="/admin/users" element={<ProtectedRoute requiredRole={["admin"]}><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/reminders" element={<ProtectedRoute requiredRole={["admin"]}><AdminReminders /></ProtectedRoute>} />
             <Route path="/admin/unactioned-shifts" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><AdminUnactionedShifts /></ProtectedRoute>} />
+            <Route path="/admin/pending-minor-approvals" element={<ProtectedRoute requiredRole={["admin"]}><PendingMinorApprovals /></ProtectedRoute>} />
             <Route path="/reports" element={<ProtectedRoute requiredRole={["coordinator", "admin"]}><Reports /></ProtectedRoute>} />
             <Route path="/admin/departments" element={<ProtectedRoute requiredRole={["admin"]}><AdminDepartments /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole={["admin"]}><AdminSettings /></ProtectedRoute>} />

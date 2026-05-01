@@ -32,7 +32,7 @@ const mockUser = { id: "coord-user-1" };
 function chainable(result: unknown) {
   const builder: Record<string, unknown> = {};
   // Most methods return the builder; eq/ilike/limit/order/not all chain.
-  for (const m of ["eq", "ilike", "order", "limit", "not"]) {
+  for (const m of ["eq", "ilike", "order", "limit", "not", "in"]) {
     builder[m] = () => builder;
   }
   // Final await on the chain returns the result via the thenable interface.

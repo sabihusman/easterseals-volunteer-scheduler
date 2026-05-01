@@ -58,6 +58,13 @@ export interface PendingConfirmation {
 
 interface UseVolunteerBookingsResult {
   upcoming: VolunteerBooking[];
+  /**
+   * Half B-1: minor volunteers' bookings sit here until an admin
+   * approves them via /admin/pending-minor-approvals. Adults never
+   * have rows in this list (the RLS WITH CHECK policy + the BEFORE
+   * INSERT trigger prevent it).
+   */
+  pendingApproval: VolunteerBooking[];
   pendingConfirmations: PendingConfirmation[];
   waitlistOffers: VolunteerBooking[];
   waitlistPassive: VolunteerBooking[];
@@ -82,6 +89,7 @@ interface UseVolunteerBookingsResult {
  */
 export function useVolunteerBookings(user: User | null, today: string): UseVolunteerBookingsResult {
   const [upcoming, setUpcoming] = useState<VolunteerBooking[]>([]);
+  const [pendingApproval, setPendingApproval] = useState<VolunteerBooking[]>([]);
   const [pendingConfirmations, setPendingConfirmations] = useState<PendingConfirmation[]>([]);
   const [waitlistOffers, setWaitlistOffers] = useState<VolunteerBooking[]>([]);
   const [waitlistPassive, setWaitlistPassive] = useState<VolunteerBooking[]>([]);
@@ -98,7 +106,13 @@ export function useVolunteerBookings(user: User | null, today: string): UseVolun
           .from("shift_bookings")
           .select("id, booking_status, confirmation_status, checked_in_at, waitlist_offer_expires_at, created_at, time_slot_id, shift_time_slots(slot_start, slot_end), shifts(id, title, shift_date, time_type, start_time, end_time, total_slots, booked_slots, requires_bg_check, status, allows_group, department_id, departments(name, location_id))")
           .eq("volunteer_id", user.id)
-          .in("booking_status", ["confirmed", "waitlisted"])
+          // Volunteer sees their pending bookings (with a "Pending
+          // approval" badge) but rejected bookings are deliberately
+          // hidden from their own view — the denial notification
+          // already carries the reason. See Half B-1 brief, Phase 2.4.
+          // `as never[]` boundary cast — the generated Database type
+          // still has the pre-Half-B-1 enum until types are regenerated.
+          .in("booking_status", ["confirmed", "waitlisted", "pending_admin_approval"] as never[])
           .order("created_at", { ascending: false }),
         supabase
           .from("volunteer_shift_reports")
@@ -125,6 +139,14 @@ export function useVolunteerBookings(user: User | null, today: string): UseVolun
           b.shifts.status !== "cancelled"
       );
 
+      const pending = all.filter(
+        (b) =>
+          b.booking_status === "pending_admin_approval" &&
+          b.shifts &&
+          isUpcoming(b.shifts) &&
+          b.shifts.status !== "cancelled"
+      );
+
       const offers = all.filter(
         (b) =>
           b.booking_status === "waitlisted" &&
@@ -142,6 +164,7 @@ export function useVolunteerBookings(user: User | null, today: string): UseVolun
       );
 
       setUpcoming(upcomingNew);
+      setPendingApproval(pending);
       setWaitlistOffers(offers);
       setWaitlistPassive(passive);
       setPendingConfirmations(((pendingData as any[]) || []) as PendingConfirmation[]);
@@ -166,6 +189,7 @@ export function useVolunteerBookings(user: User | null, today: string): UseVolun
 
   return {
     upcoming,
+    pendingApproval,
     pendingConfirmations,
     waitlistOffers,
     waitlistPassive,

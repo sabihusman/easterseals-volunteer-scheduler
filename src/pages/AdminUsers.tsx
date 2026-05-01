@@ -157,33 +157,10 @@ export default function AdminUsers() {
     setDeleteTarget(null);
   }
 
-  // ── Manage minor consent ──
-  // Extracted from the inline onClick handler in the UserCard. Admin-only
-  // path: check existing consent, otherwise capture a paper-form consent
-  // via window.prompt and insert.
-  async function handleManageMinorConsent(profileId: string) {
-    const { data } = await supabase
-      .from("parental_consents")
-      .select("id, parent_name, is_active, expires_at")
-      .eq("volunteer_id", profileId)
-      .eq("is_active", true)
-      .limit(1);
-    if (data && data.length > 0) {
-      toast({ title: "Consent on file", description: `Parent: ${(data[0] as any).parent_name}` });
-      return;
-    }
-    const parentName = window.prompt("Enter parent/guardian name (for paper consent):");
-    if (!parentName) return;
-    const { error } = await (supabase as any).from("parental_consents").insert({
-      volunteer_id: profileId,
-      parent_name: parentName,
-      parent_email: "paper-consent@easterseals.com",
-      consent_method: "paper",
-      expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
-    });
-    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else toast({ title: "Consent recorded", description: `Paper consent from ${parentName} recorded.` });
-  }
+  // (Half B-1 removed the manage-minor-consent admin handler. Minor
+  // bookings now flow through /admin/pending-minor-approvals; the
+  // parental_consents table itself was dropped in this PR's
+  // migration.)
 
   const filtered = profiles
     .filter((p) => roleFilter === "all" || p.role === roleFilter)
@@ -202,7 +179,6 @@ export default function AdminUsers() {
     onToggleMessaging: handleToggleMessaging,
     onBgCheckChange: handleBgCheck,
     onDeleteRequest: (id, name, role) => setDeleteTarget({ id, name, role }),
-    onManageMinorConsent: handleManageMinorConsent,
   };
 
   if (loading) return null;

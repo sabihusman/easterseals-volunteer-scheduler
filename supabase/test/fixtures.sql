@@ -39,13 +39,14 @@ VALUES (
   'America/Chicago'
 ) ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.departments (id, name, location_id, is_active, requires_bg_check, allows_groups, min_age)
+-- Half B-1: dropped departments.min_age column. Fixture insert no
+-- longer references it.
+INSERT INTO public.departments (id, name, location_id, is_active, requires_bg_check, allows_groups)
 VALUES (
   '00000000-0000-0000-0000-000000000200',
   'Test Department',
   '00000000-0000-0000-0000-000000000100',
   true,
   false,
-  false,
-  18
+  false
 ) ON CONFLICT (id) DO NOTHING;

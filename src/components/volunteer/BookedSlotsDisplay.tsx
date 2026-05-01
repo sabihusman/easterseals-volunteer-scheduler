@@ -29,7 +29,7 @@ export function BookedSlotsDisplay({ bookingId, shiftId, volunteerId, compact = 
         .select("time_slot_id, shift_time_slots(slot_start, slot_end)")
         .eq("shift_id", shiftId)
         .eq("volunteer_id", volunteerId)
-        .in("booking_status", ["confirmed", "waitlisted"])
+        .in("booking_status", ["confirmed", "waitlisted", "pending_admin_approval"] as never[])
         .not("time_slot_id", "is", null)
         .then(({ data }) => {
           const infos = (data || [])
