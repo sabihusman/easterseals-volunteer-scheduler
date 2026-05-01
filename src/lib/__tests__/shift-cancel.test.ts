@@ -41,6 +41,10 @@ vi.mock("@/integrations/supabase/client", () => {
               return {
                 eq() {
                   return {
+                    // Half B-1: shift-cancel now reads bookings via
+                    // `.eq("shift_id", …).in("booking_status", […])` to
+                    // include pending_admin_approval rows in the cascade.
+                    in: () => Promise.resolve(bookingsSelectResponse),
                     eq: () => Promise.resolve(bookingsSelectResponse),
                   };
                 },
@@ -51,6 +55,7 @@ vi.mock("@/integrations/supabase/client", () => {
               return {
                 eq() {
                   return {
+                    in: () => Promise.resolve({ data: null, error: null }),
                     eq: () => Promise.resolve({ data: null, error: null }),
                   };
                 },

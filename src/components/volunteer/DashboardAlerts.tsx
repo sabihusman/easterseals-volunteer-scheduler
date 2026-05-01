@@ -2,10 +2,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, XCircle } from "lucide-react";
 
 /**
- * Profile fields the alert panel reads. The `is_minor` and
- * `has_active_consent` columns aren't picked up by the supabase type
- * generator yet, so the page passes them via this extension type rather
- * than scattering `(profile as any)` access points.
+ * Profile fields the alert panel reads. The supabase type generator
+ * doesn't surface `is_minor`, so the page passes it via this extension
+ * type. (Half B-1 removed `has_active_consent` and the parental-consent
+ * banner — minor handling now flows through the
+ * /admin/pending-minor-approvals queue.)
  */
 export interface AlertProfile {
   bg_check_status: string | null;
@@ -13,7 +14,6 @@ export interface AlertProfile {
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   is_minor?: boolean;
-  has_active_consent?: boolean;
 }
 
 interface Props {
@@ -22,8 +22,8 @@ interface Props {
 
 /**
  * Stack of dashboard banners — privileges suspended, BG check failed/expired,
- * missing emergency contact, minor parental-consent state. Renders nothing
- * if all conditions are clear.
+ * missing emergency contact, minor heads-up. Renders nothing if all
+ * conditions are clear.
  */
 export function DashboardAlerts({ profile }: Props) {
   const privilegesSuspended = profile.booking_privileges === false;
@@ -59,14 +59,12 @@ export function DashboardAlerts({ profile }: Props) {
       )}
 
       {profile.is_minor && (
-        <Alert className={profile.has_active_consent ? "border-primary/50 bg-primary/5" : "border-destructive/50 bg-destructive/10"}>
+        <Alert className="border-primary/50 bg-primary/5">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>{profile.has_active_consent ? "Parental Consent on File" : "Parental Consent Required"}</AlertTitle>
+          <AlertTitle>Minor volunteer — bookings need admin approval</AlertTitle>
           <AlertDescription>
-            {profile.has_active_consent
-              ? "Your parent/guardian's consent is on file. You're cleared to book shifts."
-              : <>Volunteers under 18 need parental consent before booking shifts. <a href="/settings" className="text-primary font-medium underline">Go to Settings →</a></>
-            }
+            Because you're under 18, each booking you make is held for administrator review.
+            You'll be notified by email and in-app once it's approved.
           </AlertDescription>
         </Alert>
       )}

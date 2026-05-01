@@ -15,7 +15,6 @@ export interface UserCardActions {
   onToggleMessaging: (id: string, current: boolean) => void;
   onBgCheckChange: (id: string, status: "cleared" | "pending" | "failed" | "expired") => void;
   onDeleteRequest: (id: string, name: string, role: AdminUserRole) => void;
-  onManageMinorConsent: (profileId: string) => void;
 }
 
 interface Props {
@@ -50,19 +49,9 @@ export function UserCard({ profile: p, adminCount, actions }: Props) {
                 Emergency: {p.emergency_contact_name}{p.emergency_contact_name && p.emergency_contact_phone ? " · " : ""}{p.emergency_contact_phone}
               </div>
             )}
-            {p.role === "volunteer" && p.is_minor && (
-              <div className="text-xs text-muted-foreground">
-                Minor —{" "}
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="h-auto p-0 text-xs text-primary"
-                  onClick={() => actions.onManageMinorConsent(p.id)}
-                >
-                  Manage Consent
-                </Button>
-              </div>
-            )}
+            {/* Minor badge below; the parental-consent management link
+                was retired in Half B-1 (admin approval queue replaced
+                the consent flow — see /admin/pending-minor-approvals). */}
             <div className="flex gap-2 flex-wrap">
               <Badge className={`text-xs ${getBgCheckBadgeClass(p.bg_check_status)}`}>{p.bg_check_status}</Badge>
               {!p.booking_privileges && <Badge variant="outline" className="text-xs">No Booking</Badge>}

@@ -107,9 +107,10 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
   const missingEmergencyContact =
     !(profile as any)?.emergency_contact_name ||
     !(profile as any)?.emergency_contact_phone;
-  const isMinorWithoutConsent =
-    (profile as any)?.is_minor === true &&
-    !(profile as any)?.has_active_consent;
+  // Half B-1: minor's booking is routed to pending_admin_approval by
+  // the trg_00_route_minor_to_pending DB trigger; the toast below
+  // signals this in the success path. No client-side gate.
+  const isMinor = (profile as any)?.is_minor === true;
 
   const handleConfirm = async () => {
     if (!user || !profile) return;
@@ -119,15 +120,6 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
       toast({
         title: "Emergency contact required",
         description: "Please add an emergency contact in your profile settings before booking.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isMinorWithoutConsent) {
-      toast({
-        title: "Parental consent required",
-        description: "Volunteers under 18 need parental consent on file before booking. Go to Settings to submit consent.",
         variant: "destructive",
       });
       return;
@@ -203,7 +195,7 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
           "id, shifts!inner(title, shift_date, department_id, departments(location_id, locations:location_id(name))), shift_time_slots(slot_start, slot_end)"
         )
         .eq("volunteer_id", user.id)
-        .in("booking_status", ["confirmed", "waitlisted"])
+        .in("booking_status", ["confirmed", "waitlisted", "pending_admin_approval"] as never[])
         .eq("shifts.shift_date", shift.shift_date);
 
       type SameDayRow = {
@@ -303,8 +295,17 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
         .eq("time_slot_id", slotId)
         .maybeSingle();
 
-      if (existing && (existing.booking_status === "confirmed" || existing.booking_status === "waitlisted")) {
-        // Already booked this slot — skip
+      // Cast at the boundary — the generated Database type still has
+      // the pre-Half-B-1 enum until types are regenerated; the runtime
+      // value can be 'pending_admin_approval' for minors with a queued
+      // booking, so widen the comparison to string here.
+      const existingStatus = (existing?.booking_status ?? "") as string;
+      if (existing && (
+        existingStatus === "confirmed" ||
+        existingStatus === "waitlisted" ||
+        existingStatus === "pending_admin_approval"
+      )) {
+        // Already booked this slot — skip.
         continue;
       }
 
@@ -347,31 +348,45 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
     }
 
     const anyWaitlisted = waitlistedSlotIds.length > 0;
-    toast({
-      title: anyWaitlisted && confirmedSlotIds.length === 0
-        ? "Added to waitlist"
-        : anyWaitlisted
-        ? "Partially booked"
-        : "Shift booked!",
-      description: anyWaitlisted && confirmedSlotIds.length === 0
-        ? "All selected slots are full. You'll be notified if a spot opens up."
-        : anyWaitlisted
-        ? `${confirmedSlotIds.length} slot(s) confirmed, ${waitlistedSlotIds.length} waitlisted.`
-        : `${totalHours} hours selected`,
-    });
+    if (isMinor) {
+      // Trigger has rewritten the booking_status to
+      // pending_admin_approval — surface that in the toast so the
+      // user knows nothing's confirmed yet. Skip the standard
+      // booking-confirmation email; the approval/denial email
+      // (sent by the admin queue) is the one that matters.
+      toast({
+        title: "Booking pending admin approval",
+        description: "You'll be notified by email and in-app once an administrator reviews your booking.",
+      });
+    } else {
+      toast({
+        title: anyWaitlisted && confirmedSlotIds.length === 0
+          ? "Added to waitlist"
+          : anyWaitlisted
+          ? "Partially booked"
+          : "Shift booked!",
+        description: anyWaitlisted && confirmedSlotIds.length === 0
+          ? "All selected slots are full. You'll be notified if a spot opens up."
+          : anyWaitlisted
+          ? `${confirmedSlotIds.length} slot(s) confirmed, ${waitlistedSlotIds.length} waitlisted.`
+          : `${totalHours} hours selected`,
+      });
 
-    // Fire and forget booking confirmation email
-    if (profile?.email) {
-      const slotSummary = selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ");
-      sendEmail({
-        to: profile.email,
-        type: "shift_booked",
-        shiftTitle: shift.title,
-        shiftDate: format(new Date(shift.shift_date + "T00:00:00"), "MMMM d, yyyy"),
-        shiftTime: timeLabel(shift),
-        department: shift.departments?.name || "",
-        selectedSlots: slotSummary || undefined,
-      }).catch(console.error);
+      // Fire and forget booking confirmation email (adults only —
+      // minors get a different email when their booking is approved
+      // by an admin).
+      if (profile?.email) {
+        const slotSummary = selectedSlots.map(s => formatSlotRange(s.slot_start, s.slot_end)).join(", ");
+        sendEmail({
+          to: profile.email,
+          type: "shift_booked",
+          shiftTitle: shift.title,
+          shiftDate: format(new Date(shift.shift_date + "T00:00:00"), "MMMM d, yyyy"),
+          shiftTime: timeLabel(shift),
+          department: shift.departments?.name || "",
+          selectedSlots: slotSummary || undefined,
+        }).catch(console.error);
+      }
     }
 
     onBooked();
@@ -413,15 +428,16 @@ export function SlotSelectionDialog({ open, onOpenChange, shift, bookedSlotIds, 
           </div>
         )}
 
-        {/* Minor consent gate */}
-        {isMinorWithoutConsent && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
-            <p className="font-medium text-foreground">Parental consent required</p>
+        {/* Half B-1: minor heads-up (informational only — booking
+            proceeds and is held for admin approval by the
+            trg_00_route_minor_to_pending DB trigger). */}
+        {isMinor && (
+          <div className="rounded-md border border-amber-300/60 bg-amber-50 p-3 text-sm">
+            <p className="font-medium text-foreground">Booking will need admin approval</p>
             <p className="text-muted-foreground text-xs mt-1">
-              Volunteers under 18 must have parental consent on file.{" "}
-              <a href="/settings" className="text-primary underline" onClick={() => onOpenChange(false)}>
-                Go to Settings →
-              </a>
+              Because you're under 18, this booking will be held for an
+              administrator to review. You'll be notified by email and
+              in-app once it's approved.
             </p>
           </div>
         )}

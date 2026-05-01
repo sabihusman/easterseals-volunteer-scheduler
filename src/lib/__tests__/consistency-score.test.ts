@@ -13,24 +13,38 @@ import { describe, it, expect } from "vitest";
 
 interface BookingOutcome {
   confirmation_status: "confirmed" | "no_show" | "cancelled" | "pending_confirmation";
-  booking_status: "confirmed" | "waitlisted" | "cancelled";
+  booking_status: "confirmed" | "waitlisted" | "cancelled" | "pending_admin_approval" | "rejected";
 }
 
 /**
  * Pure TS mirror of the server-side consistency calculation.
  *
- *   attended = bookings where booking_status != 'cancelled'
+ * The DB function recalculate_consistency() pre-filters its input to
+ * `booking_status = 'confirmed'`, so in production this mirror only
+ * ever receives confirmed rows. The non-confirmed branches in the
+ * filter below are defense-in-depth: if a future caller passes a
+ * wider input (or a test fixture mixes states), pending/rejected
+ * still don't accidentally count as "attended."
+ *
+ *   attended = bookings where booking_status NOT IN
+ *              ('cancelled', 'rejected', 'pending_admin_approval')
  *              AND confirmation_status != 'no_show'
  *   window   = last 5 bookings
  *   score    = round(attended / window * 100)
  */
+const NON_ATTENDED_STATUSES = new Set([
+  "cancelled",
+  "rejected",
+  "pending_admin_approval",
+]);
+
 export function calculateConsistencyScore(
   lastFive: BookingOutcome[]
 ): number {
   if (lastFive.length === 0) return 100;
   const window = lastFive.slice(0, 5);
   const attended = window.filter(
-    (b) => b.booking_status !== "cancelled" && b.confirmation_status !== "no_show"
+    (b) => !NON_ATTENDED_STATUSES.has(b.booking_status) && b.confirmation_status !== "no_show"
   ).length;
   return Math.round((attended / window.length) * 100);
 }

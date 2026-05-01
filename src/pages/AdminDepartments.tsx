@@ -59,7 +59,9 @@ interface Department {
   name: string;
   description: string | null;
   requires_bg_check: boolean;
-  min_age: number | null;
+  // (Half B-1: departments.min_age column dropped — was never
+  // enforced anywhere. Minor handling now flows through
+  // profiles.is_minor + the admin approval queue.)
   allows_groups: boolean;
   is_active: boolean;
   location_id: string;
@@ -74,7 +76,6 @@ interface DeptForm {
   name: string;
   description: string;
   requires_bg_check: boolean;
-  min_age: string; // string for input, cast on save
   allows_groups: boolean;
   location_id: string;
 }
@@ -83,7 +84,6 @@ const EMPTY_FORM: DeptForm = {
   name: "",
   description: "",
   requires_bg_check: false,
-  min_age: "",
   allows_groups: false,
   location_id: "",
 };
@@ -150,7 +150,6 @@ export default function AdminDepartments() {
       name: dept.name,
       description: dept.description ?? "",
       requires_bg_check: dept.requires_bg_check,
-      min_age: dept.min_age?.toString() ?? "",
       allows_groups: dept.allows_groups,
       location_id: dept.location_id,
     });
@@ -168,9 +167,10 @@ export default function AdminDepartments() {
     }
 
     setSaving(true);
-    // Schema: `min_age` is NOT NULL with a default of 18 — omit when blank
-    // so the DB default applies. `location_id` is NOT NULL — always include
-    // it. Both pieces fix the broken create/edit paths from issue #119.
+    // `location_id` is NOT NULL — always include it (issue #119 fix).
+    // (Half B-1 dropped the `min_age` column entirely; it was never
+    // enforced. Minor handling now flows through is_minor + the admin
+    // approval queue.)
     const basePayload: Record<string, unknown> = {
       name: form.name.trim(),
       description: form.description.trim() || null,
@@ -178,7 +178,6 @@ export default function AdminDepartments() {
       allows_groups: form.allows_groups,
       location_id: form.location_id,
     };
-    if (form.min_age) basePayload.min_age = Number(form.min_age);
 
     // Boundary cast — Supabase's typed insert/update interface doesn't
     // expose the dynamic shape we build here. Pattern documented in
@@ -464,19 +463,6 @@ export default function AdminDepartments() {
                   setForm((f) => ({ ...f, requires_bg_check: v }))
                 }
                 className="data-[state=checked]:bg-primary"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Minimum Age</Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.min_age}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, min_age: e.target.value }))
-                }
-                placeholder="Leave blank for no minimum"
               />
             </div>
 

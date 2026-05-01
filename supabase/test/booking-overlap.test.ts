@@ -89,7 +89,6 @@ beforeAll(async () => {
       is_active: true,
       requires_bg_check: false,
       allows_groups: false,
-      min_age: 18,
     } as never,
     { onConflict: "id" }
   );

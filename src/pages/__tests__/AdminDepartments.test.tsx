@@ -34,7 +34,6 @@ const sampleDepts = [
     name: "Camp Sunnyside",
     description: "Camp",
     requires_bg_check: false,
-    min_age: 18,
     allows_groups: true,
     is_active: true,
     location_id: "loc-1",
@@ -125,7 +124,7 @@ describe("AdminDepartments dialog (#119)", () => {
     expect(insertMock).not.toHaveBeenCalled();
   });
 
-  it("on valid create, includes location_id in the insert payload and omits min_age when blank", async () => {
+  it("on valid create, includes location_id in the insert payload (Half B-1: min_age column dropped)", async () => {
     render(<AdminDepartments />);
     await openCreateDialog();
     fireEvent.change(screen.getByPlaceholderText(/therapeutic recreation/i), {
@@ -142,33 +141,26 @@ describe("AdminDepartments dialog (#119)", () => {
       name: "New Dept",
       location_id: "loc-2",
     });
-    // Schema default (18) should apply on the DB side — payload must not
-    // carry min_age at all when the input was blank.
+    // Half B-1: min_age was dropped from the schema; payload must not
+    // carry it (DB would reject the column).
     expect(payload).not.toHaveProperty("min_age");
   });
 
-  it("on edit with blank min_age, the update payload omits min_age (must not be null)", async () => {
+  it("on edit, the update payload includes location_id and does NOT include min_age (Half B-1)", async () => {
     render(<AdminDepartments />);
-    // Open edit on the seeded department.
     const editButtons = await screen.findAllByRole("button");
-    // The pencil button is the first action button in the row.
     const pencil = editButtons.find((b) => b.querySelector(".lucide-pencil"));
     expect(pencil).toBeTruthy();
     fireEvent.click(pencil!);
     await screen.findByRole("dialog");
 
-    // Clear min_age (was 18 from the fixture).
     const dialog = screen.getByRole("dialog");
-    const minAgeInput = within(dialog).getByPlaceholderText(/leave blank for no minimum/i);
-    fireEvent.change(minAgeInput, { target: { value: "" } });
-
     fireEvent.click(within(dialog).getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
       expect(updateMock).toHaveBeenCalledTimes(1);
     });
     const payload = updateMock.mock.calls[0][0];
-    // The fix: omit, not null. Schema default of 18 will apply.
     expect(payload).not.toHaveProperty("min_age");
     expect(payload.location_id).toBe("loc-1");
     expect(eqUpdateMock).toHaveBeenCalledWith("id", "dept-1");
