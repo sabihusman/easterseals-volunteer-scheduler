@@ -176,39 +176,64 @@ describe("profiles: column locks on volunteer self-update", () => {
     const admin = adminBypassClient();
     const users = getHarnessUsers();
 
-    // Stage: a shift the volunteer is confirmed on, in the past, with
-    // a coordinator-reported hours value already on the booking so
-    // resolve_hours_discrepancy has both sides to compare. The
-    // function only acts when both volunteer- and coordinator-reported
-    // are present.
-    const PAST_DATE = (() => {
+    // Stage a shift + booking the volunteer is confirmed on. The shift
+    // must be FUTURE at insert time — the BEFORE INSERT triggers on
+    // shift_bookings (enforce_booking_window, enforce_shift_not_ended_
+    // on_booking, block_bookings_on_completed_shifts) reject inserts
+    // against past or completed shifts even via service-role, since
+    // service-role bypasses RLS but not triggers.
+    //
+    // We don't actually need the shift to be in the past for this
+    // test — the SECURITY-DEFINER-bypass behaviour we're verifying is
+    // independent of shift timing. resolve_hours_discrepancy fires on
+    // volunteer_shift_reports upsert and recomputes total_hours from
+    // confirmed bookings with final_hours set. We make the booking
+    // confirmation_status='confirmed' directly so the sum has a
+    // contributing row.
+    const FUTURE_DATE = (() => {
       const d = new Date();
-      d.setUTCDate(d.getUTCDate() - 1);
+      d.setUTCDate(d.getUTCDate() + 7);
       return d.toISOString().slice(0, 10);
     })();
 
-    const { data: shiftRow } = await admin.from("shifts").insert({
+    const { data: shiftRow, error: shiftErr } = await admin.from("shifts").insert({
       department_id: "00000000-0000-0000-0000-000000000200",
       title: "Self-confirm regression shift",
-      shift_date: PAST_DATE,
+      shift_date: FUTURE_DATE,
       time_type: "morning",
       start_time: "09:00:00",
       end_time: "11:00:00",
       total_slots: 5,
       booked_slots: 0,
-      status: "completed",
+      status: "open",
       requires_bg_check: false,
     } as never).select("id").single();
+    if (shiftErr || !shiftRow) throw new Error(`Setup: shift insert failed: ${shiftErr?.message}`);
     const shiftId = (shiftRow as { id: string }).id;
 
-    const { data: bookingRow } = await admin.from("shift_bookings").insert({
+    // Volunteer needs an emergency contact for enforce_booking_window
+    // to pass during the booking insert. Stamp it now.
+    await admin.from("profiles").update({
+      emergency_contact_name: "Test Contact",
+      emergency_contact_phone: "555-0100",
+    } as never).eq("id", users.volunteer.id);
+
+    const { data: bookingRow, error: bookingErr } = await admin.from("shift_bookings").insert({
       shift_id: shiftId,
       volunteer_id: users.volunteer.id,
       booking_status: "confirmed",
+      // Stamp confirmation_status='confirmed' directly on insert so
+      // resolve_hours_discrepancy's `sum(final_hours) WHERE
+      // confirmation_status='confirmed'` will include this row. The
+      // trg_recalculate_consistency_fn / trg_recalculate_points_fn
+      // wrappers only fire on UPDATE of confirmation_status, not
+      // INSERT, so direct insertion here doesn't invoke them.
+      confirmation_status: "confirmed",
       checked_in: true,
       checked_in_at: new Date().toISOString(),
       coordinator_reported_hours: 2,
     } as never).select("id").single();
+    if (bookingErr || !bookingRow) throw new Error(`Setup: booking insert failed: ${bookingErr?.message}`);
     const bookingId = (bookingRow as { id: string }).id;
 
     try {
