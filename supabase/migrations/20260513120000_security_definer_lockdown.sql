@@ -116,7 +116,10 @@ REVOKE EXECUTE ON FUNCTION public.route_minor_booking_to_pending()           FRO
 REVOKE EXECUTE ON FUNCTION public.set_document_request_expiry()              FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.set_updated_at()                           FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.sync_booked_slots()                        FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.sync_is_minor()                            FROM PUBLIC, anon, authenticated;
+-- sync_is_minor() was dropped in 20260501000000_remove_dob_capture.sql:77
+-- (Half A removed the DOB capture + the BEFORE INSERT/UPDATE trigger that
+-- backed it). Intentionally NOT referenced here — referencing a dropped
+-- function would fail with SQLSTATE 42883.
 REVOKE EXECUTE ON FUNCTION public.sync_slot_booked_count()                   FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.sync_volunteer_reported_hours()            FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.trg_recalculate_consistency_fn()           FROM PUBLIC, anon, authenticated;
