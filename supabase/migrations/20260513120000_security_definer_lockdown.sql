@@ -242,28 +242,34 @@ GRANT  EXECUTE ON FUNCTION public.score_shifts_for_volunteer(uuid, integer) TO a
 -- Frontend compat: RecommendedShifts.tsx:83-86 always passes
 -- p_volunteer_id: user.id, so the check is a no-op for the current UI.
 
+-- Signature MUST match the existing baseline definition exactly
+-- (column names + the `p_max_days integer DEFAULT 14`). CREATE OR
+-- REPLACE FUNCTION can't change the return type of an existing
+-- function — see SQLSTATE 42P13. Renaming an output column counts as
+-- a return-type change. If a future refactor needs the rename, do it
+-- in a separate migration with DROP FUNCTION first.
 CREATE OR REPLACE FUNCTION public.score_shifts_for_volunteer(
   p_volunteer_id uuid,
-  p_max_days     integer
+  p_max_days     integer DEFAULT 14
 )
 RETURNS TABLE(
-  shift_id           uuid,
-  title              text,
-  shift_date         date,
-  department_id      uuid,
-  department_name    text,
-  start_time         time without time zone,
-  end_time           time without time zone,
-  time_type          text,
-  total_slots        integer,
-  booked_slots       integer,
-  requires_bg_check  boolean,
-  fill_rate          numeric,
-  preference_score   numeric,
-  org_need_score     numeric,
-  novelty_score      numeric,
-  total_score        numeric,
-  score_breakdown    jsonb
+  shift_id            uuid,
+  title               text,
+  shift_date          date,
+  department_id       uuid,
+  department_name     text,
+  start_time          time without time zone,
+  end_time            time without time zone,
+  time_type           text,
+  total_slots         integer,
+  booked_slots        integer,
+  requires_bg_check   boolean,
+  fill_ratio          numeric,
+  preference_match    numeric,
+  organizational_need numeric,
+  novelty_bonus       numeric,
+  total_score         numeric,
+  score_breakdown     jsonb
 )
 LANGUAGE plpgsql
 STABLE
