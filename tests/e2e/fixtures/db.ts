@@ -1,5 +1,5 @@
 import type { APIRequestContext } from "@playwright/test";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./session";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SERVICE_ROLE_KEY } from "./session";
 
 // Re-export so spec files can import these constants from a single
 // fixtures entry point. The original split between session.ts and
@@ -9,6 +9,28 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./session";
 // satisfy module boundaries was a footgun. Several specs already
 // import these from "./fixtures/db" expecting them to be exported.
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
+
+/**
+ * Headers for invoking a function as service_role (bypasses RLS and
+ * has implicit EXECUTE on every function in `public`).
+ *
+ * Use this ONLY for invoking cron-callback functions
+ * (transition_past_shifts_to_completed, reconcile_shift_counters,
+ * send_self_confirmation_reminders, etc.) that the Phase 2 lockdown
+ * revoked from anon/authenticated. In prod those functions are fired
+ * by pg_cron as the postgres superuser — calling them as service_role
+ * in tests is the closest equivalent. Never use service_role for
+ * routine user-driven REST calls; that path bypasses RLS and will
+ * silently mask authorization bugs the test is supposed to catch.
+ */
+export function serviceRoleHeaders() {
+  return {
+    "Content-Type": "application/json",
+    apikey: SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+    Prefer: "return=representation",
+  };
+}
 
 /**
  * Supabase REST helpers for E2E setup / teardown / verification.

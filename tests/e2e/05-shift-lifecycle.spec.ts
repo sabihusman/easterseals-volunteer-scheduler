@@ -9,6 +9,7 @@ import {
   uniquePastShiftDate,
   expectOk,
   authHeaders,
+  serviceRoleHeaders,
   SUPABASE_URL,
 } from "./fixtures/db";
 
@@ -82,10 +83,15 @@ test.describe("Past shift placement in admin list", () => {
     expect(shift.status).toBe("open");
 
     // --- 2. Run the transition RPC ---
+    // Phase 2 SECURITY DEFINER lockdown revoked EXECUTE from
+    // anon/authenticated on this function (cron-callback class). In
+    // prod pg_cron fires it as postgres superuser; in tests we mirror
+    // that with service_role. See serviceRoleHeaders() rationale in
+    // fixtures/db.ts.
     const rpcRes = await request.post(
       `${SUPABASE_URL}/rest/v1/rpc/transition_past_shifts_to_completed`,
       {
-        headers: authHeaders(adminAccess),
+        headers: serviceRoleHeaders(),
         data: {},
       }
     );
@@ -162,10 +168,11 @@ test.describe("Past shift placement in admin list", () => {
     });
     shiftId = shift.id;
 
-    // Flip to completed via the RPC.
+    // Flip to completed via the RPC. service_role for cron-callback
+    // invocation (see fixtures/db.ts:serviceRoleHeaders).
     const rpcRes = await request.post(
       `${SUPABASE_URL}/rest/v1/rpc/transition_past_shifts_to_completed`,
-      { headers: authHeaders(adminAccess), data: {} }
+      { headers: serviceRoleHeaders(), data: {} }
     );
     await expectOk(rpcRes, "transition_past_shifts_to_completed");
     const locked = await getShift(request, adminAccess, shiftId);
