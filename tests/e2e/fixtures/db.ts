@@ -148,8 +148,22 @@ export async function cancelVolunteerBookingsOnDate(
   // First find all active bookings the volunteer has via shifts JOIN.
   // PostgREST embedded resource syntax: shifts!inner so the join
   // applies as a filter on the parent.
+  //
+  // The status list MUST match prevent_overlapping_bookings()'s view
+  // of "what counts as a conflicting booking" — currently
+  // ('confirmed', 'waitlisted', 'pending_admin_approval') after the
+  // Half B-1 minor-approval queue landed (20260501100001). If a
+  // pending_admin_approval booking lingers on the test date, the
+  // overlap trigger blocks the new insert with "You already have a
+  // booking that overlaps with this shift time" even though
+  // cancel-cleanup looks like it should have caught it. Surfaced
+  // post-Phase-2-deploy in CI run #1082 — accumulated state had a
+  // stuck pending booking that the old (confirmed,waitlisted)-only
+  // filter ignored. Volunteers are allowed to cancel their own
+  // pending bookings (enforce_admin_only_approval permits the
+  // transition to 'cancelled'; only confirm/reject are admin-only).
   const findRes = await request.get(
-    `${SUPABASE_URL}/rest/v1/shift_bookings?select=id,shifts!inner(shift_date)&volunteer_id=eq.${volunteerId}&booking_status=in.(confirmed,waitlisted)&shifts.shift_date=eq.${shiftDate}`,
+    `${SUPABASE_URL}/rest/v1/shift_bookings?select=id,shifts!inner(shift_date)&volunteer_id=eq.${volunteerId}&booking_status=in.(confirmed,waitlisted,pending_admin_approval)&shifts.shift_date=eq.${shiftDate}`,
     { headers: headers(volunteerAccessToken) }
   );
   if (!findRes.ok()) return 0;
