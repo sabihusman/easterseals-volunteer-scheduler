@@ -4,6 +4,7 @@ import {
   adminBypassClient,
   anonClient,
   getHarnessUsers,
+  withStorageRetry,
 } from "./clients";
 
 /**
@@ -158,9 +159,9 @@ describe("avatars bucket RLS", () => {
     // volunteer's avatar. Per the brief, any authenticated user can
     // SELECT — this must work.
     const coordinator = await signInAs("coordinator");
-    const { data, error } = await coordinator.storage
-      .from(BUCKET)
-      .createSignedUrl(targetPath, 60);
+    const { data, error } = await withStorageRetry(() =>
+      coordinator.storage.from(BUCKET).createSignedUrl(targetPath, 60)
+    );
 
     expect(error).toBeNull();
     expect(data?.signedUrl).toBeTruthy();

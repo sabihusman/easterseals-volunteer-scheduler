@@ -1,5 +1,5 @@
 import type { APIRequestContext } from "@playwright/test";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./session";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, SERVICE_ROLE_KEY } from "./session";
 
 // Re-export so spec files can import these constants from a single
 // fixtures entry point. The original split between session.ts and
@@ -9,6 +9,28 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./session";
 // satisfy module boundaries was a footgun. Several specs already
 // import these from "./fixtures/db" expecting them to be exported.
 export { SUPABASE_URL, SUPABASE_ANON_KEY };
+
+/**
+ * Headers for invoking a function as service_role (bypasses RLS and
+ * has implicit EXECUTE on every function in `public`).
+ *
+ * Use this ONLY for invoking cron-callback functions
+ * (transition_past_shifts_to_completed, reconcile_shift_counters,
+ * send_self_confirmation_reminders, etc.) that the Phase 2 lockdown
+ * revoked from anon/authenticated. In prod those functions are fired
+ * by pg_cron as the postgres superuser — calling them as service_role
+ * in tests is the closest equivalent. Never use service_role for
+ * routine user-driven REST calls; that path bypasses RLS and will
+ * silently mask authorization bugs the test is supposed to catch.
+ */
+export function serviceRoleHeaders() {
+  return {
+    "Content-Type": "application/json",
+    apikey: SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+    Prefer: "return=representation",
+  };
+}
 
 /**
  * Supabase REST helpers for E2E setup / teardown / verification.
@@ -105,45 +127,85 @@ export async function ensureEmergencyContact(
 }
 
 /**
- * Cancel any active (confirmed/waitlisted) bookings the given
- * volunteer has on the given shift_date. Used as belt-and-suspenders
- * pre-test cleanup so a volunteer's leftover state from a real-life
- * booking or a previous failed test run can't poison the overlap
- * trigger.
+ * Cancel ALL active bookings the given volunteer holds, so leftover
+ * state from a real-life booking or a previous failed/retried test run
+ * can't poison the prevent_overlapping_bookings trigger.
  *
- * Runs as the postgres role via the supabase admin REST endpoint
- * (we use the coordinator's token here, which has SELECT visibility
- * via the dept-coordinator policy; the actual cancel is performed by
- * the volunteer themselves below since UPDATE on shift_bookings is
- * locked to the row's owner).
+ * "Active" = the exact status set the overlap trigger treats as
+ * conflicting: ('confirmed', 'waitlisted', 'pending_admin_approval')
+ * after the Half B-1 minor-approval queue (20260501100001).
+ *
+ * Why no date scoping (despite the `shiftDate` param):
+ *   The previous implementation scoped the SELECT to one date via a
+ *   PostgREST embedded-resource filter:
+ *     ?select=id,shifts!inner(shift_date)&shifts.shift_date=eq.<date>
+ *   That filter silently matched ZERO rows in CI (an embedded-resource
+ *   filter quirk — the parent rows weren't being restricted as
+ *   intended), so the cleanup was a no-op: it cancelled nothing, the
+ *   post-cancel verify saw nothing, and the downstream insert then
+ *   tripped the overlap trigger against the real, never-cancelled
+ *   leftover. This dogged CI runs #1082–#1084 (the
+ *   pending_admin_approval filter widening and the verify step both
+ *   appeared correct but never ran against any rows).
+ *
+ *   The test volunteer is a dedicated account with no bookings worth
+ *   preserving, so the robust fix is to cancel EVERY active booking
+ *   with a single flat query — no embed, no date filter, nothing to
+ *   silently mis-match. The `shiftDate` param is retained for
+ *   call-site compatibility but intentionally unused.
+ *
+ * Runs entirely under service_role: it bypasses RLS (SELECT sees every
+ * row), the `bookings: volunteer cancel` WITH CHECK column locks, and
+ * the enforce_admin_only_approval pending→confirmed/rejected gate
+ * (cancelled is always permitted, but service_role removes ambiguity).
+ * This is test SETUP only, never an assertion path — it does not
+ * bypass any policy the tests exercise. Every response is checked, and
+ * a post-cancel re-query throws if anything survives, converting the
+ * old silent-failure mode into a loud one.
  */
 export async function cancelVolunteerBookingsOnDate(
   request: APIRequestContext,
-  volunteerAccessToken: string,
+  _volunteerAccessToken: string,
   volunteerId: string,
-  shiftDate: string
+  _shiftDate: string
 ): Promise<number> {
-  // First find all active bookings the volunteer has via shifts JOIN.
-  // PostgREST embedded resource syntax: shifts!inner so the join
-  // applies as a filter on the parent.
-  const findRes = await request.get(
-    `${SUPABASE_URL}/rest/v1/shift_bookings?select=id,shifts!inner(shift_date)&volunteer_id=eq.${volunteerId}&booking_status=in.(confirmed,waitlisted)&shifts.shift_date=eq.${shiftDate}`,
-    { headers: headers(volunteerAccessToken) }
-  );
-  if (!findRes.ok()) return 0;
+  const ACTIVE = "(confirmed,waitlisted,pending_admin_approval)";
+  const findUrl =
+    `${SUPABASE_URL}/rest/v1/shift_bookings` +
+    `?select=id,booking_status&volunteer_id=eq.${volunteerId}` +
+    `&booking_status=in.${ACTIVE}`;
+
+  const findRes = await request.get(findUrl, { headers: serviceRoleHeaders() });
+  await expectOk(findRes, "cancelVolunteerBookings: find");
   const rows = (await findRes.json()) as Array<{ id: string }>;
   if (!rows || rows.length === 0) return 0;
-  // Cancel each one (UPDATE booking_status=cancelled).
+
   for (const row of rows) {
-    await request.patch(
+    const patchRes = await request.patch(
       `${SUPABASE_URL}/rest/v1/shift_bookings?id=eq.${row.id}`,
       {
-        headers: headers(volunteerAccessToken),
+        headers: serviceRoleHeaders(),
         data: {
           booking_status: "cancelled",
           cancelled_at: new Date().toISOString(),
         },
       }
+    );
+    await expectOk(patchRes, `cancelVolunteerBookings: cancel ${row.id}`);
+  }
+
+  // Verify the volunteer has no active bookings left — fail loudly here
+  // rather than letting the downstream booking insert hit the overlap
+  // trigger with a confusing P0001.
+  const verifyRes = await request.get(findUrl, { headers: serviceRoleHeaders() });
+  await expectOk(verifyRes, "cancelVolunteerBookings: verify");
+  const remaining = (await verifyRes.json()) as Array<{ id: string }>;
+  if (remaining.length > 0) {
+    throw new Error(
+      `cancelVolunteerBookings: ${remaining.length} active booking(s) still ` +
+        `present for volunteer ${volunteerId} after cancel (ids: ` +
+        `${remaining.map((r) => r.id).join(", ")}). The cancel did not take ` +
+        `effect — investigate before the overlap trigger fires.`
     );
   }
   return rows.length;
