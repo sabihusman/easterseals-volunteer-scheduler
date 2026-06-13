@@ -187,3 +187,22 @@ These SECURITY DEFINER functions are deliberately callable by `anon` and/or `aut
 | `validate_checkin_token(text)` | anon | Kiosk check-in flow uses the project anon key; the function only validates the token and returns a boolean. |
 
 If you're adding a function to this list, you need a security review comment in the PR and a one-line justification in the table above.
+
+## Dependency Updates (Dependabot + bun)
+
+This repo uses **bun**, and CI/deploy run `bun install --frozen-lockfile` against **`bun.lock`** (the single source of truth — `package-lock.json` was removed in #205). Dependabot **cannot maintain `bun.lock`**: it only bumps `package.json`, which then fails the frozen-lockfile check. Because of that, and because unreviewed dependency churn is what caused the 2026-06 lockfile-drift incident (#203/#204), **routine version updates are deliberate, not automated.**
+
+What's configured:
+- **Routine version PRs are silenced** — `open-pull-requests-limit: 0` on both Dependabot ecosystems. Dependabot will not open version-bump PRs.
+- **Security stays on** — Dependabot **alerts** and **security updates** remain enabled (repo Settings → Code security). `open-pull-requests-limit: 0` does not affect them (separate internal limit), and the wildcard `version-update:semver-major` ignore does not affect them either (`update-types` applies to version updates only). A real vulnerability still surfaces.
+  - Caveat: a Dependabot *security-update PR* hits the same `bun.lock` limitation, so it too needs a manual `bun install` to pass CI — but the **alert** fires reliably, and a real vuln warrants a deliberate manual fix anyway.
+
+**To take a dependency update (routine or security):**
+```bash
+# Edit the version in package.json (or check out the Dependabot branch), then:
+bun install            # regenerates bun.lock to match
+git add package.json bun.lock
+git commit -m "chore(deps): bump <pkg> to <version>"
+# The frozen-lockfile check now passes.
+```
+Major bumps are additionally held by the wildcard `semver-major` ignore in `.github/dependabot.yml` — they're deliberate, coordinated upgrades (remove the ignore or bump by hand when ready).
