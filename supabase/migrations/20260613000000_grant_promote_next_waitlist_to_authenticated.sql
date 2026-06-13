@@ -1,0 +1,48 @@
+-- Hotfix: restore EXECUTE on promote_next_waitlist to `authenticated`.
+--
+-- LIVE PROD REGRESSION introduced by the Phase 2 SECURITY DEFINER
+-- lockdown (20260513120000_security_definer_lockdown.sql, PR #196).
+--
+-- That migration revoked EXECUTE on both promote_next_waitlist
+-- signatures from PUBLIC, anon, AND authenticated, classifying the
+-- function as "internal, trigger-invoked only." That classification
+-- was wrong: the two triggers that call it run in the INVOKER's
+-- security context, not as the function owner:
+--
+--   trg_waitlist_promote_on_cancel()  -- LANGUAGE plpgsql, NO SECURITY DEFINER
+--   trg_waitlist_promote_on_delete()  -- LANGUAGE plpgsql, NO SECURITY DEFINER
+--
+-- (Both defined in 20260101000000_baseline.sql ~L2631/L2646.)
+--
+-- Because those triggers are SECURITY INVOKER, when an authenticated
+-- user cancels a confirmed booking (UPDATE booking_status='cancelled')
+-- or an admin deletes a shift with confirmed bookings, the trigger
+-- fires `PERFORM public.promote_next_waitlist(...)` AS THE INVOKING
+-- USER (authenticated). With EXECUTE revoked from authenticated, that
+-- call raises:
+--
+--   ERROR: permission denied for function promote_next_waitlist
+--   SQLSTATE 42501
+--
+-- which aborts the entire cancel/delete. Net effect on prod: every
+-- waitlist-promoting booking cancellation, and every admin shift
+-- deletion involving confirmed bookings, returns HTTP 403. Surfaced
+-- by the e2e suite (04-admin-delete-shift) once PR #197 unblocked the
+-- test far enough to reach the delete step.
+--
+-- Fix: grant EXECUTE back to `authenticated`. anon stays revoked —
+-- anon never cancels or deletes bookings, so it has no legitimate
+-- path to this function. This restores the pre-#196 (grandfathered)
+-- behavior; the function is SECURITY DEFINER, so granting EXECUTE to
+-- authenticated only lets them INVOKE it (e.g. via the trigger) — it
+-- does not widen what the function itself can do.
+--
+-- The other helpers #196 revoked from authenticated were re-checked
+-- and are NOT affected: their only non-cron callers are SECURITY
+-- DEFINER functions (which run as the owner, so the revoke is
+-- harmless). promote_next_waitlist is the sole invoker-context case.
+-- See CONTRIBUTING.md ("Before revoking EXECUTE from authenticated...")
+-- for the rule that prevents this class of regression.
+
+GRANT EXECUTE ON FUNCTION public.promote_next_waitlist(uuid)        TO authenticated;
+GRANT EXECUTE ON FUNCTION public.promote_next_waitlist(uuid, uuid)  TO authenticated;
