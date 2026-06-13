@@ -5,7 +5,15 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    # Routine version-update PRs are silenced (0). Dependabot cannot
+    # maintain bun.lock — this repo's frozen lockfile — so it only bumps
+    # package.json, which then fails `bun install --frozen-lockfile`
+    # (package-lock.json was removed in #205). Routine bumps are taken
+    # MANUALLY instead (bump package.json → `bun install` → commit both;
+    # see CONTRIBUTING.md). This does NOT affect Dependabot security
+    # updates (separate internal limit) or vulnerability alerts — both
+    # stay enabled at the repo level.
+    open-pull-requests-limit: 0
     labels:
       - dependencies
     # Split-package majors Dependabot can't coordinate correctly — it
@@ -108,6 +116,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 5
+    # Routine version-update PRs silenced (0) — Actions are bumped
+    # deliberately. Security updates / alerts are unaffected.
+    open-pull-requests-limit: 0
     labels:
       - dependencies
