@@ -35,7 +35,15 @@ export const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 // We use service_role ONLY for sign-in; all subsequent requests use
 // the user-scoped access_token with the anon key, so RLS still
 // applies normally.
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+//
+// One narrow second use: invoking cron-callback functions
+// (transition_past_shifts_to_completed et al.) that the Phase 2
+// SECURITY DEFINER lockdown revoked from anon/authenticated. In prod
+// these are fired by pg_cron as the postgres superuser. Tests don't
+// wait for cron — they need to force the transition deterministically
+// — so they invoke as service_role, which mirrors the prod execution
+// context. See serviceRoleHeaders() in fixtures/db.ts.
+export const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 export type TestRole = "volunteer" | "coordinator" | "admin";
 

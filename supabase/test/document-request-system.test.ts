@@ -23,7 +23,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { signInAs, anonClient, adminBypassClient, getHarnessUsers } from "./clients";
+import { signInAs, anonClient, adminBypassClient, getHarnessUsers, withStorageRetry } from "./clients";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const STORAGE_BUCKET = "volunteer-documents";
@@ -171,9 +171,11 @@ describe("Document Request & Upload System — RLS, state machine, triggers", ()
     const { storagePath } = await stageVolunteerDocumentRow(users.volunteer.id, "approved");
 
     // Upload a stub object to the path so storage has something to sign.
-    const { error: uploadErr } = await admin.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, new Blob(["test"], { type: "application/pdf" }), { upsert: true });
+    const { error: uploadErr } = await withStorageRetry(() =>
+      admin.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, new Blob(["test"], { type: "application/pdf" }), { upsert: true })
+    );
     expect(uploadErr).toBeNull();
 
     const { data, error } = await coordinator.storage
@@ -373,9 +375,9 @@ describe("Document Request & Upload System — RLS, state machine, triggers", ()
     // earlier `list()` approach didn't work because list only enumerates
     // immediate children of the folder arg, and our path has a
     // requestId subfolder between the volunteer dir and the file.)
-    const { data: stillThere, error: dlError } = await admin.storage
-      .from(STORAGE_BUCKET)
-      .download(storagePath);
+    const { data: stillThere, error: dlError } = await withStorageRetry(() =>
+      admin.storage.from(STORAGE_BUCKET).download(storagePath)
+    );
     expect(dlError).toBeNull();
     expect(stillThere).not.toBeNull();
   });
@@ -389,9 +391,11 @@ describe("Document Request & Upload System — RLS, state machine, triggers", ()
     // Volunteer uploads (simulating the submit_document flow inline,
     // since the RPC needs the storage object to exist first).
     const storagePath = `${users.volunteer.id}/${requestId}/happy-${Date.now()}.pdf`;
-    const { error: uploadErr } = await volunteer.storage
-      .from(STORAGE_BUCKET)
-      .upload(storagePath, new Blob(["happy"], { type: "application/pdf" }));
+    const { error: uploadErr } = await withStorageRetry(() =>
+      volunteer.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, new Blob(["happy"], { type: "application/pdf" }))
+    );
     expect(uploadErr).toBeNull();
     tracker.storagePaths.push(storagePath);
 

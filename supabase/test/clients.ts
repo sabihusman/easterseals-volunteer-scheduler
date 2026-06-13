@@ -79,3 +79,55 @@ export async function signInAs(
   }
   return client;
 }
+
+/**
+ * Retry a supabase-js storage operation that returns `{ data, error }`
+ * when the local storage emulator answers with a transient upstream
+ * error.
+ *
+ * The CI storage-api container intermittently returns HTTP 502
+ * ("An invalid response was received from the upstream server") on
+ * `upload` / `download` / `createSignedUrl` under load — a container
+ * health blip, never a correct response to assert on. This blocked the
+ * RLS harness on avatars-bucket and document-request-system tests
+ * (CI run #1084).
+ *
+ * Retry policy:
+ *   - Retry only on 5xx (or a thrown network error). A 5xx is by
+ *     definition not a legitimate result.
+ *   - Return immediately on success OR on any 4xx — a 4xx (e.g. 403
+ *     RLS-denied, 404 not-found) is a real result the test wants to
+ *     assert on, so it must NOT be retried or swallowed.
+ *   - After `attempts` exhausted, return the last result so the
+ *     caller's `expect(error).toBeNull()` still fails loudly with the
+ *     502 surfaced (a persistent outage is a real failure).
+ *
+ * Usage:
+ *   const { data, error } = await withStorageRetry(() =>
+ *     client.storage.from(BUCKET).createSignedUrl(path, 60));
+ */
+export async function withStorageRetry<T extends { error: unknown }>(
+  op: () => Promise<T>,
+  attempts = 5,
+): Promise<T> {
+  let result!: T;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      result = await op();
+    } catch (err) {
+      // Thrown (network-level) error — treat as transient and retry.
+      if (attempt === attempts) throw err;
+      await new Promise((r) => setTimeout(r, 250 * attempt));
+      continue;
+    }
+    const status = Number(
+      (result.error as { status?: number | string } | null)?.status ?? 0,
+    );
+    // Success, or a real (sub-500) error the test should assert on.
+    if (!result.error || (status > 0 && status < 500)) return result;
+    if (attempt < attempts) {
+      await new Promise((r) => setTimeout(r, 250 * attempt));
+    }
+  }
+  return result;
+}
