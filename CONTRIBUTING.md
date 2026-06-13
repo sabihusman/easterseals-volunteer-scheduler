@@ -149,6 +149,26 @@ GRANT  EXECUTE ON FUNCTION public.new_admin_rpc(...) TO authenticated;
 -- table in CONTRIBUTING.md.
 ```
 
+> **⚠️ Before revoking EXECUTE from `authenticated` on ANY function, check
+> whether an invoker-context (non-`SECURITY DEFINER`) trigger calls it.**
+> If so, `authenticated` MUST keep EXECUTE — a `SECURITY INVOKER` trigger
+> runs as the user who fired it, so when an authenticated user's
+> INSERT/UPDATE/DELETE fires the trigger, the trigger's call to the helper
+> is checked against *that user's* grants. Revoking it makes the whole
+> operation fail with `42501 permission denied for function ...`.
+>
+> This is exactly how PR #196 broke `promote_next_waitlist` in production:
+> it's called by `trg_waitlist_promote_on_cancel` / `trg_waitlist_promote_on_delete`
+> (both `LANGUAGE plpgsql`, no `SECURITY DEFINER`), so revoking it from
+> `authenticated` made every booking cancellation / shift deletion 403.
+> Fixed in `20260613000000_grant_promote_next_waitlist_to_authenticated.sql`.
+>
+> Quick check before a REVOKE: `grep` the function name across migrations
+> for `PERFORM`/`SELECT` callers, and for each caller confirm it's either
+> `SECURITY DEFINER` (safe — runs as owner) or pg_cron-only (safe). If a
+> plain `LANGUAGE plpgsql` trigger function calls it, use Pattern B
+> (keep `authenticated`), not Pattern A.
+
 ### Bucket B — intentional anon/authenticated exposure (do not lock down)
 
 These SECURITY DEFINER functions are deliberately callable by `anon` and/or `authenticated`. Supabase Security Advisor will flag them on every scan; the rationale below is the answer.
