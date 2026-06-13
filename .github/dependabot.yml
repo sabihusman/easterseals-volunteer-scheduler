@@ -40,6 +40,18 @@ updates:
     #     hands-on migration. Closed; ignoring majors here until the
     #     plugin ecosystem catches up.
     ignore:
+      # Catch-all: hold ALL major version bumps for manual review.
+      # Added 2026-06 after a batch of unevaluated Dependabot MAJOR bumps
+      # (zod 3→4, @hookform/resolvers 3→5, react-router-dom 6→7,
+      # lucide-react 0→1, sonner 1→2, vaul 0→1) silently drifted the
+      # lockfile and broke the test suite — reverted in PR #203, with a
+      # prod hotfix in #204. Majors are now deliberate, validated manual
+      # upgrades (remove this rule or open by hand when ready); patch +
+      # minor still open normally. The per-package entries below predate
+      # this wildcard and are now subsumed by it — kept for the incident
+      # history their comments document.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
       # ESLint ecosystem
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
