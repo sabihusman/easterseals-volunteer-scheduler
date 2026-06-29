@@ -1,0 +1,38 @@
+# Secrets / credentials
+break-glass.txt
+.env
+.env.*
+**/.env
+**/.env.*
+*.key
+*.pem
+.mcp.json
+.claude/
+**/credentials*
+**/*secret*
+**/*token*
+
+# Edge-function local secrets (nested env file — real MailerSend/Twilio/
+# service-role values live here). Covered by **/.env.* above; listed
+# explicitly for clarity.
+supabase/.env.local
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+.vercel/
+
+# Graphify's own output
+graphify-out/
+
+# NOTE — intentionally NOT ignored: supabase/migrations/**.sql and
+# docs/migration-history/**.sql. These hold the schema / RLS / auth-flow
+# structure this eval is meant to surface. They DO contain a hardcoded
+# Supabase ANON (publishable) key — but that key is public by design
+# (it ships in the browser bundle; see .env.example). It is NOT the
+# service_role key. No true secret lives in source. If you'd rather keep
+# even the public key out of the local graph, add:
+#   supabase/migrations/
+#   docs/migration-history/
+# (at the cost of losing most of the schema structure from the graph).
